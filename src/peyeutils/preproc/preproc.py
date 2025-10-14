@@ -2,9 +2,15 @@ from peyeutils.defs import *;
 from peyeutils.utils.tsutils import *;
 from peyeutils.utils.statutils import *;
 from peyeutils.utils.nputils import *;
+from peyeutils.utils.unitutils import *;
 import pandas as pd;
 import numpy as np;
 import math;
+
+def preproc_SHARED_D_exclude_bad(df, xcol, ycol, badcol='bad'):
+    df.loc[ True==df[badcol], [xcol,ycol] ] = np.nan;
+    return df;
+
 
 #REV: should find a way to "keep" all the raw data but just set "Bad" flags? Fuck...
 def preproc_SHARED_C_binoc_gaze(df,
@@ -326,7 +332,7 @@ def preproc_SHARED_pupilsize(sampledf,
         
         print("EYE: {} (NEWCOL: {})".format(eye, newcol));
         print(diffdf.groupby(newcol, dropna=False).count().sort_values(by='Tsec'));
-        print("NUM NANs in PA {}/{}".format(diffdf[newcol].isna().sum(), len(diffdf.index)));
+        print("NUM NANs in PA {}/{} (eye=={})".format(diffdf[newcol].isna().sum(), len(diffdf.index), eye));
         print(diffdf[newcol].dtype);
         print("PAdelta {}: Mean {},  Med {},  {}-{}".format(newcol, diffdf[newcol].mean(),
                                                             diffdf[newcol].median(),

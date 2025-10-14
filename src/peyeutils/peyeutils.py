@@ -3,13 +3,17 @@
 ## Does not do anything with events other than mark blinks...
 #REV: could pass other info here...
 import os;
-import peyeutils.eyelink.eyelink, peyeutils.peyefreeviewing.msgutils;
+import peyeutils.eyelink.eyelink;
+import peyeutils.preproc.preproc;
+
+import peyeutils.peyefv.msgutils;
+
 from peyeutils.utils.fsutils import *;
 import pandas as pd;
 
-def preproc_eyelink_edf( in_edf_path,
-                         out_csv_path = None,
-                        ):
+def preproc_peyefv_edf( in_edf_path,
+                                out_csv_path = None,
+                               ):
     '''
     Returns SAMPS, MSGS, TRIALBLOCKDF, BLOCKDF, ROWDICT, ERRORBOOL
     '''
@@ -68,8 +72,11 @@ def preproc_eyelink_edf( in_edf_path,
         pass;
     
     df, ev, msgs, badtrial = peyeutils.eyelink.eyelink.preproc_EL_A_clean_samples(s,e,m);
+    df = peyeutils.eyelink.eyelink.preproc_EL_rawcalib_px(df, msgs);
+    df = peyeutils.peyefv.msgutils.preproc_peyefreeviewing_dva_from_flatscreen(df, msgs);
+    df = peyeutils.preproc.preproc.preproc_SHARED_C_binoc_gaze(df, xcol='cgx_dva', ycol='cgy_dva', tcol='Tsec0', exclude_thresh=2);
+    #df = preproc_SHARED_D_exclude_bad( df, xcol='cgx_dva', ycol='cgy_dva', badcol='bad' );
     
-
     if( out_csv_path ):
         #REV: preprocessed messages etc.
         sfn = fname + '.samples.csv'
@@ -88,10 +95,10 @@ def preproc_eyelink_edf( in_edf_path,
         row['events_csv'] = efn;
         row['messages_csv'] = mfn;
         pass;
-            
+    
         
     
-    trialdf = peyeutils.peyefreeviewing.msgutils.import_fmri_trials( msgs );
+    trialdf = peyeutils.peyefv.msgutils.import_fmri_trials( msgs );
     if( badtrial ):
         #trialdf['haseyetracking'] = False;
         haseyetracking=False;
@@ -99,11 +106,23 @@ def preproc_eyelink_edf( in_edf_path,
         pass;
     
         
-    blockdf, trialblockdf = peyeutils.peyefreeviewing.msgutils.import_fmri_blocks(msgs, df, trialdf);
+    blockdf, blocktrialdf = peyeutils.peyefv.msgutils.import_fmri_blocks(msgs, df, trialdf);
+        
     trialdf['haseyetracking']=haseyetracking;
-    trialblockdf['haseyetracking']=haseyetracking;
+    blocktrialdf['haseyetracking']=haseyetracking;
     blockdf['haseyetracking']=haseyetracking;
     row['haseyetracking'] = haseyetracking;
+
+    if( out_csv_path ):
+        btfname=fname+'.blocktrials.csv';
+        bfname=fname+'.blocks.csv';
+        btpath=os.path.join(out_csv_path, btfname);
+        bpath=os.path.join(out_csv_path, bfname);
+        blocktrialdf.to_csv(btpath);
+        blockdf.to_csv(bpath);
+        
+        row['blocktrials_csv'] = btfname;
+        row['blocks_csv'] = bfname;
+        pass;
     
-    
-    return df, msgs, trialblockdf, blockdf, row, error;
+    return df, msgs, blocktrialdf, blockdf, row, error;
