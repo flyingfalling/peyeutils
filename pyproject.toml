@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools >= 77.0.3","numpy", "scipy", "pandas"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "peyeutils"
+version = "0.0.1"
+authors = [
+  { name="Richard Veale", email="richard.e.veale@gmail.com" },
+]
+description = "p(e)y(e) utils -- utilities for running/analyzing eyetracking and neurophysiology experiments"
+readme = "README.md"
+requires-python = ">=3.10"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Operating System :: OS Independent",
+]
+license = "MIT"
+license-files = ["LICEN[CS]E*"]
+
+[project.urls]
+Homepage = "https://github.com/flyingfalling/peyeutils"
+Issues = "https://github.com/flyingfalling/peyeutils/issues"
