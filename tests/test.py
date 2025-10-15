@@ -280,7 +280,9 @@ def plotit(edfrow, out_csv_path):
 
 
 def test1(out_csv_path):
-    s, m, bt, b, row, error = peyeutils.peyeutils.preproc_peyefv_edf('/home/riveale/richard_home/git/freeviewingsvn/data/bigsmall/nakazawa20251003/PYFREE_nakazawa_SIZEDVA_10__endrec_start_2025-10-03-11-07-42_end_2025-10-03-11-12-52.edf', out_csv_path=out_csv_path)
+    #fn='/mnt/coishare/data/freeviewing/data/bigsmall/nakazawa20251003/PYFREE_nakazawa_SIZEDVA_10__endrec_start_2025-10-03-11-07-42_end_2025-10-03-11-12-52.edf';
+    fn='/mnt/coishare/data/freeviewing/data/bigsmall/ozaki20250909/PYFREE_ozaki_SIZEDVA_10__endrec_start_2025-09-09-17-14-52_end_2025-09-09-17-20-28.edf'
+    s, m, bt, b, row, error = peyeutils.peyeutils.preproc_peyefv_edf(fn, out_csv_path=out_csv_path);
     
     print(s);
     print(bt);

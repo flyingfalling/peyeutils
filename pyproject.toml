@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools >= 77.0.3","numpy", "scipy", "pandas", "statsmodels"]
+requires = ["setuptools >= 77.0.3"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -8,6 +8,7 @@ version = "0.0.1"
 authors = [
   { name="Richard Veale", email="richard.e.veale@gmail.com" },
 ]
+dependencies=["numpy", "scipy", "pandas", "statsmodels", "matplotlib",]
 description = "p(e)y(e) utils -- utilities for running/analyzing eyetracking and neurophysiology experiments"
 readme = "README.md"
 requires-python = ">=3.10"
