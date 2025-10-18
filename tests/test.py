@@ -1,17 +1,16 @@
-import peyeutils.peyeutils
+import peyeutils as pu;
+
 import pandas as pd;
 import os;
 import matplotlib.pyplot as plt;
 import numpy as np;
+import sys;
 
-import peyeutils.peyefv.msgutils as mu;
-import peyeutils.utils.tsutils as ts;
-from peyeutils.preproc.preproc import *;
 
 def plotit(edfrow, out_csv_path):
     msgdf = pd.read_csv( os.path.join(out_csv_path, edfrow['messages_csv']) );
     
-    elparamdict = mu.get_elparams(msgdf); # has samplerate etc.
+    elparamdict = pu.peyefv.get_elparams(msgdf); # has samplerate etc.
     ELsr=elparamdict['samplerate'];
     sampdf = pd.read_csv( os.path.join(out_csv_path, edfrow['samples_csv']) );
     edftrials=pd.read_csv( os.path.join(out_csv_path, edfrow['blocktrials_csv']) );
@@ -146,7 +145,7 @@ def plotit(edfrow, out_csv_path):
             #badvar='bad';
             off2=0;
             for badvar in badvals:
-                baddf = ts.cond_rle_df( bsamps[badvar], val=True, t=bsamps[tvar] );
+                baddf = pu.utils.cond_rle_df( bsamps[badvar], val=True, t=bsamps[tvar] );
                 xlines=list();
                 for i, arow in baddf.iterrows():
                     if( arow.v == True  and
@@ -228,8 +227,8 @@ def plotit(edfrow, out_csv_path):
         #REV: do some smoothing...
         eyedata = blocksamps[ blocksamps.eye == 'B' ];
         eyedata = eyedata.sort_values(by='Tsec').reset_index(drop=True);
-        eyedata = preproc_SHARED_D_exclude_bad( eyedata, xcol='cgx_dva', ycol='cgy_dva',
-                                                badcol='bad' );
+        eyedata = pu.preproc.preproc_SHARED_D_exclude_bad( eyedata, xcol='cgx_dva', ycol='cgy_dva',
+                                                           badcol='bad' );
         from datetime import timedelta
         timecol='Tsec';
         smoothtimename='__'+timecol;
@@ -281,8 +280,15 @@ def plotit(edfrow, out_csv_path):
 
 def test1(out_csv_path):
     #fn='/mnt/coishare/data/freeviewing/data/bigsmall/nakazawa20251003/PYFREE_nakazawa_SIZEDVA_10__endrec_start_2025-10-03-11-07-42_end_2025-10-03-11-12-52.edf';
-    fn='/mnt/coishare/data/freeviewing/data/bigsmall/ozaki20250909/PYFREE_ozaki_SIZEDVA_10__endrec_start_2025-09-09-17-14-52_end_2025-09-09-17-20-28.edf'
-    s, m, bt, b, row, error = peyeutils.peyeutils.preproc_peyefv_edf(fn, out_csv_path=out_csv_path);
+    if( len(sys.argv) < 2 ):
+        fn='/mnt/coishare/data/freeviewing/data/bigsmall/ozaki20250909/PYFREE_ozaki_SIZEDVA_10__endrec_start_2025-09-09-17-14-52_end_2025-09-09-17-20-28.edf';
+        pass;
+    else:
+        fn=sys.argv[1];
+        pass;
+    print("Setting input EDF filename to [{}]".format(fn));
+    
+    s, m, bt, b, row, error = pu.preproc_peyefv_edf(fn, out_csv_path=out_csv_path);
     
     print(s);
     print(bt);
@@ -306,7 +312,13 @@ def test2(row, out_csv_path):
 def main():
     outcsv='outcsvs';
     row = test1(out_csv_path=outcsv);
-    test2(row, out_csv_path=outcsv);
+    print("MY ROW", row);
+    if( False == row['edferror'] ):
+        test2(row, out_csv_path=outcsv);
+        pass;
+    else:
+        print("Empty row, i.e. no file?");
+        pass;
     return 0;
 
 if __name__=='__main__':

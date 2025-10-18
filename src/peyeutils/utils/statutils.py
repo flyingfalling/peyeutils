@@ -1,4 +1,5 @@
 import numpy as np;
+import pandas as pd;
 
 def mean_std_on_2d_axis( mat, flattento='x', norm=True ):
     if(len(mat.shape) != 2):

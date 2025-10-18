@@ -9,6 +9,7 @@ authors = [
   { name="Richard Veale", email="richard.e.veale@gmail.com" },
 ]
 dependencies=["numpy", "scipy", "pandas", "statsmodels", "matplotlib",]
+#optional_dependencies=["psychopy", "pyedfread",]
 description = "p(e)y(e) utils -- utilities for running/analyzing eyetracking and neurophysiology experiments"
 readme = "README.md"
 requires-python = ">=3.10"

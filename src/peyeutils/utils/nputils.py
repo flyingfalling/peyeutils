@@ -1,4 +1,4 @@
-import numpy as np
+import numpy as np;
 
 def linsteps(start, stop, step, pastend=True):
     if( pastend ):

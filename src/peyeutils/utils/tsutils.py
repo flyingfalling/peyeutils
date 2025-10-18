@@ -1,14 +1,8 @@
-from peyeutils.utils.nputils import linsteps;
 import numpy as np;
 import pandas as pd;
+import peyeutils as pu;
 
-from scipy import stats; #.median_abs_deviation as smad;
-from statsmodels.robust.scale import mad;
-from scipy import signal
-from scipy import ndimage
-from scipy.signal import savgol_filter
-from scipy.ndimage import median_filter
-
+from scipy import ndimage;
 
 def select_legal_timepoints4(ts, vals, maxdt):
     
@@ -130,7 +124,7 @@ def interpolate_df_to_samplerate(df, tcol, targ_srhzsec, tcolunit_s, truesrs=dic
     
     if( ((en-st)/dt) > 1e9 ):
         raise Exception("you are attempting to create more than 1 billion time points at once...probably you will run out of memory");
-    samps = linsteps( st, en, dt );
+    samps = pu.utils.linsteps( st, en, dt );
         
     tdf = pd.DataFrame();
     tdf[tcol] = samps;
@@ -275,6 +269,7 @@ def interpolate_df_to_samplerate(df, tcol, targ_srhzsec, tcolunit_s, truesrs=dic
 
 
 def get_dilated_nan_mask(arr, iterations, max_ignore_size=None):
+    from scipy import ndimage
     clusters, nclusters = ndimage.label(np.isnan(arr))
     # go through all clusters and remove any cluster that is less
     # the max_ignore_size

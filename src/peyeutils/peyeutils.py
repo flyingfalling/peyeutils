@@ -2,14 +2,17 @@
 #REV: runs preprocessing and saves .csv files in specified dir
 ## Does not do anything with events other than mark blinks...
 #REV: could pass other info here...
+#import peyeutils.eyelink.eyelink;
+#import peyeutils.preproc.preproc;
+
+#import peyeutils.peyefv.msgutils;
+
+#from peyeutils.utils.fsutils import *;
+#import peyeutils.utils as ut;
+import peyeutils as pu;
 import os;
-import peyeutils.eyelink.eyelink;
-import peyeutils.preproc.preproc;
-
-import peyeutils.peyefv.msgutils;
-
-from peyeutils.utils.fsutils import *;
 import pandas as pd;
+import numpy as np;
 
 def preproc_peyefv_edf( in_edf_path,
                                 out_csv_path = None,
@@ -19,7 +22,8 @@ def preproc_peyefv_edf( in_edf_path,
     '''
 
     if( out_csv_path ):
-        create_dir(out_csv_path);
+        
+        pu.utils.create_dir(out_csv_path);
         pass
     
     import pyedfread;
@@ -71,10 +75,10 @@ def preproc_peyefv_edf( in_edf_path,
         row['edfmessages_csv'] = mfn;
         pass;
     
-    df, ev, msgs, badtrial = peyeutils.eyelink.eyelink.preproc_EL_A_clean_samples(s,e,m);
-    df = peyeutils.eyelink.eyelink.preproc_EL_rawcalib_px(df, msgs);
-    df = peyeutils.peyefv.msgutils.preproc_peyefreeviewing_dva_from_flatscreen(df, msgs);
-    df = peyeutils.preproc.preproc.preproc_SHARED_C_binoc_gaze(df, xcol='cgx_dva', ycol='cgy_dva', tcol='Tsec0', exclude_thresh=2);
+    df, ev, msgs, badtrial = pu.eyelink.preproc_EL_A_clean_samples(s,e,m);
+    df = pu.eyelink.preproc_EL_rawcalib_px(df, msgs);
+    df = pu.peyefv.preproc_peyefreeviewing_dva_from_flatscreen(df, msgs);
+    df = pu.preproc.preproc_SHARED_C_binoc_gaze(df, xcol='cgx_dva', ycol='cgy_dva', tcol='Tsec0', exclude_thresh=2);
     #df = preproc_SHARED_D_exclude_bad( df, xcol='cgx_dva', ycol='cgy_dva', badcol='bad' );
     
     if( out_csv_path ):
@@ -98,7 +102,7 @@ def preproc_peyefv_edf( in_edf_path,
     
         
     
-    trialdf = peyeutils.peyefv.msgutils.import_fmri_trials( msgs );
+    trialdf = pu.peyefv.import_fmri_trials( msgs );
     if( badtrial ):
         #trialdf['haseyetracking'] = False;
         haseyetracking=False;
@@ -106,7 +110,7 @@ def preproc_peyefv_edf( in_edf_path,
         pass;
     
         
-    blockdf, blocktrialdf = peyeutils.peyefv.msgutils.import_fmri_blocks(msgs, df, trialdf);
+    blockdf, blocktrialdf = pu.peyefv.import_fmri_blocks(msgs, df, trialdf);
         
     trialdf['haseyetracking']=haseyetracking;
     blocktrialdf['haseyetracking']=haseyetracking;

@@ -1,15 +1,25 @@
-from peyeutils.defs import *;
-from peyeutils.peyefv.msgutils import *;
-from peyeutils.utils.tsutils import *;
-from peyeutils.utils.nputils import *;
-from peyeutils.preproc.preproc import *;
-from peyeutils.utils.unitutils import *;
+#from peyeutils.defs import *;
+#from peyeutils.peyefv.msgutils import *;
 
-import pandas as pd;
 import numpy as np;
+import pandas as pd;
+
+import peyeutils as pu;
+
+import peyeutils.peyefv as pfv;
+import peyeutils.utils as ut;
+import peyeutils.eyelink as el;
+
+#from peyeutils.utils.tsutils import *;
+#from peyeutils.utils.nputils import *;
+#from peyeutils.utils.unitutils import *;
+
+import peyeutils.preproc as pre;
+#from peyeutils.preproc.preproc import *;
 
 
-def preproc_EL_A00_add_Tsec(rawdf, timecol='time', timeunitsec=EL_TIMEUNIT_SEC):
+
+def preproc_EL_A00_add_Tsec(rawdf, timecol='time', timeunitsec=pu.EL_TIMEUNIT_SEC):
     tvals = rawdf[timecol];
     rawdf = rawdf[ [c for c in rawdf.columns if c!=timecol] ]; #drop old timecol
     rawdf['EL'+timecol] = tvals;
@@ -25,7 +35,7 @@ def preproc_EL_A01_separate_samps_eye( samples,
                                        tname='Tmsec',
                                        tsecname='Tsec',
                                        eyename='eye',
-                                       eyes_to_use=[PEYEUTILS_LEFT_EYE, PEYEUTILS_RIGHT_EYE],
+                                       eyes_to_use=[pu.PEYEUTILS_LEFT_EYE, pu.PEYEUTILS_RIGHT_EYE],
                                        timeunit=1e-3,
                                        exclude_EL_blinks=False,
                                        ELcutoff=30000, #REV: their representtaion of NAN is like 100000000.. ):
@@ -45,7 +55,7 @@ def preproc_EL_A01_separate_samps_eye( samples,
     #samples = resample_at_rate_nearest( samples, samples[ELtname].min(), samples[ELtname].max(), ELtname, samplerate, timeunit );
         
     #REV: should replace NULL first?
-    samples = interpolate_df_to_samplerate( samples, tcol=ELtname, targ_srhzsec=samplerate, tcolunit_s=timeunit, );
+    samples = ut.interpolate_df_to_samplerate( samples, tcol=ELtname, targ_srhzsec=samplerate, tcolunit_s=timeunit, );
     #samples = interpolate_df_to_samplerate( samples, tcol=tsecname, targ_srhzsec=samplerate, tcolunit_s=1 );
     print("Finished resampling");
     print(samples);
@@ -133,20 +143,20 @@ def preproc_EL_A01_separate_samps_eye( samples,
     ldf.rename(columns=ldict, inplace=True);
     rdf.rename(columns=rdict, inplace=True);
     
-    ldf['ELeye']=EL_LEFT_EYE;
-    rdf['ELeye']=EL_RIGHT_EYE;
+    ldf['ELeye']=pu.EL_LEFT_EYE;
+    rdf['ELeye']=pu.EL_RIGHT_EYE;
     
-    ldf[eyename] = PEYEUTILS_LEFT_EYE;
-    rdf[eyename] = PEYEUTILS_RIGHT_EYE;
+    ldf[eyename] = pu.PEYEUTILS_LEFT_EYE;
+    rdf[eyename] = pu.PEYEUTILS_RIGHT_EYE;
     
     ldf['useeye']=False;
     rdf['useeye']=False;
 
-    if( PEYEUTILS_LEFT_EYE in eyes_to_use ):
+    if( pu.PEYEUTILS_LEFT_EYE in eyes_to_use ):
         print("USING LEFT EYE");
         ldf['useeye']=True;
         pass;
-    if( PEYEUTILS_RIGHT_EYE in eyes_to_use ):
+    if( pu.PEYEUTILS_RIGHT_EYE in eyes_to_use ):
         print("USING RIGHT EYE");
         rdf['useeye']=True;
         pass;
@@ -175,7 +185,7 @@ def preproc_EL_A01_separate_samps_eye( samples,
         if( clean_errors ):
             df.loc[ (df.errors != 0), ['gx', 'gy'] ] = np.nan;
         fixed=True;
-        if( allnan( df['gx'] ) ):
+        if( pu.utils.allnan( df['gx'] ) ):
             #raise Exception("EYEUTILS -> GOODLR -> WTF ALL NAN IN GOOD LR AFTER ELCUTOFF");
             print("WARNING -> ALL GX DATA IS NAN AFTER CUTOFF->NAN");
             pass;
@@ -186,7 +196,7 @@ def preproc_EL_A01_separate_samps_eye( samples,
         if( clean_errors ):
             df.loc[ (df.errors != 0), ['px', 'py'] ] = np.nan;
         fixed=True;
-        if( allnan( df['px'] ) ):
+        if( pu.utils.allnan( df['px'] ) ):
             #raise Exception("EYEUTILS -> GOODLR -> WTF ALL NAN IN GOOD LR AFTER CUTOFF");
             print("WARNING -> ALL PX DATA IS NAN AFTER CUTOFF->NAN");
             pass;
@@ -197,7 +207,7 @@ def preproc_EL_A01_separate_samps_eye( samples,
         if( clean_errors ):
             df.loc[ (df.errors != 0), ['hx', 'hy'] ] = np.nan;
         fixed=True;
-        if( allnan( df['hx'] ) ):
+        if( pu.utils.allnan( df['hx'] ) ):
             #raise Exception("EYEUTILS -> GOODLR -> WTF ALL NAN IN GOOD LR AFTER CUTOFF");
             print("WARNING -> ALL PX DATA IS NAN AFTER CUTOFF->NAN");
             pass;
@@ -212,7 +222,7 @@ def preproc_EL_A01_separate_samps_eye( samples,
         if( clean_errors ):
             df.loc[ (df.errors != 0), [pacol] ] = np.nan;
             pass;
-        if( allnan( df[pacol] ) ):
+        if( pu.utils.allnan( df[pacol] ) ):
             #raise Exception("EYEUTILS -> GOODLR -> WTF ALL NAN IN GOOD LR AFTER CUTOFF");
             print("WARNING -> ALL PA DATA IS NAN AFTER CUTOFF->NAN");
             pass;
@@ -227,7 +237,7 @@ def preproc_EL_A01_separate_samps_eye( samples,
 
 def preproc_EL_A02_clean_events(eventdf,
                                 timeunitsec=1e-3,
-                                eyes_to_use=[PEYEUTILS_LEFT_EYE, PEYEUTILS_RIGHT_EYE],
+                                eyes_to_use=[pu.PEYEUTILS_LEFT_EYE, pu.PEYEUTILS_RIGHT_EYE],
                                 ):
     
     containblinkcol='contains_blink';
@@ -259,8 +269,8 @@ def preproc_EL_A02_clean_events(eventdf,
     eventdf['eye'] = 'X'; #ERROR
     
     if( len(eventdf.index) > 0 ):
-        lev = eventdf[eventdf.ELeye==EL_LEFT_EYE].copy();
-        rev = eventdf[eventdf.ELeye==EL_RIGHT_EYE].copy();
+        lev = eventdf[eventdf.ELeye==pu.EL_LEFT_EYE].copy();
+        rev = eventdf[eventdf.ELeye==pu.EL_RIGHT_EYE].copy();
         
         ## use same "names" as remodnav...
         lev.loc[ (lev.ELevlabel=='saccade'), 'ELevlabel' ] = 'SACC';
@@ -284,21 +294,21 @@ def preproc_EL_A02_clean_events(eventdf,
             pass;
         
         if( len(lev.index)>0 ):
-            lev['eye'] = PEYEUTILS_LEFT_EYE; #REV: set to "my" labels (not eyelink anymore)
+            lev['eye'] = pu.PEYEUTILS_LEFT_EYE; #REV: set to "my" labels (not eyelink anymore)
             lev['stsec'] = lev.start * timeunitsec;
             lev['ensec'] = lev.end * timeunitsec;
             lev['useeye']=False;
-            if( PEYEUTILS_LEFT_EYE in eyes_to_use ):
+            if( pu.PEYEUTILS_LEFT_EYE in eyes_to_use ):
                 lev['useeye']=True;
                 pass;
             pass;
         
         if( len(rev.index)>0 ):
-            rev['eye'] = PEYEUTILS_RIGHT_EYE;
+            rev['eye'] = pu.PEYEUTILS_RIGHT_EYE;
             rev['stsec'] = rev.start * timeunitsec;
             rev['ensec'] = rev.end * timeunitsec;
             rev['useeye']=False;
-            if( PEYEUTILS_RIGHT_EYE in eyes_to_use ):
+            if( pu.PEYEUTILS_RIGHT_EYE in eyes_to_use ):
                 rev['useeye']=True;
                 pass;
             pass;
@@ -323,11 +333,11 @@ def preproc_EL_A_clean_samples(rawsamps, rawevents, rawmessages,
                                preblinks=False):
     
     
-    msgs = separate_EDF_msg_tags(rawmessages);
+    msgs = pfv.separate_EDF_msg_tags(rawmessages);
     
     msgs = preproc_EL_A00_add_Tsec(msgs);
     
-    elparamdict = get_elparams(msgs); #rawmessages); # has samplerate etc.
+    elparamdict = pfv.get_elparams(msgs); #rawmessages); # has samplerate etc.
     
     
     
@@ -336,8 +346,8 @@ def preproc_EL_A_clean_samples(rawsamps, rawevents, rawmessages,
     ELeyes = [ eye for eye in elparamdict['eyes'] ];
     #REV: this lists "L", "R"
     for eye in ELeyes:
-        if eye not in [PEYEUTILS_LEFT_EYE, PEYEUTILS_RIGHT_EYE]:
-            raise Exception("Unrecognized eye [{}], I only recognize from: {}".format(eye, [PEYEUTILS_LEFT_EYE, PEYEUTILS_RIGHT_EYE]));
+        if eye not in [pu.PEYEUTILS_LEFT_EYE, pu.PEYEUTILS_RIGHT_EYE]:
+            raise Exception("Unrecognized eye [{}], I only recognize from: {}".format(eye, [pu.PEYEUTILS_LEFT_EYE, pu.PEYEUTILS_RIGHT_EYE]));
         pass;
     
     print("EYELINK RECORDING FROM EYES: {}".format(ELeyes));
@@ -349,23 +359,23 @@ def preproc_EL_A_clean_samples(rawsamps, rawevents, rawmessages,
     
     #REV: this removes "time"
     ev = preproc_EL_A02_clean_events(rawevents,
-                                     timeunitsec=EL_TIMEUNIT_SEC,
+                                     timeunitsec=pu.EL_TIMEUNIT_SEC,
                                      );
     
     
     #REV: if all bad datapoints do what? Exit?
     df, badtrial = preproc_EL_A03_filter_samps_by_ELevents(df, ev,
                                                            sr_hzsec=ELsr,
-                                                           timeunitsec=EL_TIMEUNIT_SEC,
+                                                           timeunitsec=pu.EL_TIMEUNIT_SEC,
                                                            );
     if( badtrial ):
         print("BADTRIAL (no data) -- skipping pupil size analysis")
         pass;
     else:
-        df = preproc_SHARED_pupilsize(df,
-                                      timecol='Tsec',
-                                      valcol='pa',
-                                      eyecol='eye' );
+        df = pre.preproc_SHARED_pupilsize(df,
+                                          timecol='Tsec',
+                                          valcol='pa',
+                                          eyecol='eye' );
         
         #REV: this adds "bad", "badEL", "badpupil", "badpupilEL"
         #REV: note EL just refers to "PRE" added guys...not necessarily EL
@@ -373,19 +383,19 @@ def preproc_EL_A_clean_samples(rawsamps, rawevents, rawmessages,
         if(preblinks):
             preblinkcols=['elblink']; #elhasblink?
             pass;
-        df = preproc_SHARED_label_blinks(df,
-                                         sr_hzsec=ELsr,
-                                         blinkremoval_MAD_mult=5,
-                                         blinkremoval_med_mult=1,
-                                         blinkremoval_dilate_win_sec=0.030,
-                                         blinkremoval_orphan_upperlimit_sec=0.010,
-                                         blinkremoval_orphan_bracket_min_sec=0.050,
-                                         blinkremoval_shortblink_minsize=0.100,
-                                         tsecname='Tsec',
-                                         eyecol='eye',
-                                         valcol='px',
-                                         preblinkcols=preblinkcols, #REV: remove elblink detected. NOT other events...
-                                         );
+        df = pre.preproc_SHARED_label_blinks(df,
+                                             sr_hzsec=ELsr,
+                                             blinkremoval_MAD_mult=5,
+                                             blinkremoval_med_mult=1,
+                                             blinkremoval_dilate_win_sec=0.030,
+                                             blinkremoval_orphan_upperlimit_sec=0.010,
+                                             blinkremoval_orphan_bracket_min_sec=0.050,
+                                             blinkremoval_shortblink_minsize=0.100,
+                                             tsecname='Tsec',
+                                             eyecol='eye',
+                                             valcol='px',
+                                             preblinkcols=preblinkcols, #REV: remove elblink detected. NOT other events...
+                                             );
         pass;
     
     return df, ev, msgs, badtrial;
@@ -412,7 +422,7 @@ def preproc_EL_A03_filter_samps_by_ELevents(df, ev,
     df['ELevlabel']='';   ## Name of event type (same as label in event)
     df['ELsimultevs']=0;   ## Number of different (simultaneous) events occurring in samples during each time point.
     
-    if( allnan( df[xname] ) ):
+    if( pu.utils.allnan( df[xname] ) ):
         #raise Exception("-----------> WTF ALL NAN IN BEGINNING PUPIL PARAMS (Col: {})".format(xname));
         print("-----------> WTF ALL NAN IN BEGINNING PUPIL PARAMS (Col: {})".format(xname));
         badtrial=True;
@@ -536,8 +546,8 @@ def preproc_EL_A03_filter_samps_by_ELevents(df, ev,
 
 
     
-    ldf = df[df.eye==PEYEUTILS_LEFT_EYE];
-    rdf = df[df.eye==PEYEUTILS_RIGHT_EYE];
+    ldf = df[df.eye==pu.PEYEUTILS_LEFT_EYE];
+    rdf = df[df.eye==pu.PEYEUTILS_RIGHT_EYE];
 
     #REV: this ASSUMES that we have equal number of L/R samples!!!!! I.e. I can't drop bad eye.
     if(len(ldf.index) != len(rdf.index)):
@@ -563,8 +573,8 @@ def preproc_EL_A03_filter_samps_by_ELevents(df, ev,
         raise Exception("RDF Failed to match expected samplerate to DT");
     
     if( len(ev.index) > 0 ):
-        lev = ev[ev.eye==PEYEUTILS_LEFT_EYE];
-        rev = ev[ev.eye==PEYEUTILS_RIGHT_EYE];
+        lev = ev[ev.eye==pu.PEYEUTILS_LEFT_EYE];
+        rev = ev[ev.eye==pu.PEYEUTILS_RIGHT_EYE];
         
         ####### EVENT CATEGORIZATION #########
         #REV: can events overlap?
@@ -596,7 +606,7 @@ def preproc_EL_A03_filter_samps_by_ELevents(df, ev,
 #REV: adds vbox space (pixels from...bottom-left?), stimulus space (if stimulus?), dvaspace (given physical).
 #REV: this ASSUMES caliabration 
 def preproc_EL_rawcalib_px(df, msgs, FLIPY=-1):
-    gcdict = get_gazecoords(msgs); #has l, t, r, b
+    gcdict = pu.peyefv.get_gazecoords(msgs); #has l, t, r, b
     #REV: gx will be in this space.
     
     elw = gcdict['r'] - gcdict['l'];
@@ -615,253 +625,3 @@ def preproc_EL_rawcalib_px(df, msgs, FLIPY=-1):
     return df;
 
 
-def preproc_pyfreeviewing_dva_from_flatscreen(df, msgs):
-    rdict = get_recordingsession_info(msgs);
-    distm=float(rdict['VB_DM']);
-    ppm=float(rdict['VB_PPM']);
-    df = preproc_SHARED_dva_from_flatscreen(df, ppm, distm);
-    return df;
-
-
-
-
-
-
-#REV: in our case, calibrated to "screen" pixels...? Or just generally uncalibrated...
-def preproc_EL_LR_add_dva(df,
-                          dva_per_px,
-                          pxw, pxh,
-                          stimw, stimh):
-    xname='gx';
-    yname='gy';
-    tname='time';
-    
-    if( len(df.index) > 0 ):
-        cgx_px = df[xname] - pxw/2;
-        cgy_px = df[yname] - pxh/2;
-
-        #REV: not negative yet...
-        cgx_dva = cgx_px * dva_per_px;
-        cgy_dva = cgy_px * dva_per_px;
-        
-        cgx_01 = (cgx_px)/(stimw/2);
-        cgy_01 = (cgy_px)/(stimh/2);
-        
-        df['cgx_px'] = cgx_px;
-        df['cgy_px'] = cgy_px;
-        
-        df['cgx_dva'] = cgx_dva;
-        df['cgy_dva'] = cgy_dva;
-        
-        df['cgx_01'] = cgx_01;
-        df['cgy_01'] = cgy_01;
-        
-        #vel, acc, medvel?
-        #print(df[xname]);
-        #print(df[xname].diff());
-        #print(df['fgxvel']);
-        #print(df['gxvel']);
-        #exit(0);
-        df['gxvel'] = df['cgx_dva'].diff()/df['Tsec'].diff(); #Ewww...
-        df['gyvel'] = df['cgy_dva'].diff()/df['Tsec'].diff();
-        df['vel'] = np.sqrt(df['gxvel']**2 + df['gyvel']**2) * dva_per_px; #REV: eyelink filtered XY vel, PER SAMPLE or PER SECOND? And in PIXEL SPACE?
-        df['acc'] = np.nan; #df['fgxyvel'] * dva_per_px; #REV: eyelink filtered XY vel, PER SAMPLE or PER SECOND? And in PIXEL SPACE?
-
-        df['medvel'] = np.nan; #REV: why did I know med for samples? Ah, mid of 3.
-        pass;
-    
-    return df;
-
-
-
-def preproc_EL_LR_add_ev(ev,
-                         dva_per_px,
-                         pxw, pxh,
-                         stimw, stimh):
-    
-    ###### HERE IS THE ISSUE -> SACCADES DO NOT PLAY NICE WITH BINOCULAR STUFF #######
-    if( len(ev.index) > 0 ):
-        
-        EL_EVENT_STARTX='gstx';
-        EL_EVENT_STARTY='gsty';
-        EL_EVENT_ENDX='genx';
-        EL_EVENT_ENDY='geny';
-        ev['cstx_px'] = ev[EL_EVENT_STARTX] - pxw/2;
-        ev['csty_px'] = ev[EL_EVENT_STARTY] - pxh/2;
-
-        ev['cstx_dva'] = ev['cstx_px'] * dva_per_px;
-        ev['csty_dva'] = ev['csty_px'] * dva_per_px;
-        
-        ev['cstx_01'] = ev.cstx_px / (stimw/2);    #(ev['cstx_px'] + -1*(trialvidw/2)) / trialvidw; 
-        ev['csty_01'] = ev.csty_px / (stimh/2);    #(ev['csty_px'] + -1*(trialvidh/2)) / trialvidh;
-        
-        
-        ev['cenx_px'] = ev[EL_EVENT_ENDX] - pxw/2;
-        ev['ceny_px'] = ev[EL_EVENT_ENDY] - pxh/2;
-        
-        ev['cenx_dva'] = ev['cenx_px'] * dva_per_px;
-        ev['ceny_dva'] = ev['ceny_px'] * dva_per_px;
-        
-        ev['cenx_01'] = ev['cenx_px'] / (stimw/2); #(ev['cenx_px'] + -1*(trialvidw/2)) / trialvidw;
-        ev['ceny_01'] = ev['ceny_px'] / (stimh/2); #(ev['ceny_px'] + -1*(trialvidh/2)) / trialvidh;
-        ev['duration_s'] = ev['ensec'] - ev['stsec'];
-        
-        ## REV: create some other event items if needed...
-        ev['dxdva'] = ev['cenx_dva'] - ev['cstx_dva'];
-        ev['dydva'] = ev['ceny_dva'] - ev['csty_dva']; #REV: upside down? eyelink also uses top-left as 0,0?
-        ev['angle'] = np.arctan2( ev.dydva, ev.dxdva );
-        ev.pvel = ev.pvel * dva_per_px;
-        ev['medvel'] = np.nan; ## EYElink does not give median vel (I could compute it from samples, but meh).
-        ev['avgvel'] = ev.avel;
-        
-        ev['ampl'] = np.sqrt(ev.dxdva*ev.dxdva + ev.dydva*ev.dydva);
-        ev['pvel'] = ev.pvel * dva_per_px;
-
-        #REV: cluster binocular (events?) based on (any) overlap in time...
-        clust_elist=[];
-        for cat, cdf in ev.groupby('label'):
-            res = cluster_binoc_events( cdf, 'stsec', 'ensec' );
-            #print(res);
-            print("Category {}  :   {} -> {}".format( cat, len(cdf.index), len(res.index)));
-            clust_elist.append( res ); #REV: or stsec etc.
-            pass;
-        
-        print("Finished clustering events");
-        
-        ev2 = pd.concat(clust_elist);
-        if( len(ev2.index) != len(ev.index)):
-            raise Exception("Error, clustering removed data?! {} -> {}".format(len(ev2.index), len(ev.index)));
-        
-        ev = ev2;
-        pass;
-    return ev;
-    
-
-def preproc_EL_exclude_LRdelta(df,
-                               exclude_LR_dvacutoff=0,
-                               tsecname='Tsec'):
-    if( exclude_LR_dvacutoff > 0 ):
-        ldf = df[df.eye==EL_LEFT_EYE].reset_index(drop=True);
-        rdf = df[df.eye==EL_RIGHT_EYE].reset_index(drop=True);
-        
-        tsecs = np.sum(ldf[tsecname] - rdf[tsecname]);
-        if( tsecs != 0 ):
-            raise Exception("Tsec sum diff should be 0, but is {}".format(tsecs));
-        xerr = rdf.cgx_dva - ldf.cgx_dva;
-        yerr = rdf.cgy_dva - ldf.cgy_dva;
-        xyerr = np.sqrt(xerr**2 + yerr**2);
-        
-        badtimepts = np.where(xyerr > exclude_LR_dvacutoff)[0]; #REV: zeroth dimension...
-        print("Mean erro: {}   bad tp: {}/{}={:3.1f}% Vals: {}".format(np.mean(xyerr), len(badtimepts), len(xyerr), 100*len(badtimepts)/float(len(xyerr)), badtimepts));
-        if( len(badtimepts) > 0 ):
-            ldf.loc[ badtimepts, ['gx', 'gy'] ] = np.nan;
-            rdf.loc[ badtimepts, ['gx', 'gy'] ] = np.nan;
-            pass;
-        
-        df = pd.concat([ldf, rdf]).reset_index(drop=True);
-        pass;
-    
-    return df;
-
-
-
-
-
-
-def preproc_EL_create_binoc_estimate(df,
-                                     replace_with_mean_offset=True,
-                                     eyecol='eye',
-                                     tname='Tmsec',
-                                     ):
-    tosetnan = ['gx', 'gy', 'cgx_px', 'cgy_px', 'cgx_dva', 'cgy_dva', 'cgx_01', 'cgy_01', 'gxvel', 'gyvel', 'vel', 'acc', 'medvel'];
-    df.loc[ (True==df.bad), tosetnan ] = np.nan;
-    
-    ldf = df[df.eye==EL_LEFT_EYE];
-    rdf = df[df.eye==EL_RIGHT_EYE];
-    ldf.sort_values(by='Tsec', inplace=True);
-    rdf.sort_values(by='Tsec', inplace=True);
-    
-    if(len(ldf.index) != len(rdf.index)):
-        raise Exception("Unequal LDF {}  RDF {}".format(len(ldf.index), len(rdf.index)));
-    
-    #REV: should be BEFORE here! I.e. fuck it just remove all bad points first from each eye (make them NAN).
-    
-    
-    if(replace_with_mean_offset):
-        tocombine = ['cgx_dva', 'cgy_dva', 'cgx_px', 'cgy_px', 'cgx_01', 'cgy_01'];
-        for col in tocombine:
-            offset = np.nanmean( rdf[col] - ldf[col] );
-            l = ldf[col].to_numpy();
-            r = rdf[col].to_numpy();
-            lnan = np.isnan(l);
-            rnan = np.isnan(r);
-            l[ lnan ] = r[ lnan ] - offset;
-            r[ rnan ] = l[ rnan ] + offset; #NOT DIV 2 (offset should be whole offset to re-estimate my position).
-            rdf[col] = r;
-            ldf[col] = l;
-            pass;
-        pass;
-    
-    #REV: this will deal with non-numberic how?
-    #agg_d = { c: 'mean' if c == 'tsec' else 'first' for c in sampdf.columns };
-    #bsampdf=sampdf.groupby('tsec').agg(agg_d); #mean(); #REV: should ignore NAN in pandas
-    #REV: 
-    aggrule = dict.fromkeys(df, np.nanmean);
-    aggrule.update(dict.fromkeys(df.columns[df.dtypes.eq(object)], 'first')); #REV: this keeps "type" to be whatever one happened
-    #REV: to be first. I should make sure it keeps "sacc" if either is in 'sacc'?
-    bdf=df.groupby('Tsec').agg(aggrule);
-
-    #REV: at this point, 0s for BDF (blinks not aggregated lol)
-
-    #REV: 'reason' for being bad matters? Not binoc then irrelevant of course.
-    #REV: if unused, it is irrelevant...
-    #REV: fuck, being a blink is BAD, being NAN due to other capture problems is OK? (use offset).
-    #REV: i.e. if either eye is available, we will just use that one...? I.e. if FINITE, use it...?
-    #REV: need to modify this to be conditional on which eye is USEFUL.
-
-    #print(bsampdf);
-    #REV: just replace with it, everything else is same...
-    #bdf.cgx_dva = np.nanmean([lx, rx]); #/2; #REV: this is handled by the "nanmean" above?!?!?!
-    #bdf.cgy_dva = np.nanmean([ly, ry]); #/2;
-    badcols = ['bad', 'badPRE', 'badpupil', 'badpupilPRE'];
-    bdf[ badcols ] = False;
-    bdf.loc[ (np.isnan(bdf.gx)), badcols ] = True; #REV: only those with both L and R nan will be "bad" data.
-
-    bdf.eye = PEYEUTILS_BINOC_EYE;
-    bdf.loc[ (bdf.ELissacc > 0), 'ELissacc' ] = 1;
-    bdf.loc[ (bdf.ELissacc > 0), 'ELevlabel' ] = 'SACC'; #REV: if either is sacc, this is in a sacc. Otherwise, I don't really care...(should set precedence though)
-    
-    
-    #REV: all other columns are meaned...
-    df = pd.concat([df, bdf]).sort_values(by=[eyecol,tname]).reset_index(drop=True);
-    print("Finished binocular integration of L/R");
-    
-    
-    df.ELevlabel = df.ELevlabel.astype("category");
-    
-    return df;
-
-
-
-
-def full_EL_add_cdva_estimates( df, ev,
-                                dva_per_px,
-                                pxw, pxh,
-                                stimw, stimh):
-    
-    df = preproc_EL_LR_add_dva(df,
-                               dva_per_px,
-                               pxw, pxh,
-                               stimw, stimh);
-    
-    
-    ev = preproc_EL_LR_add_ev(ev,
-                              dva_per_px,
-                              pxw, pxh,
-                              stimw, stimh);
-
-    df = preproc_EL_exclude_LRdelta(df);
-        
-    df = preproc_EL_create_binoc_estimate(df);
-    
-    return df, ev

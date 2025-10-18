@@ -1,5 +1,7 @@
 import math;
 import numpy as np;
+
+
 #REV: move to utils
 def msec_to_sec( msec ):
     return msec*1e-3;
@@ -12,13 +14,11 @@ def sec_to_msec( msec ):
 def meter_to_rad( eye_to_screen_meters, wid_meters ):
     #REV: argctan
     #REV: arctan2( y, x ); Assume we are quadrant one (upper right, and we measure from normal X-axis anti-clockwise)
-    import numpy as np
     angle_rad = np.arctan2( wid_meters, eye_to_screen_meters ); #REV: y/x
     return angle_rad;
 
 def dist_at_angle_deg( mid_dist_m, angle_deg ):
     #REV: cos(a) = adj/hyp; cos(a)*hyp = adj; hyp = adj/cos(a)
-    import math;
     hyp = mid_dist_m / math.cos( deg_to_rad(angle_deg) );
     return hyp;
 
@@ -28,7 +28,6 @@ def deg_from_mid_to_meter( mid_dist_m, angle_deg ):
     distance eye-to-screen in meters.
     '''
     #REV: tana = opp/adj; tana*adj = opp
-    import math;
     opp = math.tan( deg_to_rad(angle_deg) ) * mid_dist_m;
     return opp;
 
@@ -37,7 +36,6 @@ wid_at_angle_deg = deg_from_mid_to_meter;
 
 #REV: give me full value, not div 2
 def flatscreen_dva( dm, wm ):
-    import math;
     return 2*math.degrees(math.atan2( wm/2, dm ));
 
 

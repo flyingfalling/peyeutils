@@ -1,11 +1,10 @@
-from peyeutils.defs import *;
-from peyeutils.utils.tsutils import *;
-from peyeutils.utils.statutils import *;
-from peyeutils.utils.nputils import *;
-from peyeutils.utils.unitutils import *;
+
 import pandas as pd;
 import numpy as np;
 import math;
+
+import peyeutils as pu;
+import peyeutils.utils as ut;
 
 def preproc_SHARED_D_exclude_bad(df, xcol, ycol, badcol='bad'):
     df.loc[ True==df[badcol], [xcol,ycol] ] = np.nan;
@@ -22,8 +21,8 @@ def preproc_SHARED_C_binoc_gaze(df,
                                 exclude_thresh=-1, #Set to NAN any time points in which they are separated by this amount
                                 thresh_lr_badcol='badBINOCDXY',
                                 only_alleyes_binoc=False,
-                                eyetags=[PEYEUTILS_LEFT_EYE, PEYEUTILS_RIGHT_EYE],
-                                btag=PEYEUTILS_BINOC_EYE,
+                                eyetags=[pu.PEYEUTILS_LEFT_EYE, pu.PEYEUTILS_RIGHT_EYE],
+                                btag=pu.PEYEUTILS_BINOC_EYE,
                                 ):
     
     if(len(eyetags) < 1):
@@ -153,8 +152,8 @@ def preproc_SHARED_C_binoc_gaze(df,
 
         for eye in eyedfdict:
             eyedf=eyedfdict[eye];
-            if( allnan( eyedf[tmpx] )  or
-                allnan( eyedf[tmpx] ) ):
+            if( pu.utils.allnan( eyedf[tmpx] )  or
+                pu.utils.allnan( eyedf[tmpx] ) ):
                 print("WARNING: all X or Y is NAN for eye {}... (skipping for binoc)".format(eye));
                 continue;
 
@@ -226,7 +225,7 @@ def preproc_SHARED_C_binoc_gaze(df,
 
 #REV: both assume "flat screen"
 def preproc_SHARED_dva_from_flatscreen(df, ppm, distm, method='trig', dropraw=True, sanitythreshdva=-1):
-    dva_per_m = get_center_dva_per_meter( distm, ppm );
+    dva_per_m = ut.get_center_dva_per_meter( distm, ppm );
     dva_per_px = 1/ppm * dva_per_m;
     
     df['cgx_dva_linear'] = df['cgx_px'] * dva_per_px;
@@ -328,7 +327,7 @@ def preproc_SHARED_pupilsize(sampledf,
                                               ).mean();
         df[valcol] = df[smoothvalcol];
         df = df.reset_index(drop=True);
-        diffdf, newcol = magnitude_change_over_time(df, valcol=valcol, timecol=timecol);
+        diffdf, newcol = ut.magnitude_change_over_time(df, valcol=valcol, timecol=timecol);
         
         print("EYE: {} (NEWCOL: {})".format(eye, newcol));
         print(diffdf.groupby(newcol, dropna=False).count().sort_values(by='Tsec'));
@@ -354,7 +353,7 @@ def preproc_SHARED_pupilsize(sampledf,
         #fig.savefig('wtf.pdf');
         #exit(0);
         
-        devdf, madval = MAD_timediff(indf=diffdf, valcol=newcol);
+        devdf, madval = ut.MAD_timediff(indf=diffdf, valcol=newcol);
         devdf['pa_abs_tdiff_mad'] = madval; #waste, whatever...
         lst.append(devdf);
         pass;
@@ -447,9 +446,9 @@ def preproc_SHARED_label_blinks(df,
         
         
         baddata = ( finites | preblinks );
-        pevdf = cond_rle_df( baddata, val=True, t=eyedf[tsecname] ); #REV: creates a DF of "events" TRUE where 
+        pevdf = ut.cond_rle_df( baddata, val=True, t=eyedf[tsecname] ); #REV: creates a DF of "events" TRUE where 
         finiteblink_evdf = pevdf.copy();
-        finiteblink_sdf = inverse_rle(pevdf.v, pevdf.sidx, pevdf.lidx); #REV: should be same as  baddata
+        finiteblink_sdf = ut.inverse_rle(pevdf.v, pevdf.sidx, pevdf.lidx); #REV: should be same as  baddata
         print(finiteblink_sdf);
         
         NCONST=blinkremoval_MAD_mult;
@@ -468,25 +467,25 @@ def preproc_SHARED_label_blinks(df,
                    (dpa_MAD  *  NCONST)
                   );
         
-        pevdf = events_over_thresh(eyedf.pa_abs_tdiff, thresh=thresh, t=np.array(eyedf[tsecname]) );
+        pevdf = ut.events_over_thresh(eyedf.pa_abs_tdiff, thresh=thresh, t=np.array(eyedf[tsecname]) );
         dpupil_evdf = pevdf.copy();
-        dpupil_sdf = inverse_rle(pevdf.v, pevdf.sidx, pevdf.lidx);
+        dpupil_sdf = ut.inverse_rle(pevdf.v, pevdf.sidx, pevdf.lidx);
         
         
         
         badx = (dpupil_sdf | baddata);
-        pevdf = cond_rle_df( badx, val=True, t=eyedf[tsecname] );
+        pevdf = ut.cond_rle_df( badx, val=True, t=eyedf[tsecname] );
         dpupil_finiteblink_pevdf = pevdf;
-        dpupil_finiteblink_sdf = inverse_rle(pevdf.v, pevdf.sidx, pevdf.lidx);
+        dpupil_finiteblink_sdf = ut.inverse_rle(pevdf.v, pevdf.sidx, pevdf.lidx);
         
         DILATE_SEC_WIN=blinkremoval_dilate_win_sec; #0.055; #20 msec...?
         winsamp = math.ceil(sr_hzsec * DILATE_SEC_WIN); #e.g. 1e3 * 2e-2 = 2e1 = 2 * 10 = 20
-        badxdilated = dilate_val(badx, val=True, winsamp=winsamp);
+        badxdilated = ut.dilate_val(badx, val=True, winsamp=winsamp);
         
         
-        pevdf = cond_rle_df( badxdilated, val=True, t=eyedf[tsecname] );
+        pevdf = ut.cond_rle_df( badxdilated, val=True, t=eyedf[tsecname] );
         dilated_pevdf = pevdf;
-        dilated_sdf = inverse_rle(pevdf.v, pevdf.sidx, pevdf.lidx);
+        dilated_sdf = ut.inverse_rle(pevdf.v, pevdf.sidx, pevdf.lidx);
                 
         GOODTOOSMALL=blinkremoval_orphan_upperlimit_sec; #=0.055;
         BADBIGENOUGH=blinkremoval_orphan_bracket_min_sec; #0.040; #REV: *all* bads must NECESARILY be here since dilated?
@@ -506,12 +505,12 @@ def preproc_SHARED_label_blinks(df,
             
             pass;
         
-        badxdilated = inverse_rle(pevdf.v, pevdf.sidx, pevdf.lidx);
+        badxdilated = ut.inverse_rle(pevdf.v, pevdf.sidx, pevdf.lidx);
         
         #REV: dumb, but combines true/true etc. I guess.
-        pevdf = cond_rle_df( badxdilated, val=True, t=eyedf[tsecname] );
+        pevdf = ut.cond_rle_df( badxdilated, val=True, t=eyedf[tsecname] );
         noorphan_pevdf = pevdf;
-        noorphan_sdf = inverse_rle(pevdf.v, pevdf.sidx, pevdf.lidx);
+        noorphan_sdf = ut.inverse_rle(pevdf.v, pevdf.sidx, pevdf.lidx);
         
         
         #REV: this captures other stuff too...better to just capture clean saccades having
@@ -529,10 +528,10 @@ def preproc_SHARED_label_blinks(df,
                 
                 pass;
             
-            badxlongblinks = inverse_rle(pevdf.v, pevdf.sidx, pevdf.lidx);
+            badxlongblinks = ut.inverse_rle(pevdf.v, pevdf.sidx, pevdf.lidx);
             
             #REV: dumb, but combines true/true etc. I guess.
-            pevdf = cond_rle_df( badxlongblinks, val=True, t=eyedf[tsecname] );
+            pevdf = ut.cond_rle_df( badxlongblinks, val=True, t=eyedf[tsecname] );
             pass;
         
         

@@ -1,9 +1,12 @@
+#from peyeutils.utils.unitutils import *;
+#from peyeutils.preproc.preproc import *;
 
-from peyeutils.utils.unitutils import *;
-from peyeutils.preproc.preproc import *;
+import peyeutils.utils as ut;
+import peyeutils.preproc as pre;
 
 import pandas as pd;
 import numpy as np;
+
 
 def separate_EDF_msg_tags(messages):
     if( 'tag' in messages.columns ):
@@ -180,9 +183,8 @@ def preproc_peyefreeviewing_dva_from_flatscreen(df, msgs):
     rdict = get_recordingsession_info(msgs);
     distm=float(rdict['VB_DM']);
     ppm=float(rdict['VB_PPM']);
-    df = preproc_SHARED_dva_from_flatscreen(df, ppm, distm);
+    df = pre.preproc_SHARED_dva_from_flatscreen(df, ppm, distm);
     return df;
-
 
 
 
@@ -199,7 +201,7 @@ def import_fmri_trials( mymessages, includeAasE=False, fixvidlensec=None, fiximg
     
     vbparams = get_tag_params(mymessages, 'VB');
     vbdict = vbparams;
-    dva_per_m = get_center_dva_per_meter( float(vbdict['VB_DM']), float(vbdict['VB_PPM']) );
+    dva_per_m = ut.get_center_dva_per_meter( float(vbdict['VB_DM']), float(vbdict['VB_PPM']) );
     dva_per_px = dva_per_m / float(vbdict['VB_PPM']); #REV: dva/m / px/m = dva/m * m/px = dva/px
     
     ################################################################
