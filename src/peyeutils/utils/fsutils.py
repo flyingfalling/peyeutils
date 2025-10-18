@@ -3,6 +3,19 @@ import os;
 import peyeutils;
 
 def create_dir( path, exist_ok=True ):
+    """
+
+    Parameters
+    ----------
+    path :
+        
+    exist_ok :
+         (Default value = True)
+
+    Returns
+    -------
+
+    """
     success=True;
     try:
         os.makedirs(path, exist_ok=exist_ok);
@@ -16,6 +29,19 @@ def create_dir( path, exist_ok=True ):
 
 
 def is_filename_vid( fname, videoexts=peyeutils.videoexts ):
+    """
+
+    Parameters
+    ----------
+    fname :
+        
+    videoexts :
+         (Default value = peyeutils.videoexts)
+
+    Returns
+    -------
+
+    """
     ext = fname.split('.')[-1];
     if( ext.lower() in videoexts ):
         return True;
@@ -24,6 +50,19 @@ def is_filename_vid( fname, videoexts=peyeutils.videoexts ):
     return None;
 
 def is_filename_img( fname, imgexts=peyeutils.imgexts ):
+    """
+
+    Parameters
+    ----------
+    fname :
+        
+    imgexts :
+         (Default value = peyeutils.imgexts)
+
+    Returns
+    -------
+
+    """
     ext = fname.split('.')[-1];
     if( ext.lower() in imgexts ):
         return True;
@@ -32,4 +71,15 @@ def is_filename_img( fname, imgexts=peyeutils.imgexts ):
     return None;
 
 def isfile(fname):
+    """
+
+    Parameters
+    ----------
+    fname :
+        
+
+    Returns
+    -------
+
+    """
     return os.path.isfile( fname );

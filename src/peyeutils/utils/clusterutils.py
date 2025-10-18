@@ -2,11 +2,35 @@ import numpy as np;
 import pandas as pd;
 
 def recursive_lookup(disjoint_set, rowidx):
+    """
+
+    Parameters
+    ----------
+    disjoint_set :
+        
+    rowidx :
+        
+
+    Returns
+    -------
+
+    """
     if disjoint_set[rowidx] != rowidx:
         disjoint_set[rowidx] = recursive_lookup(disjoint_set, disjoint_set[rowidx]);
     return disjoint_set[rowidx];
 
 def unique_clusters(df : pd.DataFrame):
+    """
+
+    Parameters
+    ----------
+    df : pd.DataFrame :
+        
+
+    Returns
+    -------
+
+    """
     
     disjoint_set = {}
     value_lookup = {}

@@ -9,6 +9,17 @@ import numpy as np;
 
 
 def separate_EDF_msg_tags(messages):
+    """
+
+    Parameters
+    ----------
+    messages :
+        
+
+    Returns
+    -------
+
+    """
     if( 'tag' in messages.columns ):
         print("Already tagged EDF messages, returning identical");
         return messages;
@@ -32,6 +43,17 @@ def separate_EDF_msg_tags(messages):
     return messages;
 
 def get_eye_params( mymessages ):
+    """
+
+    Parameters
+    ----------
+    mymessages :
+        
+
+    Returns
+    -------
+
+    """
     tag='EYE_USED';
     msgs=mymessages[ mymessages.tag == tag ]['body'];#msg'];
     if( len(msgs) < 1 ):
@@ -44,6 +66,19 @@ def get_eye_params( mymessages ):
     
 
 def get_tag_messages( mymessages, tag ):
+    """
+
+    Parameters
+    ----------
+    mymessages :
+        
+    tag :
+        
+
+    Returns
+    -------
+
+    """
     vbmsgs = mymessages[ mymessages['tag'] == tag ];
     msgs=[];
     for idx, row in vbmsgs.iterrows():
@@ -52,6 +87,19 @@ def get_tag_messages( mymessages, tag ):
     return msgs;
 
 def get_tag_lists( mymessages, tag ):
+    """
+
+    Parameters
+    ----------
+    mymessages :
+        
+    tag :
+        
+
+    Returns
+    -------
+
+    """
     vbmsgs = mymessages[ mymessages['tag'] == tag ];
     mylists=[];
     for idx, row in vbmsgs.iterrows():
@@ -60,6 +108,17 @@ def get_tag_lists( mymessages, tag ):
     return mylists;
 
 def reccfg_params( cfg ):
+    """
+
+    Parameters
+    ----------
+    cfg :
+        
+
+    Returns
+    -------
+
+    """
     mydict={};
     mydict['mode'] = cfg[0]; #CR etc.
     mydict['samplerate'] = int(cfg[1]);
@@ -69,6 +128,17 @@ def reccfg_params( cfg ):
     return mydict;
 
 def gazecoord_params( cfg ):
+    """
+
+    Parameters
+    ----------
+    cfg :
+        
+
+    Returns
+    -------
+
+    """
     mydict={};
     mydict['l']=float(cfg[0]); #REV: maybe should be int but meh
     mydict['t']=float(cfg[1]);
@@ -82,6 +152,25 @@ def gazecoord_params( cfg ):
 #REV: or change it so it has like a "set at time" thing.
 #REV: there are multiple rows of VB right now though (it wouldn't fit on one line messgge in eyelink)
 def get_tag_params( mymessages, tag, filter1=None, sep='=', tcol='time' ):
+    """
+
+    Parameters
+    ----------
+    mymessages :
+        
+    tag :
+        
+    filter1 :
+         (Default value = None)
+    sep :
+         (Default value = '=')
+    tcol :
+         (Default value = 'time')
+
+    Returns
+    -------
+
+    """
     vbmsgs = mymessages[ mymessages['tag'] == tag ];
     mydict={};
     for idx, row in vbmsgs.iterrows():
@@ -120,9 +209,31 @@ def get_tag_params( mymessages, tag, filter1=None, sep='=', tcol='time' ):
     return mydict;
 
 def get_available_tags( mymessages ):
+    """
+
+    Parameters
+    ----------
+    mymessages :
+        
+
+    Returns
+    -------
+
+    """
     return mymessages['tag'].unique();
 
 def get_elparams( mymessages ):
+    """
+
+    Parameters
+    ----------
+    mymessages :
+        
+
+    Returns
+    -------
+
+    """
     elparams = get_tag_lists( mymessages, 'RECCFG' );
     eldict = reccfg_params( elparams[0] );
     #coorddict = gazecoord_params( get_tag_lists( mymessages, "GAZE_COORDS" )[0] );
@@ -130,11 +241,33 @@ def get_elparams( mymessages ):
     return eldict;
 
 def get_gazecoords( mymessages ):
+    """
+
+    Parameters
+    ----------
+    mymessages :
+        
+
+    Returns
+    -------
+
+    """
     coorddict = gazecoord_params( get_tag_lists( mymessages, "GAZE_COORDS" )[0] );
     return coorddict;
     
 
 def get_recordingsession_info( mymessages ):
+    """
+
+    Parameters
+    ----------
+    mymessages :
+        
+
+    Returns
+    -------
+
+    """
     if( 'tag' not in mymessages.columns ):
         mymessages = separate_EDF_msg_tags(mymessages);
         pass;
@@ -180,6 +313,19 @@ def get_recordingsession_info( mymessages ):
 
 
 def preproc_peyefreeviewing_dva_from_flatscreen(df, msgs):
+    """
+
+    Parameters
+    ----------
+    df :
+        
+    msgs :
+        
+
+    Returns
+    -------
+
+    """
     rdict = get_recordingsession_info(msgs);
     distm=float(rdict['VB_DM']);
     ppm=float(rdict['VB_PPM']);
@@ -192,7 +338,28 @@ def preproc_peyefreeviewing_dva_from_flatscreen(df, msgs):
 
 
 
-def import_fmri_trials( mymessages, includeAasE=False, fixvidlensec=None, fiximglensec=None, fixdvawid=None, noaborts=True ):
+def import_fv_trials( mymessages, includeAasE=False, fixvidlensec=None, fiximglensec=None, fixdvawid=None, noaborts=True ):
+    """
+
+    Parameters
+    ----------
+    mymessages :
+        
+    includeAasE :
+         (Default value = False)
+    fixvidlensec :
+         (Default value = None)
+    fiximglensec :
+         (Default value = None)
+    fixdvawid :
+         (Default value = None)
+    noaborts :
+         (Default value = True)
+
+    Returns
+    -------
+
+    """
     #REV: can't use this for aborted trials.
     #REV: should do difference for each case but fuck it lol
     if( fixvidlensec is not None or fiximglensec is not None ):
@@ -511,7 +678,24 @@ def import_fmri_trials( mymessages, includeAasE=False, fixvidlensec=None, fiximg
 
 
 
-def import_fmri_blocks(msgdf, sampdf, trialsdf):
+def import_fv_blocks(msgdf : pd.DataFrame,
+                       sampdf : pd.DataFrame,
+                       edftrialsdf : pd.DataFrame):
+    """
+
+    Parameters
+    ----------
+    msgdf : messages dataframe
+        
+    sampdf : samples dataframe
+        
+    edftrialsdf :  trials dataframe of all trials in EDF file (extracted by import_fv_trials())
+        
+
+    Returns
+    -------
+
+    """
     blockdf=list();
     blockedtrialsdf=list();
     
@@ -595,7 +779,7 @@ def import_fmri_blocks(msgdf, sampdf, trialsdf):
         if( SFREEFIX != EFREEFIX ):
             raise Exception("start/end type is not same (FREE/FIX)");
         
-        blocktrialsdf = trialsdf[ (trialsdf.start_s >= stsec) & (trialsdf.end_s < ensec) ].sort_values(by='start_s').reset_index(drop=True);
+        blocktrialsdf = edftrialsdf[ (edftrialsdf.start_s >= stsec) & (edftrialsdf.end_s < ensec) ].sort_values(by='start_s').reset_index(drop=True);
         if( len(blocktrialsdf.index) < 1 ):
             print("BLOCK WOULD CONTAIN NO VIDEOS [{}] -- SKIPPING".format(edfrow.edffile));
             continue;

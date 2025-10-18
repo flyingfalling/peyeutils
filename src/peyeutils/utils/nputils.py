@@ -1,6 +1,23 @@
 import numpy as np;
 
 def linsteps(start, stop, step, pastend=True):
+    """
+
+    Parameters
+    ----------
+    start :
+        
+    stop :
+        
+    step :
+        
+    pastend :
+         (Default value = True)
+
+    Returns
+    -------
+
+    """
     if( pastend ):
         n = int(np.ceil((stop - start)/step));
     else:
@@ -15,12 +32,57 @@ def linsteps(start, stop, step, pastend=True):
 
 
 def allnan(alist):
+    """
+
+    Parameters
+    ----------
+    alist :
+        
+
+    Returns
+    -------
+
+    """
     if( np.count_nonzero(~np.isnan(np.array(alist))) < 1 ):
         return True;
     return False;
 
 def l2dist(x1, y1, x2, y2):
+    """
+
+    Parameters
+    ----------
+    x1 :
+        
+    y1 :
+        
+    x2 :
+        
+    y2 :
+        
+
+    Returns
+    -------
+
+    """
     return math.sqrt( (x1-x2)**2 + (y1-y2)**2 );
 
 def l2distvec(x1,y1,x2,y2):
+    """
+
+    Parameters
+    ----------
+    x1 :
+        
+    y1 :
+        
+    x2 :
+        
+    y2 :
+        
+
+    Returns
+    -------
+
+    """
     return np.sqrt( (x1-x2)*(x1-x2) + (y1-y2)*(y1-y2) );

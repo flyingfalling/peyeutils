@@ -2,6 +2,21 @@ import numpy as np;
 import pandas as pd;
 
 def mean_std_on_2d_axis( mat, flattento='x', norm=True ):
+    """
+
+    Parameters
+    ----------
+    mat :
+        
+    flattento :
+         (Default value = 'x')
+    norm :
+         (Default value = True)
+
+    Returns
+    -------
+
+    """
     if(len(mat.shape) != 2):
         raise Exception("Does not work on anything except for 2d matrix");
     
@@ -30,6 +45,19 @@ def mean_std_on_2d_axis( mat, flattento='x', norm=True ):
 
 ## REV: calculate percentile of positive val within negative vals.
 def calc_pctl(posval, negvals):
+    """
+
+    Parameters
+    ----------
+    posval :
+        
+    negvals :
+        
+
+    Returns
+    -------
+
+    """
     #pctle = ((negvals < posval).sum()) / float(len(negvals)+1);
     if( (len(negvals) < 1) ):
         return np.nan;
@@ -43,6 +71,21 @@ def calc_pctl(posval, negvals):
 #REV: information gain
 #REV: note, input is assumed to be unlogged by default
 def calc_infogain(posval, negval, islog2ed=False):
+    """
+
+    Parameters
+    ----------
+    posval :
+        
+    negval :
+        
+    islog2ed :
+         (Default value = False)
+
+    Returns
+    -------
+
+    """
     lposval = posval;
     lnegval = negval;
     if( not islog2ed ):
@@ -59,6 +102,21 @@ def calc_infogain(posval, negval, islog2ed=False):
 #REV: returns "diff" df containing diffs of valcol and timecol, and new col valcol + "_tdiff", containing time-scaled differences,
 #     which are maximum magnitude of change from previous or next time step.
 def magnitude_change_over_time(indf, valcol, timecol='Tsec'):
+    """
+
+    Parameters
+    ----------
+    indf :
+        
+    valcol :
+        
+    timecol :
+         (Default value = 'Tsec')
+
+    Returns
+    -------
+
+    """
     indf = indf.sort_values(by=timecol).reset_index(drop=True);
     diffdf = indf[[valcol, timecol]].diff(); #REV: default element previous row. t.diff(periods=1, axis=0) (rows=0, cols=1) This will be e.g. change of 1/0.001 = 1000/sec
     newvalcol=valcol+"_abs_tdiff";
@@ -94,6 +152,19 @@ def magnitude_change_over_time(indf, valcol, timecol='Tsec'):
 ##OUT: df with valcol + '_med_err' which is per-unit divergence from median of that signal, and
 ##     madval, which is single value representing MAD (median absolute deviation).
 def MAD_timediff(indf, valcol):
+    """
+
+    Parameters
+    ----------
+    indf :
+        
+    valcol :
+        
+
+    Returns
+    -------
+
+    """
     devdf = indf;
     med = devdf[valcol].median(); #REV: is NANMEDIAN.
     newcol = valcol + '_med_err';

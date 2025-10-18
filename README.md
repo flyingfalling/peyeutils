@@ -31,7 +31,7 @@ time-series data.
 
 # peyeutils includes three main pieces:
 
-1) Algorithms and utilities for eye tracking including functions for:
+## 1) Algorithms and utilities for eye tracking including functions for:
 
 - preprocessing (smoothing) of data
 - labelling/removing blinks and artifacts
@@ -43,7 +43,7 @@ time-series data.
 - Comparions with predictive models of gaze (e.g. saliency)
 - Storage and querying and joining of large amounts of multi-sensor/multimodal data (physiology data, gaze data, experimental conditions, stimuli)
 
-2) peye freeviewing (peyefv) -- Functions for running eye-tracking experiments
+## 2) peye freeviewing (peyefv) -- Functions for running eye-tracking experiments
 (via e.g. psychopy), defining stimuli, timing, and responses, with hooks for
 appropriate synchronization methods (e.g. send messages to EDF files for
 EYELINK)
@@ -51,7 +51,7 @@ EYELINK)
 - Color/luminance correction utilities
 - Gaze contingent experiments
 
-3) Controlling (wearable) gaze trackers via network connections
+## 3) Controlling (wearable) gaze trackers via network connections
 
 
 
@@ -79,7 +79,7 @@ libraries or python-mediated build with appropriate ffmpeg/gstreamer for codecs.
 - pylink (for EYELINK -- including SR Research eyelink SDK and system libraries https://www.sr-research.com/support/docs.php?topic=linuxsoftware)
 - Tobii SDK (for tobii https://developer.tobiipro.com/)
 
-For eyelink after-the-fact processing (of EDF files):
+## For eyelink after-the-fact processing (of EDF files):
 - pyedfread (https://github.com/flyingfalling/pyedfread)
 
 

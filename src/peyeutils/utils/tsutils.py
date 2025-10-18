@@ -5,6 +5,21 @@ import peyeutils as pu;
 from scipy import ndimage;
 
 def select_legal_timepoints4(ts, vals, maxdt):
+    """
+
+    Parameters
+    ----------
+    ts :
+        
+    vals :
+        
+    maxdt :
+        
+
+    Returns
+    -------
+
+    """
     
     
     df = pd.DataFrame();
@@ -57,6 +72,41 @@ def interpolate_df_to_samplerate(df, tcol, targ_srhzsec, tcolunit_s, truesrs=dic
                                  method='polynomial', order=2,
                                  tsecname='Tsec', tsec0name='Tsec0',
                                  ):
+    """
+
+    Parameters
+    ----------
+    df :
+        
+    tcol :
+        
+    targ_srhzsec :
+        
+    tcolunit_s :
+        
+    truesrs :
+         (Default value = dict())
+    maxtdelta_s :
+         (Default value = None)
+    maxtdeltas_s :
+         (Default value = dict())
+    startsec :
+         (Default value = None)
+    endsec :
+         (Default value = None)
+    method :
+         (Default value = 'polynomial')
+    order :
+         (Default value = 2)
+    tsecname :
+         (Default value = 'Tsec')
+    tsec0name :
+         (Default value = 'Tsec0')
+
+    Returns
+    -------
+
+    """
     import numpy as np;
     import pandas as pd;
     
@@ -269,6 +319,21 @@ def interpolate_df_to_samplerate(df, tcol, targ_srhzsec, tcolunit_s, truesrs=dic
 
 
 def get_dilated_nan_mask(arr, iterations, max_ignore_size=None):
+    """
+
+    Parameters
+    ----------
+    arr :
+        
+    iterations :
+        
+    max_ignore_size :
+         (Default value = None)
+
+    Returns
+    -------
+
+    """
     from scipy import ndimage
     clusters, nclusters = ndimage.label(np.isnan(arr))
     # go through all clusters and remove any cluster that is less
@@ -288,6 +353,23 @@ def get_dilated_nan_mask(arr, iterations, max_ignore_size=None):
     return mask;
 
 def get_dilated_mask(arr, iterations, dilateval, max_ignore_size=None):
+    """
+
+    Parameters
+    ----------
+    arr :
+        
+    iterations :
+        
+    dilateval :
+        
+    max_ignore_size :
+         (Default value = None)
+
+    Returns
+    -------
+
+    """
     clusters, nclusters = ndimage.label( (arr == dilateval) );
     # go through all clusters and remove any cluster that is less
     # the max_ignore_size
@@ -313,10 +395,22 @@ def get_dilated_mask(arr, iterations, dilateval, max_ignore_size=None):
 #REV: creates a RLE of True/False for condition (val==val). I.e. for input x, creates boolean array x==val, then
 # runs RLE on that, then otuputs a df, with some useful columns, possibly related to time (t)
 def cond_rle_df( x, val, t=None):
-    """
-    Compute lengths of chunks and put in df.
+    """Compute lengths of chunks and put in df.
     Note that the final chunk will have time of one less than expected (since no defined DT)
     Note that INDEXES are NON INCLUSIVE of endpoint.
+
+    Parameters
+    ----------
+    x :
+        
+    val :
+        
+    t :
+         (Default value = None)
+
+    Returns
+    -------
+
     """
     
     #if( t is None ):
@@ -414,6 +508,23 @@ def cond_rle_df( x, val, t=None):
 
 
 def events_over_thresh( x, thresh, t=None, invert=False ):
+    """
+
+    Parameters
+    ----------
+    x :
+        
+    thresh :
+        
+    t :
+         (Default value = None)
+    invert :
+         (Default value = False)
+
+    Returns
+    -------
+
+    """
     if( t is None ):
         t = range(0, len(x));
         pass;
@@ -445,6 +556,17 @@ def events_over_thresh( x, thresh, t=None, invert=False ):
 
 #REV: similar to RLE (before I knew about it).
 def contiguous_identical_vals( xs ):
+    """
+
+    Parameters
+    ----------
+    xs :
+        
+
+    Returns
+    -------
+
+    """
     xs=np.array(xs);
     same2left = ((xs[1:]-xs[:-1])==0)
     same2right = ((xs[:-1]-xs[1:])==0)
@@ -458,7 +580,19 @@ def contiguous_identical_vals( xs ):
 #REV: we can either include in our RLE (i.e. have sections that are "nan" together).
 #REV: They are not normally recognized due to "notequal"
 def rle(x, withnan=True):
-    """Find runs of consecutive items in an array."""
+    """Find runs of consecutive items in an array.
+
+    Parameters
+    ----------
+    x :
+        
+    withnan :
+         (Default value = True)
+
+    Returns
+    -------
+
+    """
     """REV: modified for NAN/INF (now exception)"""
     
     # ensure array
@@ -520,6 +654,21 @@ def rle(x, withnan=True):
 
 #REV: build array X from rle values
 def inverse_rle(run_values, run_starts, run_lengths):
+    """
+
+    Parameters
+    ----------
+    run_values :
+        
+    run_starts :
+        
+    run_lengths :
+        
+
+    Returns
+    -------
+
+    """
     totallen=np.sum(run_lengths); #REV: must be list?
     x=np.zeros(totallen, dtype=run_values.dtype); #REV: will make false if bool
     for val, st, size in zip(run_values, run_starts, run_lengths):
@@ -531,6 +680,19 @@ def inverse_rle(run_values, run_starts, run_lengths):
 
 
 def remove_suspicious_repeats(df, params):
+    """
+
+    Parameters
+    ----------
+    df :
+        
+    params :
+        
+
+    Returns
+    -------
+
+    """
     import math;
     import numpy as np;
     
@@ -566,6 +728,21 @@ def remove_suspicious_repeats(df, params):
 
 
 def dilate_nans( df, cols, params ):
+    """
+
+    Parameters
+    ----------
+    df :
+        
+    cols :
+        
+    params :
+        
+
+    Returns
+    -------
+
+    """
     sr=params['samplerate'];
     dilate_nan_win_samp = math.ceil(params['dilate_nan_win_sec'] * sr);
     #min_blink_samp = int(params['min_blink_sec'] * sr);
@@ -583,6 +760,21 @@ def dilate_nans( df, cols, params ):
 
 
 def dilate_val( arr, val, winsamp ):
+    """
+
+    Parameters
+    ----------
+    arr :
+        
+    val :
+        
+    winsamp :
+        
+
+    Returns
+    -------
+
+    """
     #min_blink_samp = int(params['min_blink_sec'] * sr);
     mask = np.full( len(arr), False );
     mask = mask | (get_dilated_mask( arr,
@@ -593,6 +785,19 @@ def dilate_val( arr, val, winsamp ):
     return arr;
 
 def dilate_xy_nans( df, params ):
+    """
+
+    Parameters
+    ----------
+    df :
+        
+    params :
+        
+
+    Returns
+    -------
+
+    """
     sr=params['samplerate'];
     dilate_nan_win_samp = math.ceil(params['dilate_nan_win_sec'] * sr);
     min_blink_samp = math.ceil(params['min_blink_sec'] * sr);

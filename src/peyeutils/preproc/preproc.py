@@ -7,6 +7,23 @@ import peyeutils as pu;
 import peyeutils.utils as ut;
 
 def preproc_SHARED_D_exclude_bad(df, xcol, ycol, badcol='bad'):
+    """
+
+    Parameters
+    ----------
+    df :
+        
+    xcol :
+        
+    ycol :
+        
+    badcol :
+         (Default value = 'bad')
+
+    Returns
+    -------
+
+    """
     df.loc[ True==df[badcol], [xcol,ycol] ] = np.nan;
     return df;
 
@@ -24,6 +41,39 @@ def preproc_SHARED_C_binoc_gaze(df,
                                 eyetags=[pu.PEYEUTILS_LEFT_EYE, pu.PEYEUTILS_RIGHT_EYE],
                                 btag=pu.PEYEUTILS_BINOC_EYE,
                                 ):
+    """
+
+    Parameters
+    ----------
+    df :
+        
+    xcol :
+        
+    ycol :
+        
+    tcol :
+        
+    badcol :
+         (Default value = 'bad')
+    eyecol :
+         (Default value = 'eye')
+    exclude_thresh :
+         (Default value = -1)
+    #Set to NAN any time points in which they are separated by this amountthresh_lr_badcol :
+         (Default value = 'badBINOCDXY')
+    only_alleyes_binoc :
+         (Default value = False)
+    eyetags :
+         (Default value = [pu.PEYEUTILS_LEFT_EYE)
+    pu.PEYEUTILS_RIGHT_EYE] :
+        
+    btag :
+         (Default value = pu.PEYEUTILS_BINOC_EYE)
+
+    Returns
+    -------
+
+    """
     
     if(len(eyetags) < 1):
         raise Exception("no eyetags");
@@ -225,6 +275,27 @@ def preproc_SHARED_C_binoc_gaze(df,
 
 #REV: both assume "flat screen"
 def preproc_SHARED_dva_from_flatscreen(df, ppm, distm, method='trig', dropraw=True, sanitythreshdva=-1):
+    """
+
+    Parameters
+    ----------
+    df :
+        
+    ppm :
+        
+    distm :
+        
+    method :
+         (Default value = 'trig')
+    dropraw :
+         (Default value = True)
+    sanitythreshdva :
+         (Default value = -1)
+
+    Returns
+    -------
+
+    """
     dva_per_m = ut.get_center_dva_per_meter( distm, ppm );
     dva_per_px = 1/ppm * dva_per_m;
     
@@ -309,6 +380,27 @@ def preproc_SHARED_pupilsize(sampledf,
                              characteristic_timescale_sec=0.010, #Rough characteristic timescale
                              ## of pupil size change
                              ):
+    """
+
+    Parameters
+    ----------
+    sampledf :
+        
+    timecol :
+        
+    #e.g. 'Tsec0'valcol :
+        
+    #e.g. 'pa'eyecol :
+        
+    #e.g. 'eye'characteristic_timescale_sec :
+         (Default value = 0.010)
+    #Rough characteristic timescale## of pupil size change :
+        
+
+    Returns
+    -------
+
+    """
     
     lst=[];
     for eye, df in sampledf.groupby(eyecol):
@@ -397,6 +489,41 @@ def preproc_SHARED_label_blinks(df,
                                 valcol='px',
                                 badcol='bad',
                                 preblinkcols=[] ): #'elhasblink']):
+    """
+
+    Parameters
+    ----------
+    df :
+        
+    sr_hzsec :
+        
+    blinkremoval_MAD_mult :
+         (Default value = 5)
+    blinkremoval_med_mult :
+         (Default value = 1)
+    blinkremoval_dilate_win_sec :
+         (Default value = 0.050)
+    blinkremoval_orphan_upperlimit_sec :
+         (Default value = 0.020)
+    blinkremoval_orphan_bracket_min_sec :
+         (Default value = 0.040)
+    blinkremoval_shortblink_minsize :
+         (Default value = 0.100)
+    tsecname :
+         (Default value = 'Tsec')
+    eyecol :
+         (Default value = 'eye')
+    valcol :
+         (Default value = 'px')
+    badcol :
+         (Default value = 'bad')
+    preblinkcols :
+         (Default value = [] ): #'elhasblink'])
+
+    Returns
+    -------
+
+    """
     newdflist = list();
 
     if( badcol in df.columns ):

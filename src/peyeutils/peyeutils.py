@@ -14,13 +14,33 @@ import os;
 import pandas as pd;
 import numpy as np;
 
-def preproc_peyefv_edf( in_edf_path,
-                                out_csv_path = None,
-                               ):
-    '''
-    Returns SAMPS, MSGS, TRIALBLOCKDF, BLOCKDF, ROWDICT, ERRORBOOL
-    '''
+def preproc_peyefv_edf( in_edf_path : str,
+                        out_csv_path : str = None,
+                       ):
+    """
 
+    Parameters
+    ----------
+    in_edf_path : str :  Filesystem path to edf file to read/preprocess (e.g. blah/bloop/file.edf)
+        
+    out_csv_path : str :  Filesystem path of directory in which to store CSV files created by this function (containing samples, messages, indices of trials/video starts/etc.).
+        (Default value = None)
+
+    Returns
+    -------
+    5-Tuple (row, sampdf, msgdf, trialdf, blockdf)
+    row : dict : parameters and filenames of CSV files created. blocktrials_csv, blocks_csv, samples_csv, messages_csv, events_csv, edfsamples_csv, etc.
+
+    sampdf : pandas.DataFrame : dataframe containing (preprocessed) samples
+
+    msgdf : pandas.DataFrame : dataframe containing (preprocessed) messages from EDF
+    
+    trialdf : pandas.DataFrame : dataframe containing trial start/end times, video names, sizes, etc. extracted from EDF messages.
+
+    blockdf : pandas.DataFrame : dataframe containing start/end times of blocks in the EDF file.
+    
+    """
+    #-> (pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame, dict, bool):
     if( out_csv_path ):
         
         pu.utils.create_dir(out_csv_path);
@@ -52,8 +72,8 @@ def preproc_peyefv_edf( in_edf_path,
         row['edferror'] = True;
         error=True;
         print("  -------- WARNING -- Could not read EDF file [{}], exception [{}]".format(in_edf_path, e));
-        return pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), row, error;
-    
+        return row, pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
+        
     
     if( out_csv_path ):
         #mkdir(out_csv_path);
@@ -102,7 +122,7 @@ def preproc_peyefv_edf( in_edf_path,
     
         
     
-    trialdf = pu.peyefv.import_fmri_trials( msgs );
+    trialdf = pu.peyefv.import_fv_trials( msgs );
     if( badtrial ):
         #trialdf['haseyetracking'] = False;
         haseyetracking=False;
@@ -110,23 +130,23 @@ def preproc_peyefv_edf( in_edf_path,
         pass;
     
         
-    blockdf, blocktrialdf = pu.peyefv.import_fmri_blocks(msgs, df, trialdf);
-        
+    blockdf, trialdf = pu.peyefv.import_fv_blocks(msgs, df, trialdf);
+    
     trialdf['haseyetracking']=haseyetracking;
-    blocktrialdf['haseyetracking']=haseyetracking;
     blockdf['haseyetracking']=haseyetracking;
     row['haseyetracking'] = haseyetracking;
 
     if( out_csv_path ):
-        btfname=fname+'.blocktrials.csv';
+        btfname=fname+'.trials.csv';
         bfname=fname+'.blocks.csv';
         btpath=os.path.join(out_csv_path, btfname);
         bpath=os.path.join(out_csv_path, bfname);
-        blocktrialdf.to_csv(btpath);
+        trialdf.to_csv(btpath);
         blockdf.to_csv(bpath);
         
-        row['blocktrials_csv'] = btfname;
+        row['trials_csv'] = btfname;
         row['blocks_csv'] = bfname;
         pass;
     
-    return df, msgs, blocktrialdf, blockdf, row, error;
+    
+    return row, df, msgs, trialdf, blockdf

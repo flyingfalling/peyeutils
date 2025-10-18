@@ -20,6 +20,21 @@ import peyeutils.preproc as pre;
 
 
 def preproc_EL_A00_add_Tsec(rawdf, timecol='time', timeunitsec=pu.EL_TIMEUNIT_SEC):
+    """
+
+    Parameters
+    ----------
+    rawdf :
+        
+    timecol :
+         (Default value = 'time')
+    timeunitsec :
+         (Default value = pu.EL_TIMEUNIT_SEC)
+
+    Returns
+    -------
+
+    """
     tvals = rawdf[timecol];
     rawdf = rawdf[ [c for c in rawdf.columns if c!=timecol] ]; #drop old timecol
     rawdf['EL'+timecol] = tvals;
@@ -39,6 +54,39 @@ def preproc_EL_A01_separate_samps_eye( samples,
                                        timeunit=1e-3,
                                        exclude_EL_blinks=False,
                                        ELcutoff=30000, #REV: their representtaion of NAN is like 100000000.. ):
+    """
+
+    Parameters
+    ----------
+    samples :
+        
+    samplerate :
+        
+    ELtname :
+         (Default value = 'time')
+    #REV: this is "EL" default time columntname :
+         (Default value = 'Tmsec')
+    tsecname :
+         (Default value = 'Tsec')
+    eyename :
+         (Default value = 'eye')
+    eyes_to_use :
+         (Default value = [pu.PEYEUTILS_LEFT_EYE)
+    pu.PEYEUTILS_RIGHT_EYE] :
+        
+    timeunit :
+         (Default value = 1e-3)
+    exclude_EL_blinks :
+         (Default value = False)
+    ELcutoff :
+         (Default value = 30000)
+    #REV: their representtaion of NAN is like 100000000.. :
+        
+
+    Returns
+    -------
+
+    """
                                        clean_errors=True,
                                        drop_bad_eyes=False,
                                       ):
@@ -239,6 +287,23 @@ def preproc_EL_A02_clean_events(eventdf,
                                 timeunitsec=1e-3,
                                 eyes_to_use=[pu.PEYEUTILS_LEFT_EYE, pu.PEYEUTILS_RIGHT_EYE],
                                 ):
+    """
+
+    Parameters
+    ----------
+    eventdf :
+        
+    timeunitsec :
+         (Default value = 1e-3)
+    eyes_to_use :
+         (Default value = [pu.PEYEUTILS_LEFT_EYE)
+    pu.PEYEUTILS_RIGHT_EYE] :
+        
+
+    Returns
+    -------
+
+    """
     
     containblinkcol='contains_blink';
     if( containblinkcol not in eventdf.columns ):
@@ -331,6 +396,23 @@ def preproc_EL_A02_clean_events(eventdf,
 
 def preproc_EL_A_clean_samples(rawsamps, rawevents, rawmessages,
                                preblinks=False):
+    """
+
+    Parameters
+    ----------
+    rawsamps :
+        
+    rawevents :
+        
+    rawmessages :
+        
+    preblinks :
+         (Default value = False)
+
+    Returns
+    -------
+
+    """
     
     
     msgs = pfv.separate_EDF_msg_tags(rawmessages);
@@ -414,6 +496,39 @@ def preproc_EL_A03_filter_samps_by_ELevents(df, ev,
                                             nan_EL_contains_blinks=False,
                                             nan_EL_pure_blinks=False,
                                             ):
+    """
+
+    Parameters
+    ----------
+    df :
+        
+    ev :
+        
+    sr_hzsec :
+        
+    timeunitsec :
+         (Default value = 1e-3)
+    xname :
+         (Default value = 'px')
+    yname :
+         (Default value = 'py')
+    tname :
+         (Default value = 'Tmsec')
+    tname0 :
+         (Default value = 'Tmsec0')
+    tsecname :
+         (Default value = 'Tsec')
+    tsecname0 :
+         (Default value = 'Tsec0')
+    nan_EL_contains_blinks :
+         (Default value = False)
+    nan_EL_pure_blinks :
+         (Default value = False)
+
+    Returns
+    -------
+
+    """
     df['elblink']=False;
     df['elhasblink']=False;
     df['elsacc']=False;
@@ -606,6 +721,21 @@ def preproc_EL_A03_filter_samps_by_ELevents(df, ev,
 #REV: adds vbox space (pixels from...bottom-left?), stimulus space (if stimulus?), dvaspace (given physical).
 #REV: this ASSUMES caliabration 
 def preproc_EL_rawcalib_px(df, msgs, FLIPY=-1):
+    """
+
+    Parameters
+    ----------
+    df :
+        
+    msgs :
+        
+    FLIPY :
+         (Default value = -1)
+
+    Returns
+    -------
+
+    """
     gcdict = pu.peyefv.get_gazecoords(msgs); #has l, t, r, b
     #REV: gx will be in this space.
     
