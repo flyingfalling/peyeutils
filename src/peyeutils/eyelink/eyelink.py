@@ -54,6 +54,10 @@ def preproc_EL_A01_separate_samps_eye( samples,
                                        timeunit=1e-3,
                                        exclude_EL_blinks=False,
                                        ELcutoff=30000, #REV: their representtaion of NAN is like 100000000.. ):
+
+                                       clean_errors=True,
+                                       drop_bad_eyes=False,
+                                      ):
     """
 
     Parameters
@@ -87,10 +91,6 @@ def preproc_EL_A01_separate_samps_eye( samples,
     -------
 
     """
-                                       clean_errors=True,
-                                       drop_bad_eyes=False,
-                                      ):
-    
     if( len(samples.index) < 2 ):
         print("GOOD_EL_SMAPLES_LR: no samples in df (you should exclude this data anyways)");
         return pd.DataFrame();

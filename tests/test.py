@@ -13,7 +13,7 @@ def plotit(edfrow, out_csv_path):
     elparamdict = pu.peyefv.get_elparams(msgdf); # has samplerate etc.
     ELsr=elparamdict['samplerate'];
     sampdf = pd.read_csv( os.path.join(out_csv_path, edfrow['samples_csv']) );
-    edftrials=pd.read_csv( os.path.join(out_csv_path, edfrow['blocktrials_csv']) );
+    edftrials=pd.read_csv( os.path.join(out_csv_path, edfrow['trials_csv']) );
     edfblocks=pd.read_csv( os.path.join(out_csv_path, edfrow['blocks_csv']) );
     #sampdf = pd.read_csv( os.path.join(out_csv_path, row['samples_csv']) );
     #sampdf = sampdf[ sampdf['eye'] == 'B' ];
@@ -288,7 +288,7 @@ def test1(out_csv_path):
         pass;
     print("Setting input EDF filename to [{}]".format(fn));
     
-    s, m, bt, b, row, error = pu.preproc_peyefv_edf(fn, out_csv_path=out_csv_path);
+    row, s, m, bt, b = pu.preproc_peyefv_edf(fn, out_csv_path=out_csv_path);
     
     print(s);
     print(bt);
