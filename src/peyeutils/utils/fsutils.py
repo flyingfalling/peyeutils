@@ -83,3 +83,13 @@ def isfile(fname):
 
     """
     return os.path.isfile( fname );
+
+
+## REV: todo make it generate so I can handle very very large files.
+def ungzip_text_file_to_lines(fn, create_ungzip=False):
+    import gzip
+    dictlines=list();
+    with gzip.open(fn, 'rb') as f_in:
+        dictlines = f_in.readlines();
+        pass;
+    return dictlines;
