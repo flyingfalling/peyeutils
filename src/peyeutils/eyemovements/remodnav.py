@@ -15,7 +15,6 @@ from scipy.signal import savgol_filter
 from scipy.ndimage import median_filter
 
 
-
 ## This finds peaks in data (note, shit, it just removes NAN data wtf?)
 def find_peaks(vels, threshold):
     def _get_vels(start, end):
@@ -603,6 +602,8 @@ def classify_intersaccade_periods(  eyesamps,
         yield e;
         pass;
     pass;
+
+
 
 
 

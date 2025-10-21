@@ -9,7 +9,6 @@ import sys;
 
 def plotit(edfrow, out_csv_path):
     msgdf = pd.read_csv( os.path.join(out_csv_path, edfrow['messages_csv']) );
-    
     elparamdict = pu.peyefv.get_elparams(msgdf); # has samplerate etc.
     ELsr=elparamdict['samplerate'];
     sampdf = pd.read_csv( os.path.join(out_csv_path, edfrow['samples_csv']) );
@@ -272,7 +271,25 @@ def plotit(edfrow, out_csv_path):
     
     return;
 
+def saccades_remodnav( edfrow, out_csv_path):
+    msgdf = pd.read_csv( os.path.join(out_csv_path, edfrow['messages_csv']) );
+    elparamdict = pu.peyefv.get_elparams(msgdf); # has samplerate etc.
+    ELsr=elparamdict['samplerate'];
+    sampdf = pd.read_csv( os.path.join(out_csv_path, edfrow['samples_csv']) );
 
+    import peyeutils.eyemovements.remodnav as rv;
+    
+    params1 = rv.make_default_preproc_params(ELsr, 1, 'xcdva', 'ycdva', 'tsec0');
+    params2 = rv.make_default_params();
+    params = params1 | params2;
+
+    rdf = remodnav_preprocess_eyetrace2d(eyesamps=sampdf, params=params);
+    ev = remodnav_classify_events(rdf, params);
+
+    print(ev);
+    ev.to_csv('events.csv', index=False);
+    
+    return;
 
 
 
@@ -309,12 +326,21 @@ def test2(row, out_csv_path):
     
     return;
 
+def test3(row, out_csv_path):
+    row = { a:[row[a]] for a in row };
+    df = pd.DataFrame(row);
+
+    saccades_remodnav( df.iloc[0], out_csv_path );
+    
+    return;
+
 def main():
     outcsv='outcsvs';
     row = test1(out_csv_path=outcsv);
     print("MY ROW", row);
     if( False == row['edferror'] ):
         test2(row, out_csv_path=outcsv);
+        test3(row, out_csv_path=outcsv);
         pass;
     else:
         print("Empty row, i.e. no file?");

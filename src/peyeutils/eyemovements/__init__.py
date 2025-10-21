@@ -1,1 +1,2 @@
-from peyeutils.eyemovements.remodnav import *;
+#from peyeutils.eyemovements import remodnav;
+import peyeutils.eyemovements.remodnav;
