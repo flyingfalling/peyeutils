@@ -6,3 +6,4 @@ from peyeutils.utils.nputils import *;
 from peyeutils.utils.statutils import *;
 from peyeutils.utils.tsutils import *;
 from peyeutils.utils.unitutils import *;
+from peyeutils.utils.filtering import *;
