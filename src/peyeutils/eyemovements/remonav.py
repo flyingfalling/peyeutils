@@ -1,18 +1,40 @@
 from peyeutils.utils import filter_spikes;
 
-#REV: this uses index and not raw time column for detecting...
+
+import numpy as np;
+import pandas as pd;
+import math;
+
+
+from statsmodels.robust.scale import mad;
+
+from scipy import signal
+#from scipy import ndimage
+
+from scipy.signal import savgol_filter
+from scipy.ndimage import median_filter
+
+
+
+## This finds peaks in data (note, shit, it just removes NAN data wtf?)
 def find_peaks(vels, threshold):
     def _get_vels(start, end):
         v = vels[start:end]
         v = v[~np.isnan(v)]
         return v;
     
-    sacs = [];
+    sacs = list();
     sac_on = None;
     for i, v in enumerate(vels):
+        ## If not in sacc and v goes above threshold, set the index of the saccade onset.
         if sac_on is None and v > threshold:
             # start of a saccade
-            sac_on = i
+            sac_on = i;
+            pass;
+
+        ## Else, if I'm in a saccade and I'm below some threshold, add me as a saccade, appending tuple of
+        ## [ previdx, nowidx, velarray ] where vellarray is just the list of velocities with NANs elided...
+        ## And turn off sacc
         elif sac_on is not None and v < threshold:
             sacs.append([ sac_on,
                           i,
@@ -21,6 +43,8 @@ def find_peaks(vels, threshold):
                          ]);
             sac_on = None;
             pass;
+        pass;
+    
     if sac_on:
         # end of data, but velocities still high
         sacs.append([ sac_on,
@@ -31,8 +55,7 @@ def find_peaks(vels, threshold):
     return sacs;
 
 
-def get_adaptive_saccade_velocity_velthresh( vels, params ): #, startvel=300.0, noiseconst=5.0 ):
-    #print("HI", params);
+def get_adaptive_saccade_velocity_velthresh( vels, params ):
     cur_thresh = params['startvel'];
     noiseconst = params['noiseconst'];
 
@@ -63,19 +86,22 @@ def get_adaptive_saccade_velocity_velthresh( vels, params ): #, startvel=300.0, 
     
     return cur_thresh, (med + noiseconst * scale);
 
-
+#REV: shit these are sensitive to timescale (and local noise?)
 def find_movement_onsetidx( vels, start_idx, sac_onset_velthresh ):
     idx = start_idx;
+
+    ## While I'm still bigger than the onset threshold OR I'm bigger than the one before me,
+    ##    step to the one before me.
     while idx > 0  and (vels[idx] > sac_onset_velthresh or
-                        #vels[idx] <= vels[idx - 1]): #REV: fixed?
                         vels[idx] > vels[idx - 1]):
         
         #REV: he means local MAXIMUM?!?!?!
         # find first local minimum after vel drops below onset threshold
         # going backwards in time
-
+        
         # we used to do this, but it could mean detecting very long
         # saccades that consist of (mostly) missing data
+        #REV: ah, but what about "blinks"? If saccade includes a blink...hard to compute properly properties...
         #         or np.isnan(vels[sacc_start])):
         idx -= 1
         pass;
@@ -86,8 +112,13 @@ def find_movement_offsetidx( vels, start_idx, off_velthresh ):
     idx = start_idx;
     # shift saccade end index to the first element that is below the
     # velocity threshold
-    while idx < len(vels) - 1 and (vels[idx] > off_velthresh or
-                                   (vels[idx] > vels[idx + 1])):
+
+    ## While we didn't run out of things and
+    ## I'm still greater than offset thresh OR still bigger than the next one, step to the  next one.
+    while ((idx < len(vels) - 1) and
+           (vels[idx] > off_velthresh or
+            (vels[idx] > vels[idx + 1]))
+           ):
             # we used to do this, but it could mean detecting very long
             # saccades that consist of (mostly) missing data
             #    or np.isnan(vels[idx])):
@@ -97,15 +128,20 @@ def find_movement_offsetidx( vels, start_idx, off_velthresh ):
 
 
 def find_psoend( velocities, sac_velthresh, sac_peak_velthresh ):
-    
+
+    #REV: this is finding very high peaks of saccades
     pso_peaks = find_peaks(velocities, sac_peak_velthresh)
 
+    ## "high" peak saccade onsets?
     if pso_peaks:
         pso_label = 'HPSO';
-    else:
+        pass;
+    else: ## "low" peak saccade onsets (maybe drifts?)
         pso_peaks = find_peaks(velocities, sac_velthresh);
         if pso_peaks:
             pso_label = 'LPSO';
+            pass;
+        pass;
     if not pso_peaks:
         # no PSO
         return;
@@ -128,7 +164,15 @@ def make_event(mydata, idx, lab, stidx, enidx, params={}):
     #REV: mydata better be sorted...
     xname=params['xname'];
     yname=params['yname'];
-    event = {"idx":idx, "label":lab, "stidx":stidx, "enidx":enidx-1, "stx":mydata.loc[stidx][xname], "sty":mydata.loc[stidx][yname], "enx":mydata.loc[enidx-1][xname], "eny":mydata.loc[enidx-1][yname]};
+    event = {"idx":idx,
+             "label":lab,
+             "stidx":stidx,
+             "enidx":enidx-1,
+             "stx":mydata.loc[stidx][xname],
+             "sty":mydata.loc[stidx][yname],
+             "enx":mydata.loc[enidx-1][xname],
+             "eny":mydata.loc[enidx-1][yname]
+             };
     
     if( len(mydata[ ~np.isnan(mydata.vel) ].index) > 0 ):
         event["pvel"] = mydata.vel.max();
@@ -157,15 +201,16 @@ def make_event(mydata, idx, lab, stidx, enidx, params={}):
     return event;
     
 #REV: again, candidate locs is in terms of indices, not time column...
-def detect_saccades( candidate_locs, eyesamps, start=None, end=None, winlen=None, params={}): #winlen, min_intersaccade_duration=0.04, min_sac_dur, min_intersac_dur , max_sac_freq ):
-    saccade_events = []
+def detect_saccades( candidate_locs, eyesamps, start=None, end=None, winlen=None, params={}):
+    #winlen, min_intersaccade_duration=0.04, min_sac_dur, min_intersac_dur , max_sac_freq ):
+    saccade_events = list();
     
     if start is None and end is None:
         start = 0;
         end = len(eyesamps.index);
         pass;
-
-
+    
+    
     if( winlen is None ):
         sac_peak_velthresh, sac_onset_velthresh = get_adaptive_saccade_velocity_velthresh( eyesamps.loc[start:end]['vel'],
                                                                                            params=params);
@@ -222,7 +267,7 @@ def detect_saccades( candidate_locs, eyesamps, start=None, end=None, winlen=None
         elif(status[max(0, (sacc_start - params['min_intersac_dur'])):min(len(eyesamps.index), (sacc_end + params['min_intersac_dur']))].sum()):
             #lgr.debug('Skip saccade candidate, too close to another event')
             continue;
-
+        
         #REV: exclude saccades that start or end with the trial, and saccades whose immediate before/after is NAN (or inf).
         elif( (sacc_start == 0)
               or
@@ -233,11 +278,7 @@ def detect_saccades( candidate_locs, eyesamps, start=None, end=None, winlen=None
               ( (sacc_end < (len(eyesamps.vel)-1) ) and (not np.isfinite(eyesamps.vel[sacc_end+1])) ) #REV: assume for this end is included...
              ):
             continue;
-              
         
-        #lgr.debug('Found SACCADE [%i, %i]',
-        #          sacc_start, sacc_end)
-        #event = self._mk_event_record(data, i, "SACC", sacc_start, sacc_end)
         
         #REV: if all NAN return NAN for everything.
         event = make_event( mydata, i, "SACC", sacc_start, sacc_end, params=params); #xname, yname );
@@ -249,7 +290,7 @@ def detect_saccades( candidate_locs, eyesamps, start=None, end=None, winlen=None
         
         # mark as a saccade
         status[sacc_start:sacc_end] = 1;
-
+        
         pso = find_psoend( mydata.loc[sacc_end:(sacc_end + params['max_pso_dur'])].vel,
                            sac_onset_velthresh,
                            sac_peak_velthresh);
@@ -296,7 +337,7 @@ def fix_or_pursuit( eyesamps, start, end, params={}): #min_fix_dur, pursuit_velt
                               analog=False)
         return b, a;
 
-    b, a = _butter_lowpass(params['lp_cutoff_freq'], params['samplerate']);
+    b, a = _butter_lowpass(params['lp_cutoff_freq'], params['samplerate_hzsec']);
     xname=params['xname'];
     yname=params['yname'];
     if( xname == yname ):
@@ -307,7 +348,7 @@ def fix_or_pursuit( eyesamps, start, end, params={}): #min_fix_dur, pursuit_velt
     # no entry for first datapoint!
     
     velspx = np.sqrt( np.diff(win_data[xname])**2 + np.diff(win_data[yname])**2 );
-    win_vels = velspx * params['dva_per_px'] * params['samplerate'];
+    win_vels = velspx * params['dva_per_px'] * params['samplerate_hzsec'];
     
     pursuit_peaks = find_peaks(win_vels, params['pursuit_velthresh']);
     
@@ -353,7 +394,9 @@ def fix_or_pursuit( eyesamps, start, end, params={}): #min_fix_dur, pursuit_velt
     evs = [ev for ev in evs
            if ev[2] - ev[1] >= {
                1: params['min_purs_dur'],
-               0: params['min_fix_dur']}[ev[0]]]
+               0: params['min_fix_dur']
+           }[ev[0]]];
+    
     merged_evs = []
     for i, ev in enumerate(evs):
         if i == len(evs) - 1:
@@ -390,6 +433,8 @@ def fix_or_pursuit( eyesamps, start, end, params={}): #min_fix_dur, pursuit_velt
         yield make_event( eyesamps, None, label, estart, eend, params=params);
         pass;
     pass;
+
+
 
 
 
@@ -459,6 +504,8 @@ def classify_intersaccade_period_helper( eyesamps,
     pass;
 
 
+
+
             
 def classify_intersaccade_period( eyesamps,
                                   start,
@@ -485,6 +532,8 @@ def classify_intersaccade_period( eyesamps,
             pass;
         pass;
     pass;
+
+
 
 
 def classify_intersaccade_periods(  eyesamps,
@@ -558,12 +607,14 @@ def classify_intersaccade_periods(  eyesamps,
 
 
 
-#REV: R package based on old algo:
+
+
+#REV: R package based on old algo (huh??? This is not remodnav):
 # https://github.com/tmalsburg/saccades
 
 #REV: classify events using remodnav
 def remodnav_classify_events(eyesamps, params): #sac_window_sec=1.0):
-    samplerate=params['samplerate'];
+    samplerate=params['samplerate_hzsec'];
     
     # find threshold velocities
     #print("CLASS EVENTS", params);
@@ -591,7 +642,7 @@ def remodnav_classify_events(eyesamps, params): #sac_window_sec=1.0):
         saccade_events.append(e.copy());
         events.append(e);
         pass;
-        
+    
     #REV: inter saccade periods (fixations or slow phases etc.?)
     events.extend( classify_intersaccade_periods( eyesamps=eyesamps,
                                                   start=0,
@@ -603,6 +654,7 @@ def remodnav_classify_events(eyesamps, params): #sac_window_sec=1.0):
                   );
     
     df = pd.DataFrame( events );
+    
     #print(df);
     if( len(df.index) > 0 ):
         df['stsec'] = df['stidx'] / samplerate;
@@ -620,12 +672,12 @@ def remodnav_classify_events(eyesamps, params): #sac_window_sec=1.0):
 
 
 
-def make_default_params(samplerate, dva_per_px): # samplerate, dva_per_px ):
+def make_default_params(): #samplerate_hzsec, dva_per_px): # samplerate, dva_per_px ):
     #REV: these are represented in seconds. Need to mult by sample rate...
 
     #REV: wtf, PK 377 at 4.100, PK 333 at 3.200 sec
     #REV: microsaccs not detected properly...
-d
+
     #REV: integrate path integral, and time passed?
 
     #REV: how can I remove "weird shit"? It does not even detect fucking pursuits...
@@ -653,10 +705,10 @@ d
     newdict={};
     for p in params:
         if 'dur_sec' in p:
-            newdict[ p[:-4] ] = int(params[p] * samplerate);
+            newdict[ p[:-4] ] = int(params[p] * samplerate_hzsec);
             pass;
         elif 'freq_sec' in p:
-            newdict[ p[:-4] ] = int(params[p] / samplerate);
+            newdict[ p[:-4] ] = int(params[p] / samplerate_hzsec);
             pass;
         else:
             pass;
@@ -664,13 +716,15 @@ d
     
     params = {**params, **newdict};
     
-    params['samplerate'] = samplerate;
-    params['dva_per_px'] = dva_per_px;
+    #params['samplerate_hzsec'] = samplerate;
+    #params['dva_per_px'] = dva_per_px;
     
     return params;
 
 
-def make_default_preproc_params(samplerate, dva_per_px): # samplerate, dva_per_px ):
+
+
+def make_default_preproc_params(samplerate_hzsec, dva_per_px, xname, yname, tname): # samplerate, dva_per_px ):
     #REV: these are represented in seconds. Need to mult by sample rate...
 
     #REV: actually, it is the SLOWER velocities that are due to after-blink...as pupil size changes ;(
@@ -684,13 +738,16 @@ def make_default_preproc_params(samplerate, dva_per_px): # samplerate, dva_per_p
                 savgolorder=2,
                 maxveldegsec=2000,
                 #maxaccdegsecsec=# let's say it goes from 300 to 500 in one sample. That is 200 deg/sec in 2.5 msec, i.e. 80k deg/sec/sec
-                samplerate=samplerate,
+                samplerate_hzsec=samplerate_hzsec,
                 dva_per_px=dva_per_px,
                 blink_vel_thresh_degsec=5000,
                 #240 means it goes 600 deg/sec in one sample at 400hz.
                 blink_acc_thresh_degsecsec=800000, #300000, #REV: average over window? No, acc will go up, down, up?! Fuck...
                 #REV: shorter time implies higher acceleration.
                 #blink_acc_lpf_window_sec=0.010,
+                xname=xname,
+                yname=yname,
+                tname=tname,
                 );
     
     return params;
@@ -705,14 +762,16 @@ def make_default_preproc_params(samplerate, dva_per_px): # samplerate, dva_per_p
 ## I think this is for remodnav?
 
 #REV: samples must be from single eye etc., i.e. can't be interlaced.
-#REV: note eye samps must be "dense"
+#REV: note eye samps must be "dense", i.e. every sample must be 1/samplerate_hz_sec seconds apart.
 #REV: these values *SHOULD* represent linear pitch (x) and yaw (y). If not, you must convert to them.
 #REV: time must be in SECONDS...
 ### TIME MUST BE MONOTONIC INCREASING, WILL SORT TO MAKE SURE (will resample to regular sampling rate with NANs)
 
 #REV: note, this does NOT DETECT BLINKS (assumes they are already detected as NANs).
-def preprocess_eyetrace2d(eyesamps, params={}):
-    samplerate=params['samplerate'];
+def remodnav_preprocess_eyetrace2d(eyesamps : pd.DataFrame,
+                                   params : dict):
+    
+    samplerate=params['samplerate_hzsec'];
     dva_per_px=params['dva_per_px'];
     xname=params['xname'];
     yname=params['yname'];
@@ -741,13 +800,16 @@ def preprocess_eyetrace2d(eyesamps, params={}):
     #print('beginning', len(eyesamps));
     
     #REV: resample first?
+
+    '''
     if( 'tstartsec' in params and 'tlensec' in params ):
-        eyesamps = resample_at_rate_nearest( eyesamps, params['tstartsec'], params['tstartsec']+params['tlensec'], tname, params['samplerate'], params['timeunit'] );
+        eyesamps = resample_at_rate_nearest( eyesamps, params['tstartsec'], params['tstartsec']+params['tlensec'], tname, params['samplerate_hzsec'], params['timeunit'] );
         #REV: start time at tstart
         pass;
     else:
-        eyesamps = resample_at_rate_nearest( eyesamps, eyesamps[tname].min(), eyesamps[tname].max(), tname, params['samplerate'], params['timeunit'] );
+        eyesamps = resample_at_rate_nearest( eyesamps, eyesamps[tname].min(), eyesamps[tname].max(), tname, params['samplerate_hzsec'], params['timeunit'] );
         pass;
+    '''
     
     #print('after resamp', len(eyesamps));
     
@@ -764,7 +826,7 @@ def preprocess_eyetrace2d(eyesamps, params={}):
     #REV: handle improper size of data based on sample rate?
     #print(len(eyesamps.index));
     #print("EYESAMP TIME DIFF", eyesamps.time.max() - eyesamps.time.min());
-    dur = (eyesamps[tname].max() - eyesamps[tname].min()) * params['timeunit'];
+    dur = (eyesamps[tname].max() - eyesamps[tname].min()) * (1/params['timeunit']); # e.g. 1/0.001 is 1000.
     #print("Time sacc diff: {}".format(dur));
     GRACE_SEC=0.0005*dur; #REV: drift...
     expecteddur=((len(eyesamps.index)-1) / samplerate); #500 samples / 500 samp/sec = 1 sec. #2 samples makes 2 msec...so 1 sample is...0.
@@ -813,7 +875,9 @@ def preprocess_eyetrace2d(eyesamps, params={}):
     blink_acc_thresh_degsecsec = params['blink_acc_thresh_degsecsec'];
     
     velspx = np.sqrt( np.diff(eyesamps[xname])**2 + np.diff(eyesamps[yname])**2 ); #REV: this is PER SAMPLE. Shit...is this radians?
-    velsdva = velspx * dva_per_px * samplerate; #REV: per sec. Note missing first value?
+
+    #REV: if time is in msec, then what? I don't use that info...
+    velsdva = velspx * dva_per_px * samplerate / params['timeunit'];   #REV: per sec. Note missing first value?
     velsdva = np.append([0], velsdva);
     
     eyesamps['vel'] = velsdva;
@@ -833,7 +897,7 @@ def preprocess_eyetrace2d(eyesamps, params={}):
     print("Detected {} timepoints outside of velocity or acceleration allowance.".format(len(es2.index)));
     
     eyesamps.loc[ ((eyesamps.acc >= blink_acc_thresh_degsecsec) | (eyesamps.vel >= blink_vel_thresh_degsec)), cols ] = np.nan;
-
+    
     pren = eyesamps[ eyesamps[cols].isna().any(axis=1) ]; #  len(eyesamps[ eyesamps[cols].isna() ].index);
     
     eyesamps.loc[ eyesamps[cols].isna().any(axis=1), cols ] = np.nan;
