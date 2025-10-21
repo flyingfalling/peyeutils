@@ -264,7 +264,7 @@ def plotit(edfrow, out_csv_path):
         fname="{}_blk{}.png".format(edfrow.edffile, blockrow.blkidx);
         print("Saving figure {}".format(fname));
         plt.savefig(fname, dpi=300);
-        plt.show();
+        #plt.show();
         plt.close(fig);
         pass;
 
@@ -276,16 +276,20 @@ def saccades_remodnav( edfrow, out_csv_path):
     elparamdict = pu.peyefv.get_elparams(msgdf); # has samplerate etc.
     ELsr=elparamdict['samplerate'];
     sampdf = pd.read_csv( os.path.join(out_csv_path, edfrow['samples_csv']) );
+    
+    sampdf = sampdf[ sampdf.eye == 'B' ];
 
+    print(sampdf.cgx_dva);
+    
     import peyeutils.eyemovements.remodnav as rv;
     
-    params1 = rv.make_default_preproc_params(ELsr, 1, 'xcdva', 'ycdva', 'tsec0');
-    params2 = rv.make_default_params();
+    params1 = rv.make_default_preproc_params(samplerate_hzsec=ELsr, timeunitsec=1, dva_per_px=1, xname='cgx_dva', yname='cgy_dva', tname='Tsec0');
+    params2 = rv.make_default_params(samplerate_hzsec=ELsr);
     params = params1 | params2;
 
-    rdf = remodnav_preprocess_eyetrace2d(eyesamps=sampdf, params=params);
-    ev = remodnav_classify_events(rdf, params);
-
+    rdf = rv.remodnav_preprocess_eyetrace2d(eyesamps=sampdf, params=params);
+    ev = rv.remodnav_classify_events(rdf, params);
+    
     print(ev);
     ev.to_csv('events.csv', index=False);
     

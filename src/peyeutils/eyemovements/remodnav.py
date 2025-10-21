@@ -1,4 +1,4 @@
-from peyeutils.utils import filter_spikes;
+from peyeutils.utils import filter_spikes, allnan, dilate_nans;
 
 
 import numpy as np;
@@ -13,6 +13,7 @@ from scipy import signal
 
 from scipy.signal import savgol_filter
 from scipy.ndimage import median_filter
+
 
 
 ## This finds peaks in data (note, shit, it just removes NAN data wtf?)
@@ -673,7 +674,7 @@ def remodnav_classify_events(eyesamps, params): #sac_window_sec=1.0):
 
 
 
-def make_default_params(): #samplerate_hzsec, dva_per_px): # samplerate, dva_per_px ):
+def make_default_params(samplerate_hzsec): #samplerate_hzsec, dva_per_px): # samplerate, dva_per_px ):
     #REV: these are represented in seconds. Need to mult by sample rate...
 
     #REV: wtf, PK 377 at 4.100, PK 333 at 3.200 sec
@@ -725,7 +726,7 @@ def make_default_params(): #samplerate_hzsec, dva_per_px): # samplerate, dva_per
 
 
 
-def make_default_preproc_params(samplerate_hzsec, dva_per_px, xname, yname, tname): # samplerate, dva_per_px ):
+def make_default_preproc_params(samplerate_hzsec, timeunitsec, dva_per_px, xname, yname, tname): # samplerate, dva_per_px ):
     #REV: these are represented in seconds. Need to mult by sample rate...
 
     #REV: actually, it is the SLOWER velocities that are due to after-blink...as pupil size changes ;(
@@ -749,6 +750,7 @@ def make_default_preproc_params(samplerate_hzsec, dva_per_px, xname, yname, tnam
                 xname=xname,
                 yname=yname,
                 tname=tname,
+                timeunitsec=timeunitsec,
                 );
     
     return params;
@@ -782,8 +784,8 @@ def remodnav_preprocess_eyetrace2d(eyesamps : pd.DataFrame,
     savgol_window = int(params['savgollensec'] * samplerate);
     median_window = int(params['medianfiltlensec'] * samplerate );
     savgolorder = params['savgolorder'];
-    
-    
+
+        
     if( 'vel' in eyesamps.columns or
         'medvel' in eyesamps.columns or
         'acc' in eyesamps.columns ):
@@ -804,11 +806,11 @@ def remodnav_preprocess_eyetrace2d(eyesamps : pd.DataFrame,
 
     '''
     if( 'tstartsec' in params and 'tlensec' in params ):
-        eyesamps = resample_at_rate_nearest( eyesamps, params['tstartsec'], params['tstartsec']+params['tlensec'], tname, params['samplerate_hzsec'], params['timeunit'] );
+        eyesamps = resample_at_rate_nearest( eyesamps, params['tstartsec'], params['tstartsec']+params['tlensec'], tname, params['samplerate_hzsec'], params['timeunitsec'] );
         #REV: start time at tstart
         pass;
     else:
-        eyesamps = resample_at_rate_nearest( eyesamps, eyesamps[tname].min(), eyesamps[tname].max(), tname, params['samplerate_hzsec'], params['timeunit'] );
+        eyesamps = resample_at_rate_nearest( eyesamps, eyesamps[tname].min(), eyesamps[tname].max(), tname, params['samplerate_hzsec'], params['timeunitsec'] );
         pass;
     '''
     
@@ -823,11 +825,12 @@ def remodnav_preprocess_eyetrace2d(eyesamps : pd.DataFrame,
     
         
     eyesamps.sort_values( by=tname, inplace=True );
+    eyesamps.reset_index( inplace=True, drop=True);
     
     #REV: handle improper size of data based on sample rate?
     #print(len(eyesamps.index));
     #print("EYESAMP TIME DIFF", eyesamps.time.max() - eyesamps.time.min());
-    dur = (eyesamps[tname].max() - eyesamps[tname].min()) * (1/params['timeunit']); # e.g. 1/0.001 is 1000.
+    dur = (eyesamps[tname].max() - eyesamps[tname].min()) * (1/params['timeunitsec']); # e.g. 1/0.001 is 1000.
     #print("Time sacc diff: {}".format(dur));
     GRACE_SEC=0.0005*dur; #REV: drift...
     expecteddur=((len(eyesamps.index)-1) / samplerate); #500 samples / 500 samp/sec = 1 sec. #2 samples makes 2 msec...so 1 sample is...0.
@@ -839,11 +842,12 @@ def remodnav_preprocess_eyetrace2d(eyesamps : pd.DataFrame,
     if(allnan(eyesamps[xname]) or allnan(eyesamps[yname])):
         print("EYEUTILS, PREPROC BEGINNING BEFORE SPIKEFILTER -> ALL NAN");
         return eyesamps;
-        
-
-    if( params.filterspikes ):
-        eyesamps[xname] = filter_spikes(eyesamps[xname]);
-        eyesamps[yname] = filter_spikes(eyesamps[yname]);
+    
+    
+    if( params['filterspikes'] ):
+        #REV:  this is passing by reference...and trying to set shit wtf.
+        eyesamps[xname] = filter_spikes(eyesamps[xname].copy());
+        eyesamps[yname] = filter_spikes(eyesamps[yname].copy());
         pass;
     
     #print('after spikes', len(eyesamps));
@@ -878,7 +882,7 @@ def remodnav_preprocess_eyetrace2d(eyesamps : pd.DataFrame,
     velspx = np.sqrt( np.diff(eyesamps[xname])**2 + np.diff(eyesamps[yname])**2 ); #REV: this is PER SAMPLE. Shit...is this radians?
 
     #REV: if time is in msec, then what? I don't use that info...
-    velsdva = velspx * dva_per_px * samplerate / params['timeunit'];   #REV: per sec. Note missing first value?
+    velsdva = velspx * dva_per_px * samplerate; 
     velsdva = np.append([0], velsdva);
     
     eyesamps['vel'] = velsdva;

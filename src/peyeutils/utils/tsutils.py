@@ -1,6 +1,7 @@
 import numpy as np;
 import pandas as pd;
 import peyeutils as pu;
+import math;
 
 from scipy import ndimage;
 
@@ -696,7 +697,7 @@ def remove_suspicious_repeats(df, params):
     import math;
     import numpy as np;
     
-    sr=params['samplerate'];
+    sr=params['samplerate_hzsec'];
     minlensec=params['min_suspicious_repeats_sec'];
     minlensamp = int(minlensec * sr); #REV: ceil better? float round? ;(
     xn=params['xname'];
@@ -743,7 +744,7 @@ def dilate_nans( df, cols, params ):
     -------
 
     """
-    sr=params['samplerate'];
+    sr=params['samplerate_hzsec'];
     dilate_nan_win_samp = math.ceil(params['dilate_nan_win_sec'] * sr);
     #min_blink_samp = int(params['min_blink_sec'] * sr);
     mask = np.full( len(df.index), False );
@@ -798,7 +799,7 @@ def dilate_xy_nans( df, params ):
     -------
 
     """
-    sr=params['samplerate'];
+    sr=params['samplerate_hzsec'];
     dilate_nan_win_samp = math.ceil(params['dilate_nan_win_sec'] * sr);
     min_blink_samp = math.ceil(params['min_blink_sec'] * sr);
     xname=params['xname'];
