@@ -19,6 +19,7 @@ from . import eyelink;
 from . import peyefv;
 from . import eyemovements;
 from . import tobiig3;
+from . import eyerevealer;
 
 from .peyeutils import preproc_peyefv_edf;
 

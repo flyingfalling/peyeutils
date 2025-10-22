@@ -55,6 +55,9 @@ def select_legal_timepoints4(ts, vals, maxdt):
         myclosests = goodt[ alist ]; #Now have TIMES of closests.
         
         diffs = abs(badt - myclosests);
+
+        # indices of NAN I will fill in from interpoalated (or slightly diff
+        ## timesteps due to e.g. mag/acc arriving diff time than gaze.
         keeps = diffs <= maxdt;
         passed = badt[np.where(keeps)];
         passed = np.unique(passed);
@@ -72,6 +75,7 @@ def interpolate_df_to_samplerate(df, tcol, targ_srhzsec, tcolunit_s, truesrs=dic
                                  startsec=None, endsec=None,
                                  method='polynomial', order=2,
                                  tsecname='Tsec', tsec0name='Tsec0',
+                                 zeroTsec=None,
                                  ):
     """
 
@@ -103,7 +107,8 @@ def interpolate_df_to_samplerate(df, tcol, targ_srhzsec, tcolunit_s, truesrs=dic
          (Default value = 'Tsec')
     tsec0name :
          (Default value = 'Tsec0')
-
+    zeroTsec :
+         (Default value = None)
     Returns
     -------
 
@@ -171,7 +176,7 @@ def interpolate_df_to_samplerate(df, tcol, targ_srhzsec, tcolunit_s, truesrs=dic
         en = ensec;
         pass;
     
-    print("MAX T DELTAS (now in timeunit={} sec units) -- WILL LIN STEP ({}-{} @ {})".format(tcolunit_s, st, en, dt))
+    print("MAX T DELTAS of column [{}] (now in timeunit={} sec units) -- WILL LIN STEP ({}-{} @ {})".format(tcol, tcolunit_s, st, en, dt))
     
     if( ((en-st)/dt) > 1e9 ):
         raise Exception("you are attempting to create more than 1 billion time points at once...probably you will run out of memory");
@@ -243,7 +248,7 @@ def interpolate_df_to_samplerate(df, tcol, targ_srhzsec, tcolunit_s, truesrs=dic
         finalgrps.append([c]);
         pass;
     
-    #print("Groups of similar columns: ", finalgrps);
+    print("Groups of similar columns: ", finalgrps);
         
     for g in finalgrps:
         dtgrps = [maxtdeltas_s[c] for c in g];
@@ -259,7 +264,7 @@ def interpolate_df_to_samplerate(df, tcol, targ_srhzsec, tcolunit_s, truesrs=dic
             c = mydtgrp[0];
             if( c == tcol ):
                 raise Exception("WTF, c is the tcol even though it should not be?");
-            #print("For [{}] maxdt is [{}]".format(c, maxdt));
+            print("For [{}] maxdt is [{}]".format(c, maxdt));
             good, bad = select_legal_timepoints4(mdf[tcol], mdf[c], maxdt);
             goodbad = np.concatenate([good, bad]);
             maskdf[c] = False;
@@ -292,17 +297,27 @@ def interpolate_df_to_samplerate(df, tcol, targ_srhzsec, tcolunit_s, truesrs=dic
             mdf.loc[ toset, c ] = np.nan;
             pass;
         pass;
-        
-    mdf = pd.merge(tdf, mdf, how='inner', left_on=tcol, right_on=tcol).reset_index(drop=True);
-
-    tsec=mdf[tcol] * tcolunit_s;
-    tsec0=tsec - tsec.min();
     
+    mdf = pd.merge(tdf, mdf, how='inner', left_on=tcol, right_on=tcol).reset_index(drop=True);
+    
+    tsec=mdf[tcol] * tcolunit_s;
+    if( zeroTsec is None ):
+        tsec0=tsec - tsec.min();
+        pass;
+    else:
+        print("Setting Tsec0 zero time to Tsec={} (to e.g. align with other sensor source such as video)".format(zeroTsec));
+        tsec0=tsec - zeroTsec;
+        pass;
+
+    #REV: Tsec/Tsec0
     if( tsecname not in mdf ):
         mdf[tsecname] = tsec; #mdf[tcol] * tcolunit_s; #e.g. if tcolunit_s is 0.001 (msec), then tcol of 1000 msec will become 1 sec.
         pass;
     else:
         if( False == np.all(np.isclose(tsec, mdf[tsecname])  ) ):
+            print(tsec);
+            print(mdf[tsecname]);
+            print(mdf);
             raise Exception("ERROR -- tsec exists but does not contain expected data!");
         pass;
     
@@ -311,7 +326,7 @@ def interpolate_df_to_samplerate(df, tcol, targ_srhzsec, tcolunit_s, truesrs=dic
         pass;
     else:
         if( False == np.all(np.isclose(tsec0, mdf[tsec0name])  ) ):
-            raise Exception("ERROR -- tsec0 exists but does not contain expected data!");
+            raise Exception("ERROR -- tsec0 exists but does not contain expected data! (maybe it already existed and you used zeroTsec this time?)");
         pass;
     
     return mdf;

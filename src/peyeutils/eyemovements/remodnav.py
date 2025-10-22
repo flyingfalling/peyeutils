@@ -784,8 +784,9 @@ def remodnav_preprocess_eyetrace2d(eyesamps : pd.DataFrame,
     savgol_window = int(params['savgollensec'] * samplerate);
     median_window = int(params['medianfiltlensec'] * samplerate );
     savgolorder = params['savgolorder'];
-
-        
+    
+    
+    
     if( 'vel' in eyesamps.columns or
         'medvel' in eyesamps.columns or
         'acc' in eyesamps.columns ):
@@ -820,7 +821,10 @@ def remodnav_preprocess_eyetrace2d(eyesamps : pd.DataFrame,
     #REV: PYTHON logical precedence not > and > or...
     if( savgol_window > 0 ): #params['savgollensec'] != 0 ) ):
         if( (savgol_window % 2 != 1) or (savgol_window < params['savgolorder'] ) ):
-            raise Exception("Error preproc, savgol filter needs to be odd length (in samples), and window must be >= order (unless window is 0) {} {} {}".format(savgol_window, samplerate, params['savgollensec']));
+            #raise Exception("Error preproc, savgol filter needs to be odd length (in samples), and window must be >= order (unless window is 0) {} {} {}".format(savgol_window, samplerate, params['savgollensec']));
+            print("WARNING: remodnav preproc, savgol filter needs to be odd length (in samples), and window must be >= order (unless window is 0) {} {} {}\n. We will skip SAVGOL filtering for this data".format(savgol_window, samplerate, params['savgollensec']));
+            savgol_window=0;
+            pass;
         pass;
     
         

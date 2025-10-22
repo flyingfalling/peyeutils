@@ -12,8 +12,18 @@ import numpy as np;
 import sys, os;
 import cv2;
 import json;
+import struct;
+
+import peyeutils as pu;
 
 from peyeutils.utils import isfile;
+from peyeutils.utils import create_dir;
+
+#REV: create new equally(ish) spaced values?
+from peyeutils.utils import interpolate_df_to_samplerate;
+
+from peyeutils.utils import vec3d_to_yawpitchroll_NWU;
+
 
 
 ## Problem is that "image" will always be fucked, since Y will be "up" and x
@@ -29,11 +39,10 @@ def tobiig3_axes_to_NWU(collist):
     
 def tobii3_fix_imudf(normdf, prepend='data.'):
 
-    df = normdf.copy(0);
+    df = normdf.copy();
     withmag = False;
     toconvert = [prepend+'accelerometer', prepend+'gyroscope', prepend+'magnetometer'];
-    print(df.columns);
-    
+        
     if( prepend+'accelerometer' in df.columns ):
         tmpacc = [ [x[0], x[1], x[2]] if type(x) is not float
                    else [x, x, x] for x in
@@ -77,6 +86,8 @@ def tobii3_fix_imudf(normdf, prepend='data.'):
     
         
     return df;
+
+
 
 
 
@@ -183,8 +194,7 @@ def tobii3_fix_gazedf(normdf, prepend='data.'):
         df['eyeright_pupildiameter_0'] = np.nan;
         pass;
     
-    #print(df.columns);
-    
+        
     return df;
 
 
@@ -216,17 +226,31 @@ def tobiig3_WUN_gaze3d_axes_to_NWU(df, axis_order=[2,0,1], dropold=False):
 ########### CLASS TG3 OFFICIAL RECORDING ###################
 class tobiig3_official_recording():
     availmodes=['official', 'eyerevealer'];
-    def __init__(self, mypath, overwrite=False, mode='official'):
+    def __init__(self, mypath, outpath=None, overwrite=False, mode='official'):
         if( mode not in tobiig3_official_recording.availmodes ):
             raise Exception("REV: Mode {} not in available modes: (Available: {})".format(mode, tobiig3_official_recording.availmodes));
         
         self.mode = mode;
+        
+        
         self.mypath = mypath;
+        
+        self.outpath=outpath;
+        if(outpath is None):
+            outpath=self.mypath;
+            pass;
+        else:
+            create_dir(outpath);
+            pass;
+        
         self.tcol = 'timestamp';
         self.tcolunit_s = 1.0; #second units.
         self.overwrite=overwrite;
-        self.sc_widdva=95; #REV: should extract from camera params actually...
+
+         #REV: should extract from camera params actually...
+        self.sc_widdva=95;
         self.sc_heidva=63;
+
         #REV: need to "preconvert" if it is an eyerevealer that needs to be extracted?
         self.set_params(); #REV: this "overwrites" mode
         self.set_fnames();
@@ -313,11 +337,10 @@ class tobiig3_official_recording():
             return;
         else:
             if( 'official' == self.mode ):
-                from eyeutils.vidutils import read_video_timestamps;
-                cap, self.vidtsdf = read_video_timestamps(self.fullscenepath);
+                from peyeutils.utils import read_video_timestamps;
+                cap, self.vidtsdf, metadict = read_video_timestamps(self.fullscenepath);
                 pass;
             elif( 'eyerevealer' == self.mode ):
-                from eyeutils.dataconversion.tobiig3.resample_tobii3_data import resample_tobii3_vid_ts;
                 self.vidtsdf = resample_tobii3_vid_ts(self.vidtspath, overwrite=self.overwrite, savecsvs=True);
                 pass;
             else:
@@ -326,18 +349,42 @@ class tobiig3_official_recording():
         if( 'Tsec' not in self.vidtsdf ):
             self.vidtsdf['Tsec'] = self.vidtsdf[self.tcol] * self.tcolunit_s;
             pass;
+        else:
+            if( False == np.all( np.allclose( self.vidtsdf['Tsec'], self.vidtsdf[self.tcol] * self.tcolunit_s) ) ):
+                raise Exception("VidTS Tsec not correct, should be unit * tcol");
+                pass;
+            pass;
+        
         if( 'Tsec0' not in self.vidtsdf ):
             self.vidtsdf['Tsec0'] = self.vidtsdf['Tsec'] - self.vidtsdf['Tsec'].min();
+            pass;
+        else:
+            if( False == np.all( np.allclose( self.vidtsdf['Tsec0'], self.vidtsdf['Tsec'] - self.vidtsdf['Tsec'].min()) ) ):
+                raise Exception("VidTS zeroing failed (Tsec0 existed but is not my Tsec-Tsec.min)");
             pass;
         return;
 
     def set_fnames(self):
-        
+
+        ## Fixed (orig data)
+        self.fullscenepath = os.path.join( self.mypath, self.scenevidfn);
         self.fullgazepath = os.path.join( self.mypath, self.gazedatafn );
         self.fullimupath = os.path.join( self.mypath, self.imudatafn );
-        self.fullscenepath = os.path.join( self.mypath, self.scenevidfn);
-        
         self.vidtspath = self.fullscenepath + '.ts';
+        
+        self.outvidtspath = os.path.join( self.outpath, self.scenevidfn + '.ts.csv' );
+        self.outgazepath = os.path.join( self.outpath, self.gazedatafn + '.csv' );
+        self.outimupath = os.path.join( self.outpath, self.imudatafn + '.csv' );
+
+        self.outgazeimupath = os.path.join(self.outpath, 'gazeimudata.csv');
+        self.outgazepath_re = self.outgazepath + '.resampled.csv';
+        self.outimupath_re = self.outimupath + '.resampled.csv';
+        
+        self.outgazeimupath_re = os.path.join(self.outpath, 'gazeimudata.resampled.csv');
+        self.outgazeimupath_nwu = os.path.join(self.outpath, 'gazeimudata.resampled.nwu.csv');
+        self.outgazeimupath_nwuypr = os.path.join(self.outpath, 'gazeimudata.resampled.nwu.ypr.csv');
+        
+        '''
         self.outvidtspath = self.fullscenepath + '.ts.csv';
         self.outgazepath = self.fullgazepath + '.csv'; #REV: OK, so this outputs to "gaze.gz.csv". But how does it READ?
         self.outimupath = self.fullimupath + '.csv';
@@ -345,9 +392,10 @@ class tobiig3_official_recording():
         self.outgazepath_re = self.fullgazepath + '.resampled.csv';
         self.outimupath_re = self.fullimupath + '.resampled.csv';
         self.outgazeimupath_re = os.path.join(self.mypath, 'gazeimudata.resampled.csv');
-            
         self.outgazeimupath_nwu = os.path.join(self.mypath, 'gazeimudata.resampled.nwu.csv');
         self.outgazeimupath_nwuypr = os.path.join(self.mypath, 'gazeimudata.resampled.nwu.ypr.csv');
+        '''
+        
         return;
     
     def dfs_from_tobiig3_jsongzs(self, create_csvs=False):
@@ -552,9 +600,8 @@ class tobiig3_official_recording():
     
     
     def resample_interpolate_dfs(self, sr_hzsec=100.0, create_csvs=True):
-        #REV: create new equally(ish) spaced values?
-        from eyeutils.timeseriesutils import interpolate_df_to_samplerate;
         
+        print("Resampling and interpolating dataframes!");
         if( self.overwrite == False and
             (isfile(self.outgazepath_re) and
             isfile(self.outimupath_re) and
@@ -566,81 +613,80 @@ class tobiig3_official_recording():
             print("Files exist so skipping resample step... (set overwrite==True to do anyways)");
             return;
         
-            
+        
         
         if( False == hasattr(self, 'gazedf') ): #self.gazeimudf ):
             print("Reading/Creating initial load");
             if( 'official' == self.mode ):
+                print("Loading OFFICIAL tobiig3 recording");
                 self.dfs_from_tobiig3_jsongzs(create_csvs);
                 pass;
             elif( 'eyerevealer' == self.mode ):
-                from eyeutils.dataconversion.tobiig3.resample_tobii3_data import resample_tobii3_json_to_csv;
+                print("Loading EYEREVEALER tobiig3 recording");
+                
                 jsonfname = os.path.join(self.mypath, 'tobii3_data.json');
-                self.gazeimudf, dicts = resample_tobii3_json_to_csv( jsonfname, sr_hzsec,
-                                                                     savecsvs=True, overwrite=self.overwrite
-                                                                    );
+                
+                #REV: this creates "raw" CSV from JSON but no resample...
+                dicts = resample_tobii3_json_to_csv( jsonfname, sr_hzsec,
+                                                     savecsvs=True, overwrite=self.overwrite
+                                                    );
                 self.gazedf = dicts['gaze'];
                 self.imudf = dicts['imu'];
+                self.gazeimudf = dicts['gazeimu'];
                 pass;
             else:
                 raise Exception("Unrecognized mode: {}".format(self.mode));
             pass;
         
-        if( sr_hzsec is None ):
-            if( create_csvs ):
-                print(
-                    "Saving (raw) CSVs to:\nGAZE: [{}]\nIMU: [{}]".format(
-                        self.outgazepath_re,
-                        self.outimupath_re,
-                    )
-                );
-                
-                self.gazedf.to_csv(self.outgazepath_re, index=False);
-                self.imudf.to_csv(self.outimupath_re, index=False);
-                pass;
-            pass;
-        else:
-            magsr = 10;
-            othersr = 100;
-            truesrs = { c:(magsr if ('magneto' in c) else othersr) for c in self.gazeimudf.columns  };
-            print(truesrs);
-            
-            interptype='polynomial';
-            interporder=1;
-            #REV: must remove duplicate times (usually mutually exclusive, i.e. accidentally get same time point arriving of accel and gaze)
+        magsr = 10;
+        othersr = 100;
+        truesrs = { c:(magsr if ('magneto' in c) else othersr) for c in self.gazeimudf.columns  };
+        print(truesrs);
+        
+        interptype='polynomial';
+        interporder=1;
+        
+        print("RESAMPLING GAZEIMU -- GAZEIMU DTYPES", self.gazeimudf.dtypes);
+        self.gazeimudf = self.gazeimudf.groupby('timestamp', as_index=False).mean(numeric_only=True);
+        self.gazeimudf = interpolate_df_to_samplerate(self.gazeimudf, self.tcol, sr_hzsec, startsec=None, endsec=None,
+                                                      method=interptype, order=interporder, truesrs=truesrs, tcolunit_s=1,
+                                                      zeroTsec=self.vidtsdf['Tsec'].min());
+        
+        truesrs = { c:(magsr if ('magneto' in c) else othersr) for c in self.imudf.columns  };
+        
+        print("RESAMPLING IMU -- IMU DTYPES", self.imudf.dtypes);
+        self.imudf = self.imudf.groupby('timestamp', as_index=False).mean(numeric_only=True);
+        self.imudf = interpolate_df_to_samplerate(self.imudf, self.tcol, sr_hzsec, startsec=None, endsec=None,
+                                                  method=interptype, order=interporder, truesrs=truesrs, tcolunit_s=1,
+                                                  zeroTsec=self.vidtsdf['Tsec'].min());
+        
+        truesrs = { c:(magsr if ('magneto' in c) else othersr) for c in self.gazedf.columns  };
+        
+        #REV: interpolates gaze even when it is not available (should fill in "max distance")
+        print("RESAMPLING GAZE -- GAZE DTYPES", self.gazedf.dtypes);
+        self.gazedf = self.gazedf.groupby('timestamp', as_index=False).mean(numeric_only=True);
+        self.gazedf = interpolate_df_to_samplerate(self.gazedf, self.tcol, sr_hzsec, startsec=None, endsec=None,
+                                                   method=interptype, order=interporder, truesrs=truesrs, tcolunit_s=1,
+                                                   zeroTsec=self.vidtsdf['Tsec'].min() );
+        
+        
+        
+        
+        if( create_csvs ):
+            print(
+                "Saving resampled to:\nGAZE: [{}]\nIMU: [{}]\nGAZEIMU: [{}]".format(
+                    self.outgazepath_re,
+                    self.outimupath_re,
+                    self.outgazeimupath_re)
+            );
 
-            print(self.gazeimudf.dtypes);
-            self.gazeimudf = self.gazeimudf.groupby('timestamp', as_index=False).mean(numeric_only=True);
-            self.gazeimudf = interpolate_df_to_samplerate(self.gazeimudf, self.tcol, sr_hzsec, startsec=None, endsec=None,
-                                                          method=interptype, order=interporder, truesrs=truesrs, tcolunit_s=1 );
-            
-            truesrs = { c:(magsr if ('magneto' in c) else othersr) for c in self.imudf.columns  };
-            
-            print("IMU DTYPES", self.imudf.dtypes);
-            self.imudf = self.imudf.groupby('timestamp', as_index=False).mean(numeric_only=True);
-            self.imudf = interpolate_df_to_samplerate(self.imudf, self.tcol, sr_hzsec, startsec=None, endsec=None,
-                                                      method=interptype, order=interporder, truesrs=truesrs, tcolunit_s=1 );
-        
-            truesrs = { c:(magsr if ('magneto' in c) else othersr) for c in self.gazedf.columns  };
-            #REV: interpolates gaze even when it is not available (should fill in "max distance")
-            print("GAZE DTYPES", self.gazedf.dtypes);
-            self.gazedf = self.gazedf.groupby('timestamp', as_index=False).mean(numeric_only=True);
-            self.gazedf = interpolate_df_to_samplerate(self.gazedf, self.tcol, sr_hzsec, startsec=None, endsec=None,
-                                                       method=interptype, order=interporder, truesrs=truesrs, tcolunit_s=1 );
-            if( create_csvs ):
-                print(
-                    "Saving resampled to:\nGAZE: [{}]\nIMU: [{}]\nGAZEIMU: [{}]".format(
-                        self.outgazepath_re,
-                        self.outimupath_re,
-                        self.outgazeimupath_re)
-                );
-                
-                self.gazedf.to_csv(self.outgazepath_re, index=False);
-                self.imudf.to_csv(self.outimupath_re, index=False);
-                self.gazeimudf.to_csv(self.outgazeimupath_re, index=False);
-                pass;
+            self.gazeimudf.to_csv(self.outgazeimupath_re, index=False);
+            self.imudf.to_csv(self.outimupath_re, index=False);
+            self.gazedf.to_csv(self.outgazepath_re, index=False);
+
             pass;
         
+        print(" +++++++++++ Finished resample/interpolate");
         return;
 
     def get_minmax_lr_du_gaze_dva(self):
@@ -656,16 +702,307 @@ class tobiig3_official_recording():
 ############  END OF CLASS #################
 
 
-'''
-## Test?
-def mymain():
-    mydir = sys.argv[1];
+#REV: 90k is timebase for tobii PTS.
+def extract_tobii3_timestamps(vidtsfname, tb_hz_sec=90000, tname="timestamp"):
+    return pu.eyerevealer.extract_timestamps( vidtsfname, tb_hz_sec, tname=tname );
 
-    recobj = tobiig3_official_recording(mydir);
-    recobj.resample_interpolate_dfs(create_csvs=True, sr_hzsec=100);
-    return 0;
 
-if __name__=='__main__':
-    exit(mymain());
-    pass;
-'''
+
+def resample_tobii3_vid_ts(vidtsfname, tb_hz_sec=90000, tname="timestamp", savecsvs=False, overwrite=True):
+    
+    vidcsvname=vidtsfname + '.csv';
+    if( False == overwrite and
+        os.path.isfile(vidcsvname)
+        ):
+        vidtsdf = pd.read_csv(vidcsvname);
+        pass;
+    else:
+        vidtsdf = extract_tobii3_timestamps( vidtsfname,
+                                             tb_hz_sec=tb_hz_sec,
+                                             tname=tname,
+                                            );
+        pass;
+    
+    vidtsdf = vidtsdf.sort_values(by=tname).reset_index(drop=True);
+    
+    if( savecsvs ):
+        #dir = os.path.dirname(vidtsfname);
+        #csvfilepath=os.path.join(
+        if( os.path.isfile(vidcsvname) and not overwrite):
+            print("Skipping rewriting of VID TS csv file (overwrite is false)");
+            pass;
+        else:
+            vidtsdf.to_csv(vidcsvname, index=False);
+            pass;
+        pass;
+    
+    return vidtsdf;
+
+
+#REV: 90k is timebase for tobii PTS.
+def resample_tobii3_json_to_csv(jsonfname, resample_hz_sec=100.0, tb_hz_sec=90000, tname='timestamp',
+                                savecsvs=False, overwrite=True,
+                                gazename='gazedata.gz.csv', imuname='imudata.gz.csv',
+                                gazeimuname='gazeimudata.csv',
+                                tcolunit_s=1):
+    
+    basename = os.path.basename(jsonfname);
+    basepath = os.path.dirname(jsonfname);
+    
+    tsfname = jsonfname + ".ts";
+    
+    tss = pu.eyerevealer.timestamps_from_file( tsfname, tb_hz_sec );
+    
+    tsdf = extract_tobii3_timestamps( tsfname, tb_hz_sec=tb_hz_sec, tname=tname );
+    
+    print("MAX TS: ", tsdf[tname].max());
+    print("MIN TS: ", tsdf[tname].min());
+    
+    print("MAX stamp: ", tsdf.timestamp.max());
+    print("MIN stamp: ", tsdf.timestamp.min());
+    
+    print("MAX idx: ", tsdf.idx.max());
+    print("MIN idx: ", tsdf.idx.min());
+    
+    #REV: better, sort and detect "jumps"? There should be no jumps. Assume times are all fucked and not lowkey bad/dangerous
+    # i.e. timestamps slotted into inappropriate regions from realistic values (UHOH?!!!)
+    # CHECK TOBII3 data from physlab see if it is same (short though...)
+    cutoffquant=0.995;
+    print("REMOVING QUANTILE: {}".format(cutoffquant));
+    q = tsdf[tname].quantile(cutoffquant);
+    tsdf = tsdf[ tsdf[tname] < q ];
+    
+    mint =  tsdf[tname].min();
+    maxt =  tsdf[tname].max();
+    
+    print("MAX TS: ", tsdf[tname].max());
+    print("MIN TS: ", tsdf[tname].min());
+    
+    print("MAX stamp: ", tsdf.timestamp.max());
+    print("MIN stamp: ", tsdf.timestamp.min());
+    
+    print("MAX idx: ", tsdf.idx.max());
+    print("MIN idx: ", tsdf.idx.min());
+    
+    print(tsdf);
+    
+    print(tsdf.sort_values(by="timestamp").tail(100));
+    #sortdf = tsdf.sort_values(by="timestamp");
+    maxdiff = tsdf[tname].diff().max();
+    
+    jumpcutoffsec = 100;
+    if( maxdiff > jumpcutoffsec ):
+        raise Exception("REV: something is bad, out of order, large jump > sane cutoff of {} seconds".format(jumpcutoffsec));
+    
+    
+    #REV: remove outliers? Bugs? Bitflips? Likely my RTSP ghetto file thing error... fuck.
+    #REV:
+    
+    
+    
+    jsonfh = open( jsonfname, "r" );
+    if not jsonfh:
+        raise Exception("Could not open JSON filename {}".format(jsonfname));
+        
+    dicts = {};
+    
+    tidxs = [ itm[0] for itm in tss ];
+    tsecs = [ itm[1] for itm in tss ];
+    tvals = [ itm[2] for itm in tss ];
+    ntstamps = len(tss);
+
+    #lines = jsonfh.readlines();
+
+    lines=list();
+    i=0;
+    while( True ):
+        i+=1;
+        line = jsonfh.readline();
+        if not line:
+            print("Read to end of json file [{}]".format(jsonfname));
+            break;
+
+        jline = json.loads(line); #REV: ok to have \n?
+        njline = pd.json_normalize(jline);
+        lines.append(njline);
+        pass;
+
+
+    print("Got {} lines".format(len(lines)));
+
+
+    gazeimudf = pd.concat(lines);
+
+    if( len( gazeimudf.index ) > ntstamps ):
+        print("JSON has more samples than my .tsfile...shortening JSON?");
+        gazeimudf = gazeimudf.iloc[:ntstamps];
+        if( len(gazeimudf.index) != ntstamps):
+            raise Exception("REV: I am bad at math");
+        pass;
+    elif( len( gazeimudf.index ) < ntstamps ):
+        raise Exception("Too few data for time stamps? Error...");
+    else:
+        pass;
+
+    
+    if( 'timestamp' in gazeimudf.columns ):
+        raise Exception("WTF 'timestamp' is in resampdf but it should not be...");
+
+
+    tcol='timestamp'; #timestamp';
+    gazeimudf[ 'PTS' ] = tvals;
+    gazeimudf[ 'Tidx' ] = tidxs;
+    gazeimudf[ tcol ] = tsecs;
+    
+    print("REV: columns of gazeimudf in resample_tobii3_json_to_csv (NEW): ", gazeimudf.columns);
+    
+    gazeimudf = tobii3_fix_gazedf(gazeimudf, prepend='');
+    gazeimudf = tobii3_fix_imudf(gazeimudf, prepend='');
+    
+    #gazeimudf[gazeimudf['Tsec'].duplicated(keep=False)].to_csv('test.csv', index=False);
+    #print(gazeimudf[gazeimudf['Tsec'].duplicated(keep=False)] );
+    
+    #REV: remove duplicate times...theoretically should "nanmean"
+    gazeimudf = gazeimudf.groupby(tcol, as_index=False).mean(); #agg('nanmean');
+
+    tcols = ['PTS', 'Tidx', tcol];
+    gazedf = gazeimudf[ tcols + [ c for c in gazeimudf.columns if (('gaze' in c) or ('eye' in c))] ];
+    
+    imudf = gazeimudf[ tcols + [ c for c in gazeimudf.columns if
+                                 (('accel' in c) or
+                                  ('gyro' in c) or
+                                  ('magn' in c) ) ] ];
+    
+    dicts['gaze'] = gazedf;
+    dicts['imu'] = imudf;
+    dicts['gazeimu'] = gazeimudf;
+
+    '''
+
+    print("REV: resample_tobii3_data, using NEW resample method (from IMU stuff)");
+    interptype='polynomial';
+    interporder=1;
+    magsr = 10;
+    othersr = 100;
+
+    print("Will now resample");
+    truesrs = { c:(magsr if ('magneto' in c) else othersr) for c in gazeimudf.columns  };
+
+    print("RESAMPLING GAZEIMU");
+    rgazeimudf = interpolate_df_to_samplerate(gazeimudf,
+                                              tcol,
+                                              resample_hz_sec,
+                                              startsec=None,
+                                              endsec=None,
+                                              method=interptype,
+                                              order=interporder,
+                                              truesrs=truesrs,
+                                              tcolunit_s=tcolunit_s,
+                                              );
+
+
+    truesrs = { c:(magsr if ('magneto' in c) else othersr) for c in imudf.columns  };
+    print("RESAMPLING IMU");
+    rimudf = interpolate_df_to_samplerate(imudf,
+                                          tcol,
+                                          resample_hz_sec,
+                                          startsec=None,
+                                          endsec=None,
+                                          method=interptype,
+                                          order=interporder,
+                                          truesrs=truesrs,
+                                          tcolunit_s=tcolunit_s,
+                                        );
+
+
+    truesrs = { c:(magsr if ('magneto' in c) else othersr) for c in gazedf.columns  };
+    print("RESAMPLING GAZE");
+    rgazedf = interpolate_df_to_samplerate(gazedf,
+                                           tcol,
+                                           resample_hz_sec,
+                                           startsec=None,
+                                           endsec=None,
+                                           method=interptype,
+                                           order=interporder,
+                                           truesrs=truesrs,
+                                           tcolunit_s=tcolunit_s,
+                                           );
+
+    '''
+
+    #REV: saves both original and resampled csvs...
+    if( savecsvs ):
+
+        gazecsv = os.path.join(basepath, gazename);
+        imucsv = os.path.join(basepath, imuname);
+        gazeimucsv = os.path.join(basepath, gazeimuname);
+
+
+        print("Saving original CSVs derived from JSON [resample_tobii3_json_to_csv]");
+
+        if( False == overwrite and os.path.isfile(gazecsv) ):
+            print("Skipping {} (exists and overwrite=False)".format(gazecsv));
+            pass;
+        else:
+            print("Writing CSV [{}]".format(gazecsv));
+            gazedf.to_csv(gazecsv, index=False);
+            pass;
+
+        if( False == overwrite and os.path.isfile(imucsv) ):
+            print("Skipping {} (exists and overwrite=False)".format(imucsv));
+            pass;
+        else:
+            print("Writing CSV [{}]".format(imucsv));
+            imudf.to_csv(imucsv, index=False);
+            pass;
+
+        if( False == overwrite and os.path.isfile(gazeimucsv) ):
+            print("Skipping {} (exists and overwrite=False)".format(gazeimucsv));
+            pass;
+        else:
+            print("Writing CSV [{}]".format(gazeimucsv));
+            gazeimudf.to_csv(gazeimucsv, index=False);
+            pass;
+
+        #REV: purpose is to ENSURE that .resampled.csv exists? Even from richard's method? eyerevealer.
+        '''
+        print("Saving resampled CSVs derived from JSON [resample_tobii3_json_to_csv]");
+        rgazecsv = gazecsv + '.resampled.csv';
+        rimucsv = imucsv + '.resampled.csv';
+        rgazeimucsv = gazeimucsv + '.resampled.csv';
+
+        if( False == overwrite and os.path.isfile(rgazecsv) ):
+            print("Skipping {} (exists and overwrite=False)".format(rgazecsv));
+            pass;
+        else:
+            print("Writing CSV [{}]".format(rgazecsv));
+            rgazedf.to_csv(rgazecsv, index=False);
+            pass;
+
+        if( False == overwrite and os.path.isfile(rimucsv) ):
+            print("Skipping {} (exists and overwrite=False)".format(rimucsv));
+            pass;
+        else:
+            print("Writing CSV [{}]".format(rimucsv));
+            rimudf.to_csv(rimucsv, index=False);
+            pass;
+
+        if( False == overwrite and os.path.isfile(rgazeimucsv) ):
+            print("Skipping {} (exists and overwrite=False)".format(rgazeimucsv));
+            pass;
+        else:
+            print("Writing CSV [{}]".format(rgazeimucsv));
+            rgazeimudf.to_csv(rgazeimucsv, index=False);
+            pass;
+        '''
+        
+        pass;
+    
+    ## Inputs is the full dict or the separate dict DTs  (mydict in dicts);
+    ## Those have: name and df.
+    print("Finished [resample_tobii3_json_to_csv]");
+    return dicts;
+    
+
+
+
