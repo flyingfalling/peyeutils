@@ -760,16 +760,19 @@ def dilate_nans( df, cols, params ):
 
     """
     sr=params['samplerate_hzsec'];
-    dilate_nan_win_samp = math.ceil(params['dilate_nan_win_sec'] * sr);
+    dilate_nan_win_samp = math.ceil(params['dilate_nan_win_sec'] * sr); # E.g. if 0.030 sec and SR=100, 0.030 * 100 = 3
+    #REV: maybe better to interpolate barely missing values?
     #min_blink_samp = int(params['min_blink_sec'] * sr);
     mask = np.full( len(df.index), False );
     for col in cols:
         mask = mask | (get_dilated_nan_mask( df[col],
                                              dilate_nan_win_samp ) );
         pass;
-    
+
+    df = df.reset_index(drop=True);
     for col in cols:
-        df[col][mask] = np.nan;
+        #REV: only works if df index is dense and from 0 to length?
+        df.loc[mask, col] = np.nan;
         pass;
     
     return df;

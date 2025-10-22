@@ -184,6 +184,8 @@ def make_event(mydata, idx, lab, stidx, enidx, params={}):
         event["dydva"] = params['dva_per_px'] * (event["eny"] - event["sty"]);
         event["medvel"] = np.median( mydata.vel );
         event["avgvel"] = np.nanmean( mydata.vel );
+        event["peakvel"] = abs(mydata.vel).nanmax();
+        
         event["angle"] = math.degrees( math.atan2( event["dxdva"], event["dydva"] ) );
         event["ampl"] = math.sqrt( (event["dxdva"])**2 + (event["dydva"])**2  ); #REV: assumes these are pitch/yaw angles.
         pass;
@@ -193,6 +195,7 @@ def make_event(mydata, idx, lab, stidx, enidx, params={}):
         event["dydva"] = np.nan;
         event["medvel"] = np.nan;
         event["avgvel"] = np.nan;
+        event["peakvel"] = np.nan;
         
         event["angle"] = np.nan;
         event["ampl"] = np.nan;
@@ -656,11 +659,15 @@ def remodnav_classify_events(eyesamps, params): #sac_window_sec=1.0):
                   );
     
     df = pd.DataFrame( events );
+
+    tcol = params['tname'];
+    tunits = params['timeunitsec'];
+    firstsec = eyesamps[tcol].min() * tunits;
+    #e.g. if it is 0.001 i.e. 1msec units, if first timestamp is, will be 1000 * 0.001 = 1, which is ok.
     
-    #print(df);
     if( len(df.index) > 0 ):
-        df['stsec'] = df['stidx'] / samplerate;
-        df['ensec'] = df['enidx'] / samplerate;
+        df['stsec'] = df['stidx'] / samplerate + firstsec;
+        df['ensec'] = df['enidx'] / samplerate + firstsec;
         
         df.sort_values( inplace=True, by='stidx' );
         df.reset_index( inplace=True, drop=True );
@@ -822,7 +829,7 @@ def remodnav_preprocess_eyetrace2d(eyesamps : pd.DataFrame,
     if( savgol_window > 0 ): #params['savgollensec'] != 0 ) ):
         if( (savgol_window % 2 != 1) or (savgol_window < params['savgolorder'] ) ):
             #raise Exception("Error preproc, savgol filter needs to be odd length (in samples), and window must be >= order (unless window is 0) {} {} {}".format(savgol_window, samplerate, params['savgollensec']));
-            print("WARNING: remodnav preproc, savgol filter needs to be odd length (in samples), and window must be >= order (unless window is 0) {} {} {}\n. We will skip SAVGOL filtering for this data".format(savgol_window, samplerate, params['savgollensec']));
+            print("WARNING: remodnav preproc, savgol filter needs to be odd length (in samples), and window must be >= order (unless window is 0) {} {} {}.\nWe will skip SAVGOL filtering for this data".format(savgol_window, samplerate, params['savgollensec']));
             savgol_window=0;
             pass;
         pass;
@@ -912,7 +919,7 @@ def remodnav_preprocess_eyetrace2d(eyesamps : pd.DataFrame,
     eyesamps.loc[ eyesamps[cols].isna().any(axis=1), cols ] = np.nan;
     
     eyesamps = dilate_nans(eyesamps, cols, params);
-
+    
     #print('after nans', len(eyesamps));
     
     if(allnan(eyesamps[xname]) or allnan(eyesamps[yname])):
@@ -962,7 +969,7 @@ def remodnav_preprocess_eyetrace2d(eyesamps : pd.DataFrame,
     for vel in eyesamps.vel:
         if( vel  >  params['maxveldegsec'] ):
             print("REV: Detected too-high velocity {}? Maybe bad filter params?".format(vel));
-            vel = finalvels[-1]; #REV: just replace it with the previous velocity? Fine with high sample rates...
+            #vel = finalvels[-1]; #REV: just replace it with the previous velocity? Fine with high sample rates...
             pass;
         finalvels.append(vel);
         pass;

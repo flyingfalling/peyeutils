@@ -338,7 +338,7 @@ class tobiig3_official_recording():
         else:
             if( 'official' == self.mode ):
                 from peyeutils.utils import read_video_timestamps;
-                cap, self.vidtsdf, metadict = read_video_timestamps(self.fullscenepath);
+                cap, self.vidtsdf, metadict = read_video_timestamps(self.fullscenepath, timename=self.tcol);
                 pass;
             elif( 'eyerevealer' == self.mode ):
                 self.vidtsdf = resample_tobii3_vid_ts(self.vidtspath, overwrite=self.overwrite, savecsvs=True);
@@ -346,6 +346,8 @@ class tobiig3_official_recording():
             else:
                 raise Exception("Unrec mode");
             pass;
+        
+        
         if( 'Tsec' not in self.vidtsdf ):
             self.vidtsdf['Tsec'] = self.vidtsdf[self.tcol] * self.tcolunit_s;
             pass;
@@ -413,9 +415,9 @@ class tobiig3_official_recording():
             return;
         
         
-        gazeaslines = ungzip_text_file_to_lines(self.fullgazepath);
+        gazeaslines = pu.utils.ungzip_text_file_to_lines(self.fullgazepath);
 
-        imuaslines = ungzip_text_file_to_lines(self.fullimupath);
+        imuaslines = pu.utils.ungzip_text_file_to_lines(self.fullimupath);
         
         gazejsonlines = [ json.loads(line) for line in gazeaslines ];
         imujsonlines = [ json.loads(line) for line in imuaslines ];
@@ -650,7 +652,8 @@ class tobiig3_official_recording():
         self.gazeimudf = self.gazeimudf.groupby('timestamp', as_index=False).mean(numeric_only=True);
         self.gazeimudf = interpolate_df_to_samplerate(self.gazeimudf, self.tcol, sr_hzsec, startsec=None, endsec=None,
                                                       method=interptype, order=interporder, truesrs=truesrs, tcolunit_s=1,
-                                                      zeroTsec=self.vidtsdf['Tsec'].min());
+                                                      zeroTsec=self.vidtsdf['Tsec'].min(), #ensures that Tsec0 lines up with vid times too
+                                                      );
         
         truesrs = { c:(magsr if ('magneto' in c) else othersr) for c in self.imudf.columns  };
         
@@ -658,7 +661,8 @@ class tobiig3_official_recording():
         self.imudf = self.imudf.groupby('timestamp', as_index=False).mean(numeric_only=True);
         self.imudf = interpolate_df_to_samplerate(self.imudf, self.tcol, sr_hzsec, startsec=None, endsec=None,
                                                   method=interptype, order=interporder, truesrs=truesrs, tcolunit_s=1,
-                                                  zeroTsec=self.vidtsdf['Tsec'].min());
+                                                  zeroTsec=self.vidtsdf['Tsec'].min(), #ensures that Tsec0 lines up with vid times too
+                                                  );
         
         truesrs = { c:(magsr if ('magneto' in c) else othersr) for c in self.gazedf.columns  };
         
@@ -667,7 +671,8 @@ class tobiig3_official_recording():
         self.gazedf = self.gazedf.groupby('timestamp', as_index=False).mean(numeric_only=True);
         self.gazedf = interpolate_df_to_samplerate(self.gazedf, self.tcol, sr_hzsec, startsec=None, endsec=None,
                                                    method=interptype, order=interporder, truesrs=truesrs, tcolunit_s=1,
-                                                   zeroTsec=self.vidtsdf['Tsec'].min() );
+                                                   zeroTsec=self.vidtsdf['Tsec'].min(), #ensures that Tsec0 lines up with vid times too
+                                                   );
         
         
         

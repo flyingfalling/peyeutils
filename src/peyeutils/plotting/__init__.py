@@ -1,1 +1,1 @@
-import peyeutils.plotting
+from peyeutils.plotting.plotting import *;

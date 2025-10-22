@@ -3,7 +3,7 @@ import pandas as pd
 import av;
 import numpy as np;
     
-def frametimes_with_pyav(videofn: str, index: int = 0) -> pd.DataFrame: # -> List[float]:
+def frametimes_with_pyav(videofn: str, index: int = 0, timename='Tsec') -> pd.DataFrame: # -> List[float]:
     """
     Link: https://pypi.org/project/av/
     My comments:
@@ -31,7 +31,7 @@ def frametimes_with_pyav(videofn: str, index: int = 0) -> pd.DataFrame: # -> Lis
         );
     
     av_timestamps = [
-        {'idx':idx, 'Tsec':float(packet.pts * video.time_base), 'PTS':packet.pts}
+        {'idx':idx, timename:float(packet.pts * video.time_base), 'PTS':packet.pts}
         for idx, packet in enumerate(container.demux(video))
         if packet.pts is not None
     ];
@@ -58,22 +58,22 @@ def frametimes_with_pyav(videofn: str, index: int = 0) -> pd.DataFrame: # -> Lis
     
     container.close();
     timestampdf = pd.DataFrame( av_timestamps );
-    timestampdf = timestampdf.sort_values(by='Tsec');
+    timestampdf = timestampdf.sort_values(by=timename);
     d = timestampdf.idx.diff();
     if( d.min() != 1 and d.max() != 1 ):
         print(timestampdf);
         raise Exception("Wat, df diff min/max for PTS is fucked ({}, {})".format(d.min(), d.max()));
-                           
-    timestampdf['drift'] = timestampdf.Tsec.diff()-(1/25.0); #0.040
+    
+    timestampdf['drift'] = timestampdf[timename].diff()-(1/25.0); #0.040
     timestampdf['drift'] = timestampdf.drift.cumsum();
     print("Drift is [{}] seconds".format(timestampdf.iloc[ len(timestampdf.index)-1 ].drift));
-    got = timestampdf.Tsec.max() - timestampdf.Tsec.min();
+    got = timestampdf[timename].max() - timestampdf[timename].min();
     expected = len(timestampdf.index)/25.0;
     print("Total time is [{}] s, time with 25Hz is: [{}]   (diff [{}] s)".format( got, expected, got - expected ));
 
     
     timestampdf['gts'] = ghetto_tss;
-    timestampdf['ds'] = timestampdf.Tsec - timestampdf.gts;
+    timestampdf['ds'] = timestampdf[timename] - timestampdf.gts;
     print("Min: {}   Max: {}".format(timestampdf.ds.min(), timestampdf.ds.max()));
     if( timestampdf.ds.abs().max() > 0.1 ):
         print(" +++++++ We have a problem, max offset is: {}".format(timestampdf.ds.abs().max()));
@@ -84,7 +84,7 @@ def frametimes_with_pyav(videofn: str, index: int = 0) -> pd.DataFrame: # -> Lis
 
 
 
-def read_video_timestamps(scenefullpath): #row, mypath):
+def read_video_timestamps(scenefullpath, timename): #row, mypath):
     cap = cv2.VideoCapture( scenefullpath );
     if( False == cap.isOpened() ):
         raise Exception("VID file {} does not exist".format(scenefullpath));
@@ -93,11 +93,12 @@ def read_video_timestamps(scenefullpath): #row, mypath):
     hpx = cap.get(cv2.CAP_PROP_FRAME_HEIGHT);
     fps = cap.get(cv2.CAP_PROP_FPS); #flt
     nframes = cap.get(cv2.CAP_PROP_FRAME_COUNT);
-    vidtimedf = frametimes_with_pyav( scenefullpath );
-    vidlensec = vidtimedf.Tsec.max() - vidtimedf.Tsec.min();
-    print("Video: [{}] {}x{} ({} fps, {} frames, i.e. [{}] duration), (PTS [{}]s - [{}]s, [{}]s long)".format(
-        scenefullpath, wpx, hpx, fps, nframes, nframes/fps, vidtimedf.Tsec.min(), vidtimedf.Tsec.max(), vidlensec));
 
+    vidtimedf = frametimes_with_pyav( scenefullpath, timename=timename );
+    vidlensec = vidtimedf[timename].max() - vidtimedf[timename].min();
+    print("Video: [{}] {}x{} ({} fps, {} frames, i.e. [{}] duration), (PTS [{}]s - [{}]s, [{}]s long)".format(
+        scenefullpath, wpx, hpx, fps, nframes, nframes/fps, vidtimedf[timename].min(), vidtimedf[timename].max(), vidlensec));
+    
     metadict = dict(wpx=wpx,hpx=hpx,fps=fps,nframes=nframes,vidlensec=vidlensec);
     
     return cap, vidtimedf, metadict;
