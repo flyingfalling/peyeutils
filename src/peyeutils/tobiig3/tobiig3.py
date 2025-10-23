@@ -652,7 +652,7 @@ class tobiig3_official_recording():
         self.gazeimudf = self.gazeimudf.groupby('timestamp', as_index=False).mean(numeric_only=True);
         self.gazeimudf = interpolate_df_to_samplerate(self.gazeimudf, self.tcol, sr_hzsec, startsec=None, endsec=None,
                                                       method=interptype, order=interporder, truesrs=truesrs, tcolunit_s=1,
-                                                      zeroTsec=self.vidtsdf['Tsec'].min(), #ensures that Tsec0 lines up with vid times too
+                                                      #zeroTsec=self.vidtsdf['Tsec'].min(), #ensures that Tsec0 lines up with vid times too
                                                       );
         
         truesrs = { c:(magsr if ('magneto' in c) else othersr) for c in self.imudf.columns  };
@@ -661,7 +661,7 @@ class tobiig3_official_recording():
         self.imudf = self.imudf.groupby('timestamp', as_index=False).mean(numeric_only=True);
         self.imudf = interpolate_df_to_samplerate(self.imudf, self.tcol, sr_hzsec, startsec=None, endsec=None,
                                                   method=interptype, order=interporder, truesrs=truesrs, tcolunit_s=1,
-                                                  zeroTsec=self.vidtsdf['Tsec'].min(), #ensures that Tsec0 lines up with vid times too
+                                                  #zeroTsec=self.vidtsdf['Tsec'].min(), #ensures that Tsec0 lines up with vid times too
                                                   );
         
         truesrs = { c:(magsr if ('magneto' in c) else othersr) for c in self.gazedf.columns  };
@@ -671,7 +671,7 @@ class tobiig3_official_recording():
         self.gazedf = self.gazedf.groupby('timestamp', as_index=False).mean(numeric_only=True);
         self.gazedf = interpolate_df_to_samplerate(self.gazedf, self.tcol, sr_hzsec, startsec=None, endsec=None,
                                                    method=interptype, order=interporder, truesrs=truesrs, tcolunit_s=1,
-                                                   zeroTsec=self.vidtsdf['Tsec'].min(), #ensures that Tsec0 lines up with vid times too
+                                                   #zeroTsec=self.vidtsdf['Tsec'].min(), #ensures that Tsec0 lines up with vid times too
                                                    );
         
         

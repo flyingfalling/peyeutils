@@ -175,24 +175,26 @@ def make_event(mydata, idx, lab, stidx, enidx, params={}):
              };
     
     if( len(mydata[ ~np.isnan(mydata.vel) ].index) > 0 ):
-        event["pvel"] = mydata.vel.max();
         if 'dva_per_px' not in params:
             print("lol wtf");
             exit(1);
             pass;
         event["dxdva"] = params['dva_per_px'] * (event["enx"] - event["stx"]);
         event["dydva"] = params['dva_per_px'] * (event["eny"] - event["sty"]);
-        event["medvel"] = np.median( mydata.vel );
+
+        event["pvel"] = np.nanmax(mydata.vel );
+        event["medvel"] = np.nanmedian( mydata.vel );
         event["avgvel"] = np.nanmean( mydata.vel );
-        event["peakvel"] = abs(mydata.vel).nanmax();
+        
         
         event["angle"] = math.degrees( math.atan2( event["dxdva"], event["dydva"] ) );
         event["ampl"] = math.sqrt( (event["dxdva"])**2 + (event["dydva"])**2  ); #REV: assumes these are pitch/yaw angles.
         pass;
     else:
-        event["pvel"] = np.nan;
         event["dxdva"] = np.nan;
         event["dydva"] = np.nan;
+
+        event["pvel"] = np.nan;
         event["medvel"] = np.nan;
         event["avgvel"] = np.nan;
         event["peakvel"] = np.nan;

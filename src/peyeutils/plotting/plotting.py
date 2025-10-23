@@ -108,7 +108,7 @@ def plot_gaze_chunks(
                     span_start = max(event[event_start_col], start_time)
                     span_end = min(event[event_end_col], end_time)
                     if span_start < span_end:
-                        ax.axvspan(span_start, span_end, color=color, alpha=0.3, zorder=0)
+                        ax.axvspan(span_start, span_end, color=color, alpha=0.7, zorder=0)
 
             # --- 5b. Plot Gaze Traces ---
             chunk_data = data[

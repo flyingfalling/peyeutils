@@ -65,9 +65,9 @@ def main():
 
     print(df);
 
-    fn='tobiig3.csv';
-    print('saving to: {}'.format(fn));
-    df.to_csv(fn, index=False);
+    #fn='tobiig3.csv';
+    #print('saving to: {}'.format(fn));
+    #df.to_csv(fn, index=False);
 
 
     
@@ -81,12 +81,37 @@ def main():
     
     
     #REV: need to do peyeutils preprocessing as well?
+    df['eye']='L';
+    df = pu.preproc.preproc_SHARED_pupilsize(df, timecol='Tsec0',
+                                             pacol='eyeleft_pupildiameter_0', eyecol='eye');
 
-    print("remodnav: preproc eyetrace");
-    rdf = rv.remodnav_preprocess_eyetrace2d(eyesamps=df, params=params);
+    df = pu.preproc.preproc_SHARED_label_blinks(
+        df=df,
+        sr_hzsec=sr,
+        tsecname='Tsec0',
+        eyecol='eye',
+        valcol='gaze2d_lr_dva',
+        pacol='eyeleft_pupildiameter_0',
+    );
+    
+    print(df.columns);
 
-    print("remodnav: classify");
-    ev = rv.remodnav_classify_events(rdf, params);
+    blinkev = pu.preproc.blink_df_from_samples(df);
+    sacc=False;
+    if(sacc):
+        print("remodnav: preproc eyetrace");
+        rdf = rv.remodnav_preprocess_eyetrace2d(eyesamps=df, params=params);
+        
+        print("remodnav: classify");
+        ev = rv.remodnav_classify_events(rdf, params);
+        
+        ev = pd.concat( [ev, blinkev] );
+        pass;
+    else:
+        ev=blinkev;
+        pass;
+    
+    ev = ev.sort_values(by='stsec').reset_index(drop=True);
     
     print(ev);
     ev.to_csv('tg3events.csv', index=False);

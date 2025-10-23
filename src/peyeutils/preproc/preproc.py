@@ -375,7 +375,7 @@ def preproc_SHARED_dva_from_flatscreen(df, ppm, distm, method='trig', dropraw=Tr
 ##  -> need to specify to "exclude" gaps of 250 msec from interpolation.
 def preproc_SHARED_pupilsize(sampledf,
                              timecol, #e.g. 'Tsec0'
-                             valcol, #e.g. 'pa'
+                             pacol, #e.g. 'pa'
                              eyecol, #e.g. 'eye'
                              characteristic_timescale_sec=0.010, #Rough characteristic timescale
                              ## of pupil size change
@@ -412,14 +412,14 @@ def preproc_SHARED_pupilsize(sampledf,
         from datetime import timedelta
         df[smoothtimename] = pd.to_timedelta(df[timecol], unit='s');
         df = df.set_index(smoothtimename);
-        smoothvalcol=valcol+'_lpf';
-        df[smoothvalcol] = df[valcol].rolling(center=True,
+        smoothpacol=pacol+'_lpf';
+        df[smoothpacol] = df[pacol].rolling(center=True,
                                               min_periods=1,
                                               window=pd.to_timedelta(characteristic_timescale_sec, unit='s'),
                                               ).mean();
-        df[valcol] = df[smoothvalcol];
+        df[pacol] = df[smoothpacol];
         df = df.reset_index(drop=True);
-        diffdf, newcol = ut.magnitude_change_over_time(df, valcol=valcol, timecol=timecol);
+        diffdf, newcol = ut.magnitude_change_over_time(df, valcol=pacol, timecol=timecol);
         
         print("EYE: {} (NEWCOL: {})".format(eye, newcol));
         print(diffdf.groupby(newcol, dropna=False).count().sort_values(by='Tsec'));
@@ -446,7 +446,8 @@ def preproc_SHARED_pupilsize(sampledf,
         #exit(0);
         
         devdf, madval = ut.MAD_timediff(indf=diffdf, valcol=newcol);
-        devdf['pa_abs_tdiff_mad'] = madval; #waste, whatever...
+        mad_name = newcol + '_mad';
+        devdf[mad_name] = madval; #'pa_abs_tdiff_mad'  waste, whatever...
         lst.append(devdf);
         pass;
     
@@ -457,7 +458,20 @@ def preproc_SHARED_pupilsize(sampledf,
     return alldf;
 
 
+#REV: to implement?
+###Coe, B. C., Huang, J., Brien, D. C., White, B. J., Yep, R., & Munoz, D. P. (2024). Automated Analysis Pipeline for Extracting Saccade, Pupil, and Blink Parameters Using Video-Based Eye Tracking. Vision, 8(1), 14. https://doi.org/10.3390/vision8010014
 
+
+## REV: need to smooth, median filter, and then find shifts in gaze.
+## Problem is that gaze can also 'drift' and can also have periods of e.g.
+## VOR, etc.
+## So, we are looking for shifts on the order of less than 100~150 msec.
+## And assume the eye stays where it was before/after, even if there are
+## small drifts before after. However, it should detect movements in mean
+## location, and optimize that, e.g. find the difference that maximally
+## straddles the movement, and then crushes size until the shift starts getting
+## much less (i.e. partway through shift). But what if it is weirdly shaped,
+## E.g. a blink so that vertical goes down.
 
 # "Knobs":
 ## MAD_mult:
@@ -480,14 +494,16 @@ def preproc_SHARED_label_blinks(df,
                                 sr_hzsec,
                                 blinkremoval_MAD_mult=5,
                                 blinkremoval_med_mult=1,
-                                blinkremoval_dilate_win_sec=0.050,
+                                blinkremoval_dilate_win_sec=0.030,
                                 blinkremoval_orphan_upperlimit_sec=0.020,
                                 blinkremoval_orphan_bracket_min_sec=0.040,
-                                blinkremoval_shortblink_minsize=0.100,
+                                blinkremoval_shortblink_minsize=0.070,
                                 tsecname='Tsec',
                                 eyecol='eye',
-                                valcol='px',
+                                valcol='px', #REV: is pupil area NAN when no eye tracking?
                                 badcol='bad',
+                                pacol='pa',
+                                #patdiffcol='pa_abs_tdiff',
                                 preblinkcols=[] ): #'elhasblink']):
     """
 
@@ -514,7 +530,7 @@ def preproc_SHARED_label_blinks(df,
     eyecol :
          (Default value = 'eye')
     valcol :
-         (Default value = 'px')
+         (Default value = 'pa')
     badcol :
          (Default value = 'bad')
     preblinkcols :
@@ -563,9 +579,11 @@ def preproc_SHARED_label_blinks(df,
         
         #print(eye, eyedf.pa.min(), eyedf.pa.max(), eyedf.pa.std());
         #print(eye, eyedf.pa_abs_tdiff.min(), eyedf.pa_abs_tdiff.max());
+        patdiffcol = pacol + '_abs_tdiff';
+        madname=patdiffcol + '_mad';
         
-        if( len( eyedf.pa_abs_tdiff_mad.unique() ) != 1 ):
-            print(eyedf.pa_abs_tdiff_mad);
+        if( len( eyedf[madname].unique() ) != 1 ):
+            print(eyedf[madname]);
             raise Exception("WTF pupil tidff mad not one");
         
         
@@ -578,23 +596,20 @@ def preproc_SHARED_label_blinks(df,
         finiteblink_sdf = ut.inverse_rle(pevdf.v, pevdf.sidx, pevdf.lidx); #REV: should be same as  baddata
         print(finiteblink_sdf);
         
-        NCONST=blinkremoval_MAD_mult;
-        MEDCONST=blinkremoval_med_mult;
-        
         #REV: choose some percentile? Not median? Base on distribution?
         #REV: If I base on "percentile" I will specify about how much I will exclude...e.g. 95% means I will exclude those above 95%
         #REV: I can't necessarily predict beforehand how many points need to be removed per trial...it will depend on the trial.
         #REV: trials with large variance for example? Use STD? STD is just e.g. 67% 
         
-        if( len(eyedf.pa_abs_tdiff_mad.unique()) != 1 ):
-            raise Exception( "More than one MAD: {}".format(eyedf.pa_abs_tdiff_mad.unique()));
+        if( len(eyedf[madname].unique()) != 1 ):
+            raise Exception( "More than one MAD: {}".format(eyedf[madname].unique()));
         
-        dpa_MAD = eyedf.pa_abs_tdiff_mad.unique()[0];
-        thresh = ( (np.nanmedian(eyedf.pa_abs_tdiff) * MEDCONST) +
-                   (dpa_MAD  *  NCONST)
+        dpa_MAD = eyedf[madname].unique()[0];
+        thresh = ( (np.nanmedian(eyedf[patdiffcol]) * blinkremoval_med_mult) +
+                   (dpa_MAD  *  blinkremoval_MAD_mult)
                   );
         
-        pevdf = ut.events_over_thresh(eyedf.pa_abs_tdiff, thresh=thresh, t=np.array(eyedf[tsecname]) );
+        pevdf = ut.events_over_thresh(eyedf[patdiffcol], thresh=thresh, t=np.array(eyedf[tsecname]) );
         dpupil_evdf = pevdf.copy();
         dpupil_sdf = ut.inverse_rle(pevdf.v, pevdf.sidx, pevdf.lidx);
         
@@ -679,6 +694,20 @@ def preproc_SHARED_label_blinks(df,
 
 
 
+
+def blink_df_from_samples(df,
+                           badcol='bad',
+                           tcol='Tsec0',
+                           stcol='stsec',
+                           encol='ensec'
+                           ):
+    ev = pu.utils.cond_rle_df( df[badcol], val=True, t=df[tcol] );
+    ev = ev[ ev['v'] == True ].reset_index(drop=True);
+    ev[stcol] = ev['st'];
+    ev[encol] = ev['et'];
+    ev['label'] = 'BLNK';
+    ev = ev[ [ c for c in ev if c in [stcol, encol, 'label'] ] ];
+    return ev;
 
 
 
