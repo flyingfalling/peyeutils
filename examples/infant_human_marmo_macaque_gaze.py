@@ -416,6 +416,7 @@ def main():
     MULTIPROC=True;
     #MULTIPROC=False;
     NPROC=8;
+    #wrapped=wrapped[:8]; #testing only do first few...
     results=list();
     if(MULTIPROC):
         with Pool(processes=NPROC) as pool:
@@ -429,6 +430,7 @@ def main():
             pass;
         pass;
 
+    rows=list();
     for row in results:
         if( row.iloc[0]['edferror'] ):
             continue;
@@ -485,7 +487,10 @@ def main():
     '''
     
     bigrows = pd.concat(rows);
-    bigrows.to_csv('final_infant_rows.csv', index=False);
+    
+    outidxcsv='final_infant_rows.csv';
+    print("Writing to file: {}".format(outidxcsv));
+    bigrows.to_csv(outidxcsv, index=False);
     
     return 0;
 
