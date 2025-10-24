@@ -109,7 +109,11 @@ def preproc_peyefv_edf( in_edf_path : str,
     df, ev, msgs, badtrial = pu.eyelink.preproc_EL_A_clean_samples(s,e,m);
     df = pu.eyelink.preproc_EL_rawcalib_px(df, msgs);
     df = pu.peyefv.preproc_peyefreeviewing_dva_from_flatscreen(df, msgs);
-    df = pu.preproc.preproc_SHARED_C_binoc_gaze(df, xcol='cgx_dva', ycol='cgy_dva', tcol='Tsec0', exclude_thresh=2);
+    
+    if( False == badtrial ):
+        df = pu.preproc.preproc_SHARED_C_binoc_gaze(df, xcol='cgx_dva', ycol='cgy_dva', tcol='Tsec0', exclude_thresh=2);
+        pass;
+    
     #df = preproc_SHARED_D_exclude_bad( df, xcol='cgx_dva', ycol='cgy_dva', badcol='bad' );
     
     if( out_csv_path ):

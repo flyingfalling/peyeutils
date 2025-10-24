@@ -879,8 +879,19 @@ def import_fv_blocks(msgdf : pd.DataFrame,
         blockdf.append(pd.DataFrame([newblk]));
         edfblocknum  += 1;
         pass; ### END for stidx/enidx
+
+    if(len(blockdf) > 0 ):
+        blockdf = pd.concat(blockdf);
+        pass;
+    else:
+        blockdf = pd.DataFrame();
+        pass;
     
-    blockdf = pd.concat(blockdf);
-    blockedtrialsdf = pd.concat(blockedtrialsdf);
+    if(len(blocktrialsdf) > 0 ):
+        blockedtrialsdf = pd.concat(blockedtrialsdf);
+        pass;
+    else:
+        blockedtrialsdf = pd.DataFrame();
+        pass;
     
     return blockdf, blockedtrialsdf;

@@ -394,7 +394,7 @@ def main():
                     row['subj'] = subj;
                     
                     import json
-                    print(json.dumps(row.iloc[0], indent=4, sort_keys=True));
+                    print(json.dumps(row.iloc[0].to_dict(), indent=4, sort_keys=True));
                     
                     rows.append(row);
                     pass;

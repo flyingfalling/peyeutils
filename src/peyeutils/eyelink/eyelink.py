@@ -451,7 +451,8 @@ def preproc_EL_A_clean_samples(rawsamps, rawevents, rawmessages,
                                                            timeunitsec=pu.EL_TIMEUNIT_SEC,
                                                            );
     if( badtrial ):
-        print("BADTRIAL (no data) -- skipping pupil size analysis")
+        print("BADTRIAL (no data) -- skipping pupil size analysis");
+        df['bad'] = True; #should fill in all bad ...
         pass;
     else:
         df = pre.preproc_SHARED_pupilsize(df,
