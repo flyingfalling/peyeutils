@@ -233,6 +233,11 @@ def plotit(edfrow, out_csv_path):
                 ax.scatter(bsamps.Tsec, bsamps.cgx_dva, s=0.5, label='{} X'.format(eye));
                 ax.scatter(bsamps.Tsec, bsamps.cgy_dva, s=0.5, label='{} Y'.format(eye));
                 pass;
+
+            if( 'pa_abs_tdiff_med_err' not in bsamps.columns ):
+                print(bsamps.columns);
+                print("NO pupil info for MAD here, probably there was no data?");
+                continue;
             
             mederr=bsamps.iloc[0].pa_abs_tdiff_med_err;
             mad=bsamps.iloc[0].pa_abs_tdiff_mad;
@@ -264,7 +269,7 @@ def plotit(edfrow, out_csv_path):
         
         #for vid, viddf in blocktrials.groupby('video'):
         
-        ymax=9;
+        ymax=13;
         text_y=ymax;
         for tridx, trdf in blocktrials.groupby('trialidx'):
             #print(trdf.columns);
@@ -273,7 +278,8 @@ def plotit(edfrow, out_csv_path):
             most = trdf.nsec.max();
             pct = (trdf.ngood.max()/trdf.nsamp.max())*100;
             if( len(trdf.index) != 3 ):
-                raise Exception("not 3 for L/R/B as expected: {}".format(len(trdf.index)));
+                print("WARNING not 3 for L/R/B as expected: {} (maybe B is missing)".format(len(trdf.index)));
+                pass;
             ax.axvline( trdf.iloc[0].start_s, color='red', linestyle='--', alpha=0.5 );
             ax.axvline( trdf.iloc[0].end_s, color='black', linestyle='--', alpha=0.5 );
             
@@ -406,6 +412,8 @@ def main():
         
         pass;
     
+    bigrows = pd.concat(rows);
+    bigrows.to_csv('final_infant_rows.csv', index=False);
     
     return 0;
 

@@ -523,6 +523,13 @@ def import_fv_trials( mymessages, includeAasE=False, fixvidlensec=None, fiximgle
     stdf=subfm[subfm.sten=='S'].reset_index(drop=True); #REV: assume/guaranteed still sorted...
     endf=subfm[(subfm.sten=='E') | (subfm.sten=='A')].reset_index(drop=True); #REV: if we will keep, keep anyways?
     #endf=subfm[subfm.sten=='E'].reset_index(drop=True); #REV: if we will keep, keep anyways?
+
+    if( len(stdf.index) == (len(endf.index)+1) ):
+        if( stdf.iloc[-1]['Tsec'] > endf.iloc[-1]['Tsec'] ):
+            print("++++++++++ PROBABLY A BUGGED EDF due to power loss or something. Dropping the final S");
+            stdf = stdf.iloc[:-1];
+            pass;
+        pass;
     
     #print(stdf);
     #print(endf);
@@ -544,7 +551,7 @@ def import_fv_trials( mymessages, includeAasE=False, fixvidlensec=None, fiximgle
     else:
         # Nothing to do...just keep all as they are.
         pass;
-
+    
     if( len(stdf.index) != len(endf.index) ):
         print(stdf);
         print(endf);
@@ -728,7 +735,7 @@ def import_fv_blocks(msgdf : pd.DataFrame,
         
         
         #REV: add extra at very end just to be sure
-        tmprow = stdf.iloc[ len(stdf.index)-1 ]; #stdf.tail(1); #iloc[ len(stdf.index)-1 ];
+        tmprow = stdf.iloc[ len(stdf.index)-1 ].copy(); #stdf.tail(1); #iloc[ len(stdf.index)-1 ];
         tmprow['sten'] = 'E';
         #sampdf = pd.read_csv( samppath );
         lastsamp = sampdf['Tsec'].max();
@@ -794,11 +801,12 @@ def import_fv_blocks(msgdf : pd.DataFrame,
                    'start_s', 'end_s',
                    'start_wall', 'end_wall',
                    'video', 'vidw_px', 'vidh_px',
-                   'vidxpos_px', 'vidypos_px', 'isabort']
+                   'vidxpos_px', 'vidypos_px', 'isabort',
+                   'fmri_offset_s',  'fmri_offset_el',  'fmri_offset_wall'];
         
         tocheck = [ c for c in tocheck if c not in viddfcols ];
         newblk = blocktrialsdf[ tocheck ].drop_duplicates();
-                
+        
         if( 1 != len(newblk.index) ):
             print(newblk);
             raise Exception("Non-unique items within block, this should be impossible");
@@ -887,7 +895,7 @@ def import_fv_blocks(msgdf : pd.DataFrame,
         blockdf = pd.DataFrame();
         pass;
     
-    if(len(blocktrialsdf) > 0 ):
+    if(len(blockedtrialsdf) > 0 ):
         blockedtrialsdf = pd.concat(blockedtrialsdf);
         pass;
     else:
