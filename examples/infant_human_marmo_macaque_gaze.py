@@ -65,6 +65,7 @@ import matplotlib.pyplot as plt;
 import numpy as np;
 import sys;
 
+from multiprocessing import Pool;
 
 
 
@@ -343,6 +344,8 @@ def plotit(edfrow, out_csv_path):
 
 
 
+
+
 def preproc_file(fn, out_csv_path):
     print("Setting input EDF filename to [{}]".format(fn));
     
@@ -365,6 +368,19 @@ def preproc_file(fn, out_csv_path):
     
     return df;
 
+####### parallel func wrapper ########
+def parallel_preproc( mytup ):
+    fn = mytup[0];
+    out_csv_path = mytup[1];
+
+    return preproc_file( fn, out_csv_path );
+
+
+
+
+####### end parallel func ###########
+
+
 
 def main():
     idxfile=sys.argv[1];
@@ -373,7 +389,62 @@ def main():
     
     idxdf = pd.read_csv(idxfile);
     print(idxdf);
+
+    #wrapped = [ tuple((x[1], outcsv)) for x in idxdf.iterrows() ];
     
+    
+    wrapped=list();
+    for i, idxrow in idxdf.iterrows():
+        subj=idxrow['subj'];
+        path=idxrow['path'];
+        
+        fullpath = os.path.join(inpath, path);
+        files=os.listdir(fullpath);
+        for fn in files:
+            fn2 = os.path.join(fullpath, fn);
+            if( pu.utils.isfile(fn2) and
+                fn2.lower().endswith('.edf') ):
+                
+                print("Adding: Processing [{}] (SUBJECT: {})".format(fn2, subj));
+                wrapped.append( (fn2, outcsv) );
+                pass;
+            pass;
+        pass;
+    
+    print("Will proc: {}".format(wrapped));
+    
+    MULTIPROC=True;
+    #MULTIPROC=False;
+    NPROC=8;
+    results=list();
+    if(MULTIPROC):
+        with Pool(processes=NPROC) as pool:
+            results = pool.map(parallel_preproc, wrapped);
+            print(results);
+            pass;
+        pass;
+    else:
+        for row in wrapped:
+            results.append( parallel_preproc(row) );
+            pass;
+        pass;
+
+    for row in results:
+        if( row.iloc[0]['edferror'] ):
+            continue;
+        else:
+            row['datadir']=path;
+            if('subj' in row ):
+                raise Exception("WTF why subj here");
+            
+            row['subj'] = subj;
+            
+            import json
+            print(json.dumps(row.iloc[0].to_dict(), indent=4, sort_keys=True));
+            rows.append(row);
+        pass;
+    
+    '''
     rows=list();
     for i, idxrow in idxdf.iterrows():
         subj=idxrow['subj'];
@@ -411,6 +482,7 @@ def main():
         ## pixels (Physical distances and measures should be correct?).
         
         pass;
+    '''
     
     bigrows = pd.concat(rows);
     bigrows.to_csv('final_infant_rows.csv', index=False);
