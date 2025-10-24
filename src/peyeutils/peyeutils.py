@@ -95,6 +95,17 @@ def preproc_peyefv_edf( in_edf_path : str,
         row['edfmessages_csv'] = mfn;
         pass;
     
+    recinfo = pu.peyefv.get_recordingsession_info(m);
+
+    pretag='recinfo_';
+    for key in recinfo:
+        if( key in row ):
+            print("Replacing metadata info in row for file {} (key={} original row [{}]->[{}]  (from recinfo)) -- will name everything {}PARAM".format(in_edf_path, key, row[key], recinfo[key], pretag));
+            pass;
+        row[pretag+key] = recinfo[key];
+        pass;
+    
+    
     df, ev, msgs, badtrial = pu.eyelink.preproc_EL_A_clean_samples(s,e,m);
     df = pu.eyelink.preproc_EL_rawcalib_px(df, msgs);
     df = pu.peyefv.preproc_peyefreeviewing_dva_from_flatscreen(df, msgs);

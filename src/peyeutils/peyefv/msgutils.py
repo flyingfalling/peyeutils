@@ -289,8 +289,13 @@ def get_recordingsession_info( mymessages ):
     #REV: oh shit this will be over written?
     sessdict = get_tag_params(mymessages, 'SESSION', filter1='S');
     #print(sessdict);
+    #REC too?
+    recdict = get_tag_params(mymessages, 'REC', filter1='S'); #REV: newer, basically overlaps session...
     
     screendict = get_tag_params(mymessages, 'SCREEN');
+    
+    
+    
     
     eyedict = get_eye_params( mymessages ); #EYE_USED
     

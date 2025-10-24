@@ -456,7 +456,7 @@ def preproc_EL_A_clean_samples(rawsamps, rawevents, rawmessages,
     else:
         df = pre.preproc_SHARED_pupilsize(df,
                                           timecol='Tsec',
-                                          valcol='pa',
+                                          pacol='pa',
                                           eyecol='eye' );
         
         #REV: this adds "bad", "badEL", "badpupil", "badpupilEL"
@@ -476,6 +476,7 @@ def preproc_EL_A_clean_samples(rawsamps, rawevents, rawmessages,
                                              tsecname='Tsec',
                                              eyecol='eye',
                                              valcol='px',
+                                             pacol='pa',
                                              preblinkcols=preblinkcols, #REV: remove elblink detected. NOT other events...
                                              );
         pass;
