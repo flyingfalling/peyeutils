@@ -415,8 +415,7 @@ def main():
     
     MULTIPROC=True;
     #MULTIPROC=False;
-    NPROC=8;
-    #wrapped=wrapped[:8]; #testing only do first few...
+    NPROC=60;
     results=list();
     if(MULTIPROC):
         with Pool(processes=NPROC) as pool:
