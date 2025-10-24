@@ -684,8 +684,8 @@ def import_fv_trials( mymessages, includeAasE=False, fixvidlensec=None, fiximgle
 
 
 def import_fv_blocks(msgdf : pd.DataFrame,
-                       sampdf : pd.DataFrame,
-                       edftrialsdf : pd.DataFrame):
+                     sampdf : pd.DataFrame,
+                     edftrialsdf : pd.DataFrame):
     """
 
     Parameters
@@ -733,7 +733,7 @@ def import_fv_blocks(msgdf : pd.DataFrame,
         #sampdf = pd.read_csv( samppath );
         lastsamp = sampdf['Tsec'].max();
         tmprow['Tsec'] = lastsamp;
-        print("Uneven number of S/E for BLK ({}). Adding missing. (Artificial match is last sample [{}])".format(edfrow.edffile, lastsamp));
+        print("Uneven number of S/E for BLK. Adding missing. (Artificial match is last sample [{}])".format( lastsamp));
         
         endf.loc[ len(endf.index) ] = tmprow;
         
@@ -786,7 +786,7 @@ def import_fv_blocks(msgdf : pd.DataFrame,
         
         blocktrialsdf = edftrialsdf[ (edftrialsdf.start_s >= stsec) & (edftrialsdf.end_s < ensec) ].sort_values(by='start_s').reset_index(drop=True);
         if( len(blocktrialsdf.index) < 1 ):
-            print("BLOCK WOULD CONTAIN NO VIDEOS [{}] -- SKIPPING".format(edfrow.edffile));
+            print("BLOCK WOULD CONTAIN NO VIDEOS -- SKIPPING"); #.format(edfrow.edffile));
             continue;
 
         tocheck = list(blocktrialsdf.columns);

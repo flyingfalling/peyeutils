@@ -346,13 +346,15 @@ def preproc_file(fn, out_csv_path):
     print(bt);
     print(b);
     print(row);
+
+    row2 = { a:[row[a]] for a in row };
+    df = pd.DataFrame(row2);
     
     if(False == row['edferror'] ):
         plotit(df.iloc[0], out_csv_path);
         pass;
     
-    row = { a:[row[a]] for a in row };
-    df = pd.DataFrame(row);
+    
     print(df);
     
     return df;
@@ -382,7 +384,7 @@ def main():
                 print("Processing [{}] (SUBJECT: {})".format(fn2, subj));
                 row = preproc_file(fn2, outcsv);
                 
-                if( row['edferror'] ):
+                if( row.iloc[0]['edferror'] ):
                     continue;
                 else:
                     row['datadir']=path;
@@ -392,7 +394,7 @@ def main():
                     row['subj'] = subj;
                     
                     import json
-                    print(json.dumps(row, indent=4, sort_keys=True));
+                    print(json.dumps(row.iloc[0], indent=4, sort_keys=True));
                     
                     rows.append(row);
                     pass;
