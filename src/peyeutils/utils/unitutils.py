@@ -147,7 +147,7 @@ def get_center_dva_per_meter( dm, ppm, reference_width_meters=0.01, reference_cu
 
 
 def vec3d_to_yawpitchroll_NWU(n,w,u):
-    from eyeutils.nputils import compute_yaw_pitch_roll;
+    from peyeutils.utils import compute_yaw_pitch_roll;
     
     if( len(n.shape) > 1 ):
         raise Exception("vec3d_to_yawpitchroll_NWU requires n,w,u vectors to be 1d...(np treats as horizontal vectors). Real shape is {}".format(n.shape));
