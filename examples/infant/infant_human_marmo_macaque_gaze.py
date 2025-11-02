@@ -346,7 +346,7 @@ def plotit(edfrow, out_csv_path):
 
 
 
-def preproc_file(fn, out_csv_path):
+def preproc_file(fn, out_csv_path, doplot=False):
     print("Setting input EDF filename to [{}]".format(fn));
     
     row, s, m, bt, b = pu.preproc_peyefv_edf(fn, out_csv_path=out_csv_path);
@@ -359,7 +359,7 @@ def preproc_file(fn, out_csv_path):
     row2 = { a:[row[a]] for a in row };
     df = pd.DataFrame(row2);
     
-    if(False == row['edferror'] ):
+    if(False == row['edferror'] and doplot ):
         plotit(df.iloc[0], out_csv_path);
         pass;
     
