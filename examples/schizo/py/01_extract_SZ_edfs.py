@@ -23,22 +23,37 @@ def preproc_file(fn, out_csv_path, doplot=False):
     print(row);
     
     row2 = { a:[row[a]] for a in row };
-    df = pd.DataFrame(row2);
+    row2df = pd.DataFrame(row2);
     
     if(False == row['edferror'] and doplot ):
-        plotit(df.iloc[0], out_csv_path);
+        plotit(row2df.iloc[0], out_csv_path);
         pass;
-    print(df);
-    return df;
+    #print(df);
+    return row2df;
 
 
 ####### parallel func wrapper ########
 
 def parallel_preproc( mytup ):
-    fn = mytup[0];
+    row = mytup[0];
+    fn = os.path.join(row['edfpath'], row['edffile']);
     out_csv_path = mytup[1];
-    
-    return preproc_file( fn, out_csv_path );
+    newrow = preproc_file( fn, out_csv_path );
+
+    for c in newrow.columns:
+        if( c in row ):
+            if( row[c] != newrow.iloc[0][c] ):
+                raise Exception("WTF column {} does not line up? Old: {} New: {}".format(c, row[c], newrow.iloc[0][c]) );
+            pass;
+        row[c] = newrow.iloc[0][c];
+        pass;
+
+        
+    rowdf = { c:[v] for c,v in row.items() }
+    print(rowdf);
+    rowdf = pd.DataFrame(rowdf);
+    print(rowdf);
+    return rowdf;
 
 #######   end parallel    ############
 
@@ -46,7 +61,7 @@ def parallel_preproc( mytup ):
 
 
 def main():
-    NPROC=None; # none makes num_cpu
+    NPROC=None; #None; # none makes num_cpu
     
     alledfcsv=sys.argv[1];
     fmriedfdir=sys.argv[2];
@@ -60,7 +75,7 @@ def main():
     
     alledf_df = pd.read_csv(alledfcsv);
 
-    alledf_df=alledf_df.iloc[:4];
+    #alledf_df=alledf_df.iloc[:5];
     
     ## REV: prepare to run it...
     rows = [ tuple((x[1], savecsvdir)) for x in alledf_df.iterrows() ];
@@ -77,21 +92,23 @@ def main():
             results.append( parallel_preproc(row) );
             pass;
         pass;
-
+    
     #REV: only non-error EDFs...
-    alledfs = pd.concat( [ r for r in results if False==r['edferror'] ]  );
+    #alledfs = pd.concat( [ r for r in results if False==r.iloc[0]['edferror'] ]  );
     
     alltrials=list();
-    for i, row in alledfs.iterrows():
+    alledfs=list();
+    for rowdf in results:
+        row=rowdf.iloc[0];
         if(False == row['edferror']):
+            alledfs.append(rowdf);
             trialdf = pd.read_csv(os.path.join(savecsvdir, row['trials_csv']));
             alltrials.append(trialdf);
             pass;
         pass;
-    alltrials = pd.concat(alltrials);
     
     bigtrialdf = pd.concat(alltrials).reset_index(drop=True);
-    bigedfdf = pd.DataFrame(alledfs); #pd.concat(alledfs).reset_index(drop=True);
+    bigedfdf = pd.concat(alledfs).reset_index(drop=True);
     
     
     print(bigtrialdf);

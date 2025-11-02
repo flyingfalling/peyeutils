@@ -88,37 +88,51 @@ def main():
             print("[{}]  HAS AN FMRI EDF DIR!!".format(name));
             #fmriedfs = [x for x in os.listdir(myfmriedfdir) if x.lower()[-4:]=='.edf'];
             fmriedfs=list();
-            fnames=list();
+            subdirs=list();
             for root, dirs, files in os.walk(myfmriedfdir):
                 if(len(dirs) != 0 ):
-                    print("WARNING: More than one subdir?: {}".format(dirs));
+                    print("WARNING: One or more subdirs? Unexpected: {}".format(dirs));
                 for filename in files:
                     #if( filename.lower()[-4:]=='.edf' ):
                     if( filename.lower().endswith('.edf') ):
-                        if( filename in fnames ):
+                        if( filename in fmriedfs ):
                             raise Exception("Something wrong, doubled up filename? [{}]".format(filename));
-                        fnames.append(filename);
+                        
                         full_file_path = os.path.join(root, filename);
                         relative_file_path = os.path.relpath(full_file_path, myfmriedfdir);
-                        fmriedfs.append(relative_file_path);
+                        subdir = os.path.dirname(relative_file_path);
+                        subdirs.append(subdir);
+                        fmriedfs.append(filename);
                         pass;
                     pass;
                 pass;
             
             ninside=len(fmriedfs);
-            for x in fmriedfs:
+
+            for x,subx in zip(fmriedfs, subdirs):
                 import re;
                 mydatetime = re.match(edfdatepattern, x);
-                mydatetime = mydatetime.group(1);
-                mydatetime = pd.to_datetime(mydatetime, format='%Y-%m-%d-%H-%M-%S', errors='coerce');
-                mydate = mydatetime.normalize();
+                if( not mydatetime ):
+                    print("WARNING, edf {} is missing date/time (maybe fname is not normal)".format(x));
+                    mydatetime = None;
+                    pass;
+                else:
+                    mydatetime = mydatetime.group(1);
+                    mydatetime = pd.to_datetime(mydatetime, format='%Y-%m-%d-%H-%M-%S', errors='coerce');
+                    mydate = mydatetime.normalize();
+                    pass;
                 #if( mydate != fmriexpecteddate ):
                 #    print(" ---------- FMRI WARNING : Dates do not line up (got {}, expected {})".format(mydate, fmriexpecteddate));
                 #    pass;
                 
-                print("Processing {} (date={}, time={})".format(x,mydate, mydatetime));
-                edflist.append( dict( name=name, edfdate=mydate, edfdatetime=mydatetime, expecteddate=fmriexpecteddate,
-                                      edfpath=myfmriedfdir, edffile=x, kind='fmri') );
+                print("Processing {}/{} (date={}, time={})".format(subx,x,mydate, mydatetime));
+                edflist.append( dict( name=name, edfdate=mydate,
+                                      edfdatetime=mydatetime,
+                                      expecteddate=fmriexpecteddate,
+                                      edfbasedir=myfmriedfdir,
+                                      edfsubdir=subx,
+                                      edfpath=os.path.join(myfmriedfdir,subx),
+                                      edffile=x, kind='fmri') );
                 
                 pass;
             pass;
@@ -134,7 +148,7 @@ def main():
             
             #outsideedfs = [x for x  in os.listdir(myoutsideedfdir) if x.lower()[-4:]=='.edf'];
             outsideedfs=list();
-            fnames=list();
+            subdirs=list();
             for root, dirs, files in os.walk(myoutsideedfdir):
                 if(len(dirs) != 0 ):
                     print("WARNING: More than one subdir?: {}".format(dirs));
@@ -142,18 +156,22 @@ def main():
                     
                     #if( filename.lower()[-4:]=='.edf' ):
                     if( filename.lower().endswith('.edf') ):
-                        if( filename in fnames ):
+                        if( filename in outsideedfs ):
                             raise Exception("Something wrong, doubled up filename? [{}]".format(filename));
-                        fnames.append(filename);
+                                                
                         full_file_path = os.path.join(root, filename);
                         relative_file_path = os.path.relpath(full_file_path, myoutsideedfdir);
-                        outsideedfs.append(relative_file_path);
+                        subdir = os.path.dirname(relative_file_path);
+                        
+                        subdirs.append(subdir);
+                        outsideedfs.append(filename);
                         pass;
                     pass;
                 pass;
             
             noutside=len(outsideedfs);
-            for x in outsideedfs:
+            
+            for x,subx in zip(outsideedfs, subdirs):
                 mydatetime = re.match(edfdatepattern, x);
                 mydatetime = mydatetime.group(1);
                 mydatetime = pd.to_datetime(mydatetime, format='%Y-%m-%d-%H-%M-%S', errors='coerce')
@@ -161,10 +179,14 @@ def main():
                 #if( mydate != outsideexpecteddate ):
                 #    print(" ---------- OUTSIDE WARNING : Dates do not line up (got {}, expected {})".format(mydate, outsideexpecteddate));
                 #    pass;
-                print("Processing {} (date={}, time={})".format(x,mydate, mydatetime));
-                edflist.append( dict( name=name, edfdate=mydate, edfdatetime=mydatetime,
+                print("Processing {}/{} (date={}, time={})".format(subx,x,mydate, mydatetime));
+                edflist.append( dict( name=name, edfdate=mydate,
+                                      edfdatetime=mydatetime,
                                       expecteddate=outsideexpecteddate,
-                                      edfpath=myoutsideedfdir, edffile=x, kind='outside') );
+                                      edfbasedir=myoutsideedfdir,
+                                      edfsubdir=subx,
+                                      edfpath=os.path.join(myoutsideedfdir,subx),
+                                      edffile=x, kind='outside') );
                 pass;
             pass;
         else:
