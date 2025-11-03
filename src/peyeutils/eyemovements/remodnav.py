@@ -849,7 +849,7 @@ def remodnav_preprocess_eyetrace2d(eyesamps : pd.DataFrame,
     expecteddur=((len(eyesamps.index)-1) / samplerate); #500 samples / 500 samp/sec = 1 sec. #2 samples makes 2 msec...so 1 sample is...0.
     
     if( abs(expecteddur - dur) > GRACE_SEC ):
-        raise Exception("ERROR, missing samples (not dense)  expected from #samples {}   observed {}".format(expecteddur, dur));
+        raise Exception("ERROR, missing samples (not dense)  expected from #samples {}   observed {} ({}-{})".format(expecteddur, dur, eyesamps[tname].max(), eyesamps[tname].min()));
         
     
     if(allnan(eyesamps[xname]) or allnan(eyesamps[yname])):

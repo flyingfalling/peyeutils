@@ -343,7 +343,7 @@ def preproc_peyefreeviewing_dva_from_flatscreen(df, msgs):
 
 
 
-def import_fv_trials( mymessages, includeAasE=False, fixvidlensec=None, fiximglensec=None, fixdvawid=None, noaborts=True ):
+def import_fv_trials( mymessages, includeAasE=False, fixvidlensec=None, fiximglensec=None, fixdvawid=None, noaborts=True, tcol='Tsec'):
     """
 
     Parameters
@@ -384,7 +384,7 @@ def import_fv_trials( mymessages, includeAasE=False, fixvidlensec=None, fiximgle
     #REV: Includes (S->A too!)
     #subfm = mymessages[ (mymessages.filename == fn) & (mymessages.tag == 'VID') ].copy();
     subfm = mymessages[ (mymessages.tag == 'VID') ].copy();
-    subfm.sort_values(by='Tsec', inplace=True);
+    subfm.sort_values(by=tcol, inplace=True);
     
     blkm = mymessages[ (mymessages.tag == 'BLK') ].copy();
     if( len(blkm) > 0 ):
@@ -404,7 +404,7 @@ def import_fv_trials( mymessages, includeAasE=False, fixvidlensec=None, fiximgle
                 raise Exception("FMRI MSG FORMAT BAD");
             fmrit = float(fmrilst[1]);
             fmridf.append( pd.DataFrame( dict(fmrist_wall=[fmrit],
-                                              fmrist_s=[row.Tsec],
+                                              fmrist_s=[row[tcol]],
                                               fmrist_el=[row.ELtime]) ) );
             pass;
         pass;
@@ -487,7 +487,7 @@ def import_fv_trials( mymessages, includeAasE=False, fixvidlensec=None, fiximgle
         pass;
     
     #REV: sort them.
-    subfm.sort_values(by='Tsec', inplace=True); #REV: I think...?
+    subfm.sort_values(by=tcol, inplace=True); #REV: I think...?
     
     #REV: only want if they are DIRECTLY PAST EACH OTHER!
     #subfm.drop_duplicates( subset=['sten'], keep='last', inplace=True );
@@ -525,7 +525,7 @@ def import_fv_trials( mymessages, includeAasE=False, fixvidlensec=None, fiximgle
     #endf=subfm[subfm.sten=='E'].reset_index(drop=True); #REV: if we will keep, keep anyways?
 
     if( len(stdf.index) == (len(endf.index)+1) ):
-        if( stdf.iloc[-1]['Tsec'] > endf.iloc[-1]['Tsec'] ):
+        if( stdf.iloc[-1][tcol] > endf.iloc[-1][tcol] ):
             print("++++++++++ PROBABLY A BUGGED EDF due to power loss or something. Dropping the final S");
             stdf = stdf.iloc[:-1];
             pass;
@@ -603,8 +603,8 @@ def import_fv_trials( mymessages, includeAasE=False, fixvidlensec=None, fiximgle
                 
         newvidrow = dict( start_el=strow.ELtime,
                           end_el=enrow.ELtime,
-                          start_s=strow.Tsec,
-                          end_s=enrow.Tsec,
+                          start_s=strow[tcol],
+                          end_s=enrow[tcol],
                           start_wall=t,
                           end_wall=ent,
                           video=vid,
@@ -614,12 +614,6 @@ def import_fv_trials( mymessages, includeAasE=False, fixvidlensec=None, fiximgle
                           vidypos_px=y,
                           isabort=isabort );
         newvidrow = { k:[newvidrow[k]] for k in newvidrow };
-        '''
-        newvidrow = [ strow.ELtime, enrow.ELtime,
-                      strow.Tsec, enrow.Tsec,
-                      t, ent,
-                      vid, w, h, x, y, isabort ];
-        '''
         #vidtrialdf.loc[len(vidtrialdf.index)] = newvidrow;
         vidtrialdf.append( pd.DataFrame(newvidrow) );
         pass;
@@ -692,7 +686,8 @@ def import_fv_trials( mymessages, includeAasE=False, fixvidlensec=None, fiximgle
 
 def import_fv_blocks(msgdf : pd.DataFrame,
                      sampdf : pd.DataFrame,
-                     edftrialsdf : pd.DataFrame):
+                     edftrialsdf : pd.DataFrame,
+                     tcol='Tsec'):
     """
 
     Parameters
@@ -711,14 +706,14 @@ def import_fv_blocks(msgdf : pd.DataFrame,
     blockdf=list();
     blockedtrialsdf=list();
     
-    if( 'Tsec' not in msgdf.columns ):
-        raise Exception("File (MSG DF) has no Tsec?");
+    if( tcol not in msgdf.columns ):
+        raise Exception("File (MSG DF) has no column: {}?".format(tcol));
     blkm = msgdf[ (msgdf.tag == 'BLK') ].copy();
-    blkm = blkm.sort_values(by='Tsec');
+    blkm = blkm.sort_values(by=tcol);
     blkm['sten'] = [ row.body[0] for idx,row in blkm.iterrows() ];
     
     fmrim = msgdf[ (msgdf.tag == 'FMRI') ].copy();
-    fmrim = fmrim.sort_values(by='Tsec');
+    fmrim = fmrim.sort_values(by=tcol);
 
     abortedblks = blkm[blkm.sten=='A'];
     if(len(abortedblks.index)>0):
@@ -738,8 +733,8 @@ def import_fv_blocks(msgdf : pd.DataFrame,
         tmprow = stdf.iloc[ len(stdf.index)-1 ].copy(); #stdf.tail(1); #iloc[ len(stdf.index)-1 ];
         tmprow['sten'] = 'E';
         #sampdf = pd.read_csv( samppath );
-        lastsamp = sampdf['Tsec'].max();
-        tmprow['Tsec'] = lastsamp;
+        lastsamp = sampdf[tcol].max();
+        tmprow[tcol] = lastsamp;
         print("Uneven number of S/E for BLK. Adding missing. (Artificial match is last sample [{}])".format( lastsamp));
         
         endf.loc[ len(endf.index) ] = tmprow;
@@ -747,13 +742,13 @@ def import_fv_blocks(msgdf : pd.DataFrame,
         #REV: make dummy "E" just before each "S" except the first.
         newEs = stdf.iloc[1:].copy();
         newEs['sten'] = 'E'
-        newEs['Tsec'] -= 0.020; #20 msec, just so dividsible by 1k, 2k, 250hz, 500hz, 200hz?
+        newEs[tcol] -= 0.020; #20 msec, just so dividsible by 1k, 2k, 250hz, 500hz, 200hz?
         endf = pd.concat([endf, newEs]);
         #endf = endf.sort_values(by='time').reset_index(drop=True);
         
         #REV: recombine S/E and sort to interlace.
         bothdf=pd.concat([stdf,endf]);
-        bothdf = bothdf.sort_values(by='Tsec').reset_index(drop=True);
+        bothdf = bothdf.sort_values(by=tcol).reset_index(drop=True);
         
         mylen=len(bothdf.index) + 1;
         while( len(bothdf.index) < mylen ):
@@ -782,8 +777,8 @@ def import_fv_blocks(msgdf : pd.DataFrame,
         #stsec = float(smsg[2].split('=')[1]);
         stel = strow.ELtime;
         enel = enrow.ELtime;
-        stsec = strow.Tsec;
-        ensec = enrow.Tsec;
+        stsec = strow[tcol];
+        ensec = enrow[tcol];
         
         EFREEFIX=smsg[1];
         #etsec = float(emsg[2].split('=')[1]);
@@ -827,8 +822,8 @@ def import_fv_blocks(msgdf : pd.DataFrame,
         if(len(fmrim.index)>0):
             myfmrim = fmrim.copy();
             print(myfmrim);
-            print("DOING {} - {}".format(myfmrim['Tsec'], newblk['blkstart_s']));
-            myfmrim['dist'] = myfmrim['Tsec'] - newblk['blkstart_s']; #will be negative if fmri before (smaller) than block start. Way it works is start block -> waits for FMRI key ('6') -> starts trial for sync.
+            print("DOING {} - {}".format(myfmrim[tcol], newblk['blkstart_s']));
+            myfmrim['dist'] = myfmrim[tcol] - newblk['blkstart_s']; #will be negative if fmri before (smaller) than block start. Way it works is start block -> waits for FMRI key ('6') -> starts trial for sync.
             #print("HI!", myfmrim);
             myfmrim = myfmrim[ myfmrim['dist'] > 0 ];
             
@@ -836,21 +831,21 @@ def import_fv_blocks(msgdf : pd.DataFrame,
             if(len(myfmrim) > 0):
                 myfmrim = myfmrim.sort_values(by='dist').reset_index(drop=True);
                 best = myfmrim.iloc[0];
-                besttime = best['Tsec'];
+                besttime = best[tcol];
                 tmpstdf=stdf.copy();
-                tmpstdf['dist'] = besttime - tmpstdf['Tsec']; #REV: smallest one.
+                tmpstdf['dist'] = besttime - tmpstdf[tcol]; #REV: smallest one.
                 tmpstdf = tmpstdf.sort_values(by='dist').reset_index(drop=True);
                 bestblk = tmpstdf.iloc[0];
-                if( bestblk.Tsec != newblk.blkstart_s ):
+                if( bestblk[tcol] != newblk.blkstart_s ):
                     print("There is no valid FMRI message for me");
                     newblk['fmrist_s'] = np.nan;
                     newblk['fmrist_el'] = np.nan;
                     newblk['fmrist_wall'] = np.nan;
                     pass;
                 else:
-                    print("FMRI trial for this block starts at: {}".format(best['Tsec']));
+                    print("FMRI trial for this block starts at: {}".format(best[tcol]));
                     walltime = float(best.body.split('=')[1]);
-                    newblk['fmrist_s']  = best['Tsec'];
+                    newblk['fmrist_s']  = best[tcol];
                     newblk['fmrist_el']  = best['Tmsec'];
                     newblk['fmrist_wall']  = walltime;
                     pass;
@@ -901,5 +896,7 @@ def import_fv_blocks(msgdf : pd.DataFrame,
     else:
         blockedtrialsdf = pd.DataFrame();
         pass;
-    
+
+    blockdf['tcol'] = tcol;
+    blockedtrialsdf['tcol'] = tcol;
     return blockdf, blockedtrialsdf;
