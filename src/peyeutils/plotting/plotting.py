@@ -18,6 +18,13 @@ import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
 import matplotlib.patches as mpatches
 
+
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import matplotlib.gridspec as gridspec
+import matplotlib.patches as mpatches
+
 def plot_gaze_chunks(
     df, timestamp_col, x_col, y_col, chunk_size_sec=10,
     events_df=None, event_start_col=None, event_end_col=None, event_type_col=None,
@@ -26,15 +33,15 @@ def plot_gaze_chunks(
     max_chunks_per_fig=10
 ):
     """
-    Plots gaze data in paginated, stacked chunks with separate event timelines.
-    Correctly normalizes all timestamps to start from 0.
+    Plots gaze data in paginated chunks using ABSOLUTE timestamps.
+    No time normalization is performed.
 
     Args:
         df (pd.DataFrame): DataFrame with gaze data.
         timestamp_col, x_col, y_col (str): Column names for gaze data.
         chunk_size_sec (int): Duration of each chunk.
         
-        events_df (pd.DataFrame): DataFrame with discrete events (e.g., blinks).
+        events_df (pd.DataFrame): DataFrame with discrete events.
         event_start_col, event_end_col, event_type_col (str): Event columns.
         
         stimulus_df (pd.DataFrame): DataFrame with stimulus presentation times.
@@ -44,31 +51,37 @@ def plot_gaze_chunks(
         max_chunks_per_fig (int): Max chunks per figure for pagination.
     """
     
-    # --- 1. Prepare Gaze Data & Time Normalization ---
+    # --- 1. Prepare Gaze Data ---
     data = df.copy()
     if not pd.api.types.is_numeric_dtype(data[timestamp_col]):
         raise TypeError(f"Timestamp column '{timestamp_col}' must be numeric (e.g., seconds).")
     
-    # --- FIX ---
-    # Calculate the offset from the main data's start time
-    time_offset = data[timestamp_col].min()
-    data['time_sec'] = data[timestamp_col] - time_offset
-    # --- END FIX ---
-    
-    # --- 1b. Downsample Gaze Data (New) ---
+    # --- 1b. Downsample Gaze Data (if requested) ---
     if max_points_per_sec is not None and max_points_per_sec > 0:
         try:
-            data['timestamp'] = pd.to_timedelta(data['time_sec'], unit='s')
+            # Create a 0-based time column *only* for resampling
+            time_offset = data[timestamp_col].min()
+            data['time_sec_norm'] = data[timestamp_col] - time_offset
+            data['timestamp'] = pd.to_timedelta(data['time_sec_norm'], unit='s')
             data = data.set_index('timestamp')
+            
             rule_ms = 1000 / max_points_per_sec
             rule = f"{rule_ms:.0f}ms"
+            
+            # Resample. .mean() acts as a low-pass filter.
             data = data.resample(rule).mean().reset_index()
-            data['time_sec'] = data['timestamp'].dt.total_seconds()
+            
+            # Re-create the absolute timestamp column from the new 0-based time
+            data['time_sec_norm'] = data['timestamp'].dt.total_seconds()
+            data[timestamp_col] = data['time_sec_norm'] + time_offset
+            
+            # Clean up temporary column
+            data = data.drop(columns=['time_sec_norm', 'timestamp'])
             print(f"Resampled gaze data to {rule} ({max_points_per_sec} Hz)")
         except Exception as e:
             print(f"Warning: Could not resample data: {e}. Plotting all points.")
+            # Revert if it fails
             data = df.copy()
-            data['time_sec'] = data[timestamp_col] - time_offset
 
     # --- 2. Prepare Event & Stimulus Colors ---
     event_color_map = {}
@@ -96,10 +109,16 @@ def plot_gaze_chunks(
             print(f"Warning: Error processing stimulus_df: {e}. Skipping stimulus plotting.")
             stim_args_provided = False
 
-    # --- 3. Determine Overall Layout ---
-    max_time = data['time_sec'].max()
-    total_num_chunks = int(np.ceil(max_time / chunk_size_sec))
-    if total_num_chunks == 0: return
+    # --- 3. Determine Overall Layout (using absolute times) ---
+    global_min_time = data[timestamp_col].min()
+    global_max_time = data[timestamp_col].max()
+    total_duration = global_max_time - global_min_time
+    
+    total_num_chunks = int(np.ceil(total_duration / chunk_size_sec))
+    if total_num_chunks == 0: 
+        print("Error: No time duration in gaze data.")
+        return
+        
     total_num_figures = int(np.ceil(total_num_chunks / max_chunks_per_fig))
     
     plot_width = 16
@@ -121,8 +140,10 @@ def plot_gaze_chunks(
         # --- 5. Loop and Plot Each CHUNK for THIS figure ---
         for i in range(num_chunks_this_fig):
             global_chunk_idx = start_chunk_idx + i
-            start_time = global_chunk_idx * chunk_size_sec
-            end_time = (global_chunk_idx + 1) * chunk_size_sec
+            
+            # --- FIX: Chunk boundaries are absolute ---
+            start_time = global_min_time + (global_chunk_idx * chunk_size_sec)
+            end_time = global_min_time + ((global_chunk_idx + 1) * chunk_size_sec)
 
             inner_gs = gridspec.GridSpecFromSubplotSpec(
                 2, 1, subplot_spec=outer_gs[i], 
@@ -131,52 +152,51 @@ def plot_gaze_chunks(
             gaze_ax = fig.add_subplot(inner_gs[0])
             event_ax = fig.add_subplot(inner_gs[1], sharex=gaze_ax)
             
-            # --- 5b. Plot Stimulus Spans (on gaze_ax) ---
+            # --- 5b. Plot Stimulus Spans (Absolute) ---
             if stim_args_provided:
-                # --- FIX: Apply time_offset to filter ---
+                # Filter using absolute times
                 relevant_stim = stimulus_df[
-                    (stimulus_df[stim_start_col] - time_offset < end_time) &
-                    (stimulus_df[stim_end_col] - time_offset > start_time)
+                    (stimulus_df[stim_start_col] < end_time) &
+                    (stimulus_df[stim_end_col] > start_time)
                 ]
                 for _, stim in relevant_stim.iterrows():
                     stim_name = stim[stim_name_col]
                     color = stim_color_map.get(stim_name, 'gray')
                     
-                    # --- FIX: Apply time_offset to start/end times ---
-                    stim_start_norm = stim[stim_start_col] - time_offset
-                    stim_end_norm = stim[stim_end_col] - time_offset
+                    # Get absolute event times
+                    stim_start_abs = stim[stim_start_col]
+                    stim_end_abs = stim[stim_end_col]
                     
-                    # Clip the span to the chunk's boundaries
-                    span_start = max(stim_start_norm, start_time)
-                    span_end = min(stim_end_norm, end_time)
+                    # Clip to chunk boundaries
+                    span_start = max(stim_start_abs, start_time)
+                    span_end = min(stim_end_abs, end_time)
                     
                     if span_start < span_end:
                         gaze_ax.axvspan(span_start, span_end, color=color, 
                                         alpha=0.4, zorder=0, ec='none')
-                        
                         text_x = (span_start + span_end) / 2
                         gaze_ax.text(text_x, 0.97, stim_name, 
-                                     color=color*0.8, 
-                                     alpha=1.0, ha='center', va='top', 
-                                     fontsize=9, weight='bold',
+                                     color=color*0.8, alpha=1.0, ha='center', 
+                                     va='top', fontsize=9, weight='bold',
                                      transform=gaze_ax.get_xaxis_transform())
 
-            # --- 5c. Plot Gaze Traces (on gaze_ax) ---
+            # --- 5c. Plot Gaze Traces (Absolute) ---
             chunk_data = data[
-                (data['time_sec'] >= start_time) & (data['time_sec'] < end_time)
+                (data[timestamp_col] >= start_time) & 
+                (data[timestamp_col] < end_time)
             ]
             if not chunk_data.empty:
-                h1, = gaze_ax.plot(chunk_data['time_sec'], chunk_data[x_col], label=f'{x_col} (X)')
-                h2, = gaze_ax.plot(chunk_data['time_sec'], chunk_data[y_col], label=f'{y_col} (Y)')
+                h1, = gaze_ax.plot(chunk_data[timestamp_col], chunk_data[x_col], label=f'{x_col} (X)')
+                h2, = gaze_ax.plot(chunk_data[timestamp_col], chunk_data[y_col], label=f'{y_col} (Y)')
                 if not all_line_handles: 
                     all_line_handles = [h1, h2]
             
-            # --- 5d. Plot Events (on event_ax) ---
+            # --- 5d. Plot Events (Absolute) ---
             if event_args_provided and len(event_types_list) > 0:
-                # --- FIX: Apply time_offset to filter ---
+                # Filter using absolute times
                 relevant_events = events_df[
-                    (events_df[event_start_col] - time_offset < end_time) &
-                    (events_df[event_end_col] - time_offset > start_time)
+                    (events_df[event_start_col] < end_time) &
+                    (events_df[event_end_col] > start_time)
                 ]
                 for event_idx, event in relevant_events.iterrows():
                     event_type = event[event_type_col]
@@ -185,18 +205,17 @@ def plot_gaze_chunks(
                     y_level = event_types_list.index(event_type)
                     color = event_color_map[event_type]
                     
-                    # --- FIX: Apply time_offset to start/end times ---
-                    event_start_norm = event[event_start_col] - time_offset
-                    event_end_norm = event[event_end_col] - time_offset
+                    # Get absolute event times
+                    event_start_abs = event[event_start_col]
+                    event_end_abs = event[event_end_col]
                     
-                    # Clip the span to the chunk's boundaries
-                    span_start = max(event_start_norm, start_time)
-                    span_end = min(event_end_norm, end_time)
+                    # Clip to chunk boundaries
+                    span_start = max(event_start_abs, start_time)
+                    span_end = min(event_end_abs, end_time)
                     
                     if span_start < span_end:
                         event_ax.hlines(y=y_level, xmin=span_start, xmax=span_end, 
                                         color=color, linewidth=6)
-                        
                         text_x = span_start + (span_end-span_start)/2
                         event_ax.text(text_x, y_level, str(event_idx), ha='center', 
                                       va='center', fontsize=7, color='white', 
@@ -208,9 +227,12 @@ def plot_gaze_chunks(
                                     linewidth=1, alpha=0.3)
 
             # --- 5e. Format Axes ---
+            # Set X-axis limits to the absolute chunk times
             gaze_ax.set_xlim(start_time, end_time)
             gaze_ax.grid(True, linestyle=':', alpha=0.7)
+            # Title now reflects absolute time
             gaze_ax.set_title(f'Time: {start_time:.1f}s – {end_time:.1f}s', loc='left')
+            
             if i == num_chunks_this_fig // 2: 
                 gaze_ax.set_ylabel('Gaze Displacement')
             
@@ -231,7 +253,6 @@ def plot_gaze_chunks(
                 event_ax.set_xlabel('Time (seconds)')
             else:
                 plt.setp(event_ax.get_xticklabels(), visible=False)
-
 
         # --- 6. Final Figure Formatting (per figure) ---
         if all_line_handles:

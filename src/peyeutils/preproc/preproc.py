@@ -696,11 +696,11 @@ def preproc_SHARED_label_blinks(df,
 
 
 def blink_df_from_samples(df,
-                           badcol='bad',
-                           tcol='Tsec0',
-                           stcol='stsec',
-                           encol='ensec'
-                           ):
+                          badcol='bad',
+                          tcol='Tsec',
+                          stcol='stsec',
+                          encol='ensec'
+                          ):
     ev = pu.utils.cond_rle_df( df[badcol], val=True, t=df[tcol] );
     ev = ev[ ev['v'] == True ].reset_index(drop=True);
     ev[stcol] = ev['st'];
