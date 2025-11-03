@@ -30,7 +30,8 @@ def plot_gaze_chunks(
     events_df=None, event_start_col=None, event_end_col=None, event_type_col=None,
     stimulus_df=None, stim_start_col=None, stim_end_col=None, stim_name_col=None,
     max_points_per_sec=None,
-    max_chunks_per_fig=10
+    max_chunks_per_fig=10,
+    ylim=None,
 ):
     """
     Plots gaze data in paginated chunks using ABSOLUTE timestamps.
@@ -50,6 +51,9 @@ def plot_gaze_chunks(
         max_points_per_sec (int, optional): Max sample rate to plot (downsamples).
         max_chunks_per_fig (int): Max chunks per figure for pagination.
     """
+    if( ylim is None ):
+        ylim = np.max( abs(df[x_col]).max(), abs(df[y_col]).max() );
+        pass;
     
     # --- 1. Prepare Gaze Data ---
     data = df.copy()
@@ -229,6 +233,7 @@ def plot_gaze_chunks(
             # --- 5e. Format Axes ---
             # Set X-axis limits to the absolute chunk times
             gaze_ax.set_xlim(start_time, end_time)
+            gaze_ax.set_ylim(-ylim, ylim);
             gaze_ax.grid(True, linestyle=':', alpha=0.7)
             # Title now reflects absolute time
             gaze_ax.set_title(f'Time: {start_time:.1f}s – {end_time:.1f}s', loc='left')
