@@ -53,7 +53,7 @@ def plot_gaze_chunks(
         max_chunks_per_fig (int): Max chunks per figure for pagination.
     """
     if( ylim is None ):
-        ylim = np.max( abs(df[x_col]).max(), abs(df[y_col]).max() );
+        ylim = np.max( [abs(df[x_col]).max(), abs(df[y_col]).max()] );
         pass;
     
     # --- 1. Prepare Gaze Data ---

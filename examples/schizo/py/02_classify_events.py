@@ -82,7 +82,8 @@ def plotrow(rowdic):
                                           stim_start_col='start_s',
                                           stim_end_col='end_s',
                                           stim_name_col='video',
-                                          max_chunks_per_fig=5 )
+                                          max_chunks_per_fig=5,
+                                          ylim=7, )
             ):
         figbase=os.path.join( csvdir, row['edffile'] );
         fn = figbase + '_timeplot_{:04d}.pdf'.format(i)
