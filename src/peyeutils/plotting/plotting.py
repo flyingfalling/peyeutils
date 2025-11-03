@@ -267,9 +267,9 @@ def plot_gaze_chunks(
         title = 'Gaze Trace Timecourse'
         if total_num_figures > 1:
             title += f' (Page {fig_idx + 1} of {total_num_figures})'
-        
+            pass;
         fig.suptitle(title, fontsize=16, y=1.02)
-        fig.set_constrained_layout_pads(w_pad=0.1, h_pad=0.1)
+        #fig.set_constrained_layout_pads(w_pad=0.1, h_pad=0.1)
         
         yield fig;
         pass;
