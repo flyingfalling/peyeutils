@@ -70,7 +70,7 @@ def main():
         name=row['ID']
         print("[{}]: {}    (OUT1: {}   OUT2: {})".format(name, row['fmridate'], row['out1date'], row['out2date']));
         
-        myfmriedfdir = os.path.join(fmriedfdir, name);
+        myfmriedfdir = os.path.normpath( os.path.join(fmriedfdir, name) );
         print("ATTEMPTING FMRIDIR: [{}]".format(myfmriedfdir));
         ninside=0;
         fmriexpecteddate=row.fmridate;
@@ -98,9 +98,9 @@ def main():
                         if( filename in fmriedfs ):
                             raise Exception("Something wrong, doubled up filename? [{}]".format(filename));
                         
-                        full_file_path = os.path.join(root, filename);
-                        relative_file_path = os.path.relpath(full_file_path, myfmriedfdir);
-                        subdir = os.path.dirname(relative_file_path);
+                        full_file_path = os.path.normpath( os.path.join(root, filename) );
+                        relative_file_path = os.path.normpath( os.path.relpath(full_file_path, myfmriedfdir) );
+                        subdir = os.path.normpath( os.path.dirname(relative_file_path) );
                         subdirs.append(subdir);
                         fmriedfs.append(filename);
                         pass;
@@ -131,7 +131,7 @@ def main():
                                       expecteddate=fmriexpecteddate,
                                       edfbasedir=myfmriedfdir,
                                       edfsubdir=subx,
-                                      edfpath=os.path.join(myfmriedfdir,subx),
+                                      edfpath=os.path.normpath(os.path.join(myfmriedfdir,subx)),
                                       edffile=x, kind='fmri') );
                 
                 pass;
@@ -142,7 +142,7 @@ def main():
         
         
         noutside=0;
-        myoutsideedfdir = os.path.join(outsideedfdir, name);
+        myoutsideedfdir = os.path.normpath( os.path.join(outsideedfdir, name) );
         if( os.path.exists(myoutsideedfdir) ):
             #REV: walk the dir.
             
@@ -159,9 +159,9 @@ def main():
                         if( filename in outsideedfs ):
                             raise Exception("Something wrong, doubled up filename? [{}]".format(filename));
                                                 
-                        full_file_path = os.path.join(root, filename);
-                        relative_file_path = os.path.relpath(full_file_path, myoutsideedfdir);
-                        subdir = os.path.dirname(relative_file_path);
+                        full_file_path = os.path.normpath( os.path.join(root, filename) );
+                        relative_file_path = os.path.normpath( os.path.relpath(full_file_path, myoutsideedfdir));
+                        subdir = os.path.normpath(os.path.dirname(relative_file_path));
                         
                         subdirs.append(subdir);
                         outsideedfs.append(filename);
@@ -185,7 +185,7 @@ def main():
                                       expecteddate=outsideexpecteddate,
                                       edfbasedir=myoutsideedfdir,
                                       edfsubdir=subx,
-                                      edfpath=os.path.join(myoutsideedfdir,subx),
+                                      edfpath=os.path.normpath(os.path.join(myoutsideedfdir,subx)),
                                       edffile=x, kind='outside') );
                 pass;
             pass;
