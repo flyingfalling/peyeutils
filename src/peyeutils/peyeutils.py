@@ -111,7 +111,7 @@ def preproc_peyefv_edf( in_edf_path : str,
     df = pu.peyefv.preproc_peyefreeviewing_dva_from_flatscreen(df, msgs);
     
     if( False == badtrial ):
-        df = pu.preproc.preproc_SHARED_C_binoc_gaze(df, xcol='cgx_dva', ycol='cgy_dva', tcol='Tsec0', exclude_thresh=2);
+        df = pu.preproc.preproc_SHARED_C_binoc_gaze(df, xcol='cgx_dva', ycol='cgy_dva', tcol='Tsec', exclude_thresh=2);
         pass;
     
     #df = preproc_SHARED_D_exclude_bad( df, xcol='cgx_dva', ycol='cgy_dva', badcol='bad' );
@@ -144,13 +144,13 @@ def preproc_peyefv_edf( in_edf_path : str,
         print(" BAD TRIAL (no data?)...");
         pass;
     
-        
+    
     blockdf, trialdf = pu.peyefv.import_fv_blocks(msgs, df, trialdf);
     
     trialdf['haseyetracking']=haseyetracking;
     blockdf['haseyetracking']=haseyetracking;
     row['haseyetracking'] = haseyetracking;
-
+    
     if( out_csv_path ):
         btfname=fname+'.trials.csv';
         bfname=fname+'.blocks.csv';
