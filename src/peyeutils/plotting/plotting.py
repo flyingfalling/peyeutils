@@ -32,6 +32,7 @@ def plot_gaze_chunks(
     max_points_per_sec=None,
     max_chunks_per_fig=10,
     ylim=None,
+    propdict={},
 ):
     """
     Plots gaze data in paginated chunks using ABSOLUTE timestamps.
@@ -136,7 +137,7 @@ def plot_gaze_chunks(
         num_chunks_this_fig = end_chunk_idx - start_chunk_idx
         if num_chunks_this_fig <= 0: continue
 
-        fig = plt.figure(figsize=(plot_width, plot_height_per_chunk * num_chunks_this_fig))
+        fig = plt.figure(figsize=(plot_width, plot_height_per_chunk * num_chunks_this_fig), constrained_layout=True)
         outer_gs = gridspec.GridSpec(nrows=num_chunks_this_fig, ncols=1, 
                                      figure=fig, hspace=0.4)
         all_line_handles = [] 
@@ -264,11 +265,11 @@ def plot_gaze_chunks(
             fig.legend(handles=all_line_handles, loc='upper right', 
                        bbox_to_anchor=(0.99, 0.99))
             
-        title = 'Gaze Trace Timecourse'
-        if total_num_figures > 1:
-            title += f' (Page {fig_idx + 1} of {total_num_figures})'
-            pass;
-        fig.suptitle(title, fontsize=16, y=1.02)
+        title = 'Gaze: {}\n'.format(propdict); #Gaze Trace Timecourse
+        #if total_num_figures > 1:
+        title += f'(Page {fig_idx + 1} of {total_num_figures})'
+        #    pass;
+        fig.suptitle(title, fontsize=16); #, y=1.02)
         #fig.set_constrained_layout_pads(w_pad=0.1, h_pad=0.1)
         
         yield fig;
