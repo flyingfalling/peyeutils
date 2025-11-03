@@ -7,6 +7,7 @@ import pandas as pd;
 import sys;
 import os;
 import peyeutils as pu;
+from multiprocessing import Pool;
 
 def process_events(rowdic):
     row=rowdic['row'];
@@ -70,6 +71,9 @@ def plotrow(rowdic):
     print(samps.columns);
     print(ev.columns);
     print(trials.columns);
+    tokeep=['edffile', 'name', 'kind']
+    print(row.keys());
+    titlerow=[ row[k] for k in row.keys() if k in tokeep ];
     for i,fig in enumerate(
             pu.plotting.plot_gaze_chunks( df=samps, timestamp_col='Tsec',
                                           x_col='cgx_dva', y_col='cgy_dva',
@@ -83,7 +87,8 @@ def plotrow(rowdic):
                                           stim_end_col='end_s',
                                           stim_name_col='video',
                                           max_chunks_per_fig=5,
-                                          ylim=7, )
+                                          ylim=7,
+                                          proplist=titlerow )
             ):
         figbase=os.path.join( csvdir, row['edffile'] );
         fn = figbase + '_timeplot_{:04d}.pdf'.format(i)
@@ -99,10 +104,22 @@ def main():
     
     rowdf = pd.read_csv(rowcsv);
     
-    rowdf = rowdf[:2];
+    rowdf = rowdf[:5];
     results = list();
-    for i, row in rowdf.iterrows():
-        results.append( process_events( dict(row=row, csvdir=csvdir) ) );
+    rows=[ dict(row=row,csvdir=csvdir) for i,row in rowdf.iterrows() ];
+    
+    
+    MULTIPROC=True;
+    NPROC=None;
+    if(MULTIPROC):
+        with Pool(processes=NPROC) as pool:
+            results = pool.map(process_events, rows);
+            pass;
+        pass;
+    else:
+        for rowdict in rows:
+            results.append( process_events( rowdict ) );
+            pass;
         pass;
     
     rowdf = pd.DataFrame(results);
