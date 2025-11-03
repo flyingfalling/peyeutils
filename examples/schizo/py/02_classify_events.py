@@ -28,7 +28,7 @@ def process_events(rowdic):
                                              timeunitsec=1,
                                              dva_per_px=1, xname='cgx_dva',
                                              yname='cgy_dva',
-                                             tname='Tsec0');
+                                             tname='Tsec');
     #REV: TSEC this will be offset from beginning of EDF (not block...fuck).
     
     params2 = rv.make_default_params(samplerate_hzsec=sr);
