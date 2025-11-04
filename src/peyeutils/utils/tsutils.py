@@ -839,7 +839,11 @@ def pearson_gaze_CC(x1, x2):
         n=len(x2);
         x1=x1[:n];
         pass;
-
+    if(len(x2) > len(x1) ):
+        n=len(x1);
+        x2=x2[:n];
+        pass;
+    
     m1 = np.isfinite(x1);
     m2 = np.isfinite(x2);
     m = m1 & m2;
