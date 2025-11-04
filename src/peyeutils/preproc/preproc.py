@@ -701,6 +701,8 @@ def blink_df_from_samples(df,
                           stcol='stsec',
                           encol='ensec'
                           ):
+    if( badcol not in df.columns ):
+        raise Exception("No column {} in df".format(badcol));
     ev = pu.utils.cond_rle_df( df[badcol], val=True, t=df[tcol] );
     ev = ev[ ev['v'] == True ].reset_index(drop=True);
     ev[stcol] = ev['st'];

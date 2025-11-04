@@ -1,4 +1,5 @@
 
+
 ## REV: easier to make a "class" which takes a row (with specific names) and then it can access those with helper functions.
 ## E.g. based on what kind of file it is, get samples etc.? Can I add additional names?
 ##      So easiest thing is just to load the DF and it will create a chunk of classes?
@@ -8,15 +9,24 @@ import sys;
 import os;
 import peyeutils as pu;
 from multiprocessing import Pool;
+import numpy as np;
 
 def process_events(rowdic):
     row=rowdic['row'];
     csvdir=rowdic['csvdir'];
-
+    
+    if( row['edferror'] or not row['haseyetracking'] ):
+        raise Exception("Shouldn't be here?");
+    
     samppath = os.path.join(csvdir, row['samples_csv']);
     df = pd.read_csv(samppath);
-    df = df[ df.eye=='B' ];
-
+    df2 = df[ df.eye=='B' ];
+    if(len(df2.index) < 1 ):
+        print(df);
+        print("Any non-NAN? ", np.any(np.isfinite(df.cgx_dva)));
+        raise Exception("File {}: Binocular data is length 0 (full data is {})".format(len(df2.index), len(df.index)));
+    
+    df = df2;
     #REV these "times" will be correct because they are just rle (run-length encoding) of samples.
     blinkev = pu.preproc.blink_df_from_samples(df);
     blinkev['method'] = 'blink';
@@ -103,8 +113,8 @@ def main():
     csvdir = sys.argv[2];
     
     rowdf = pd.read_csv(rowcsv);
-    
-    rowdf = rowdf[:5];
+    rowdf = rowdf.loc[ (rowdf['haseyetracking'] & (False==rowdf['edferror'])) ];
+    #rowdf = rowdf[:5];
     results = list();
     rows=[ dict(row=row,csvdir=csvdir) for i,row in rowdf.iterrows() ];
     

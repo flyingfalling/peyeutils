@@ -452,7 +452,9 @@ def cond_rle_df( x, val, t=None):
     '''
     
     if( len(x) < 1 ):
-        raise Exception("Input x len is <1");
+        #raise Exception("Input x len is <1");
+        print("Input x len is <1");
+        return pd.DataFrame();
     
     
     
