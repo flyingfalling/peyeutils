@@ -35,7 +35,7 @@ def preproc_EL_A00_add_Tsec(rawdf, timecol='time', timeunitsec=pu.EL_TIMEUNIT_SE
     -------
 
     """
-    tvals = rawdf[timecol];
+    tvals = rawdf[timecol].to_numpy();
     rawdf = rawdf[ [c for c in rawdf.columns if c!=timecol] ]; #drop old timecol
     rawdf['EL'+timecol] = tvals;
     rawdf['Tsec'] = tvals * timeunitsec;

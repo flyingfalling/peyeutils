@@ -81,8 +81,8 @@ def preproc_SHARED_C_binoc_gaze(df,
     tmpx="__"+xcol;
     tmpy="__"+ycol;
     
-    df[tmpx] = df[xcol];
-    df[tmpy] = df[ycol];
+    df[tmpx] = df[xcol].to_numpy();
+    df[tmpy] = df[ycol].to_numpy();
     
         
     print("MEANS TMP:" , df[tmpx].mean(), df[tmpy].mean());
@@ -125,7 +125,7 @@ def preproc_SHARED_C_binoc_gaze(df,
     aggrule = dict.fromkeys(df, np.nanmean);
     
     aggrule.update(dict.fromkeys(df.columns[df.dtypes.eq(object)], 'first'));
-
+    
         
     bdf=df.groupby(tcol).agg(aggrule);
     #bdf[badcol] = ldf[badcol] & rdf[badcol];
@@ -152,7 +152,7 @@ def preproc_SHARED_C_binoc_gaze(df,
     else:
         bdf[badcol] = ~haseither;
         pass;
-
+    
     #REV: from offset if one eye is missing, offset by mean amount from known eye to binocular. Should really use only local timepoints
     ## but meh.
     bdf['fromoffset'] = False;

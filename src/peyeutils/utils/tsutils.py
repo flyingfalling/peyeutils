@@ -828,3 +828,27 @@ def dilate_xy_nans( df, params ):
     df[xname][mask] = np.nan;
     df[yname][mask] = np.nan;
     return df;
+
+
+#Assume aligned at beginning.
+def pearson_gaze_CC(x1, x2):
+    n=len(x1);
+    if(len(x1) > len(x2) ):
+        n=len(x2);
+        x1=x1[:n];
+        pass;
+
+    m1 = np.isfinite(x1);
+    m2 = np.isfinite(x2);
+    m = m1 & m2;
+    
+    x1 = x1[m];
+    x2 = x2[m];
+
+    ngood = len(x1);
+
+    cc = np.corrcoef(x1, x2);
+    if( cc.shape != (2,2) ):
+        raise Exception("Unexpected shape not (2,2): {}".format(cc.shape));
+    cc=cc[0][1];
+    return cc, ngood;
