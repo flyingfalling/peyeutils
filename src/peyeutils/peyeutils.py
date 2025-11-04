@@ -156,8 +156,8 @@ def preproc_peyefv_edf( in_edf_path : str,
         bfname=fname+'.blocks.csv';
         btpath=os.path.join(out_csv_path, btfname);
         bpath=os.path.join(out_csv_path, bfname);
-        trialdf.to_csv(btpath);
-        blockdf.to_csv(bpath);
+        trialdf.to_csv(btpath, index=False);
+        blockdf.to_csv(bpath, index=False);
         
         row['trials_csv'] = btfname;
         row['blocks_csv'] = bfname;

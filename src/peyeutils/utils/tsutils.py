@@ -851,4 +851,4 @@ def pearson_gaze_CC(x1, x2):
     if( cc.shape != (2,2) ):
         raise Exception("Unexpected shape not (2,2): {}".format(cc.shape));
     cc=cc[0][1];
-    return cc, ngood;
+    return cc, ngood, n;
