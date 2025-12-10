@@ -35,7 +35,7 @@ def parse_trial_description_pythonic(file_path):
         'binocularmode': r"mode:\s+([\S]+)",
         'hflip':         r"horizontal\s+flip:\s+([\S]+)", # Context specific
         'vflip':         r"vertical\s+flip:\s+([\S]+)",   # Context specific
-        'video':         r"movie,\s+([\S]+)",
+        'vid':         r"movie,\s+([\S]+)",
         'width':         r"width:\s+([\d.]+)", # Capture digits/dots
         'height':        r"height:\s+([\d.]+)"
     }
@@ -115,7 +115,7 @@ def parse_trial_description_pythonic(file_path):
         data['rawdaytime'] = time_part
         
         # Trial Name construction
-        data['trialName'] = f"{monkey_name}_{data['year']}_{data['month']}_{data['day']}_{data['time']}_{data['video']}"
+        data['trialName'] = f"{monkey_name}_{data['year']}_{data['month']}_{data['day']}_{data['time']}_{data['vid']}"
         
         # Saliency Paths
         data['trialTag'] = f"{monkey_name}_{date_part}_{time_part}"
@@ -175,7 +175,13 @@ def main():
         print(fpath);
         if( False == os.path.isfile( fpath ) ):
             raise Exception("File does not exist? {}".format(fpath));
-        data = parse_trial_description_pythonic( os.path.join( datdir, getattr(row, 'trialcsv')) );
+        trialcsvpath = os.path.join( datdir, getattr(row, 'trialcsv') );
+        data = parse_trial_description_pythonic( trialcsvpath );
+        trialsubpath = os.path.dirname(trialcsvpath);
+        trialsubpath = os.path.relpath(trialsubpath, datdir);
+        print("RELATIVE PATH: {}".format(trialsubpath));
+        data['relpath'] = trialsubpath;
+        
         print(data);
         species = getattr(row, 'species');
         data['species'] = species;
@@ -210,9 +216,30 @@ def main():
     
     #REV: just use pure pixel values haha.
     print(fulldf.columns);
-    fulldf['video'] = fulldf['video'].str[:-4];
-    result = fulldf.groupby(['species', 'subj', 'video']).size();
+    fulldf['vid'] = fulldf['vid'].str[:-4];
+    result = fulldf.groupby(['species', 'subj', 'vid']).size();
+    fulldf = fulldf.reset_index(drop=True);
+    
+    fulldf['trialidx'] = fulldf.index;
 
+    biggazelist=list();
+    for adf in fulldf.itertuples():
+        csvfile = getattr( adf, 'saliencyCsvFileFullName' );
+        trialdir = getattr( adf, 'relpath');
+        csvpath = os.path.join( datdir,
+                                trialdir,
+                                csvfile );
+        gazedf = pd.read_csv(csvpath, skipinitialspace=True);
+        gazedf = gazedf.rename( columns={'# ms':'timems'} );
+        gazedf['trialidx'] = getattr(adf, 'trialidx');
+        biggazelist.append(gazedf);
+        #print(gazedf);
+        pass;
+    
+    biggazedf = pd.concat(biggazelist);
+    biggazedf.to_csv('data/orig_biggazedf_jnp2025.csv', index=False);
+    fulldf.to_csv('data/orig_freeviewing_trials_idx_jnp2025.csv', index=False);
+    
     pd.set_option('display.max_rows', None)
     print(result);
     
