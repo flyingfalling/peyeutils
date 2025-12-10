@@ -8,6 +8,7 @@
 import re
 import os
 import sys
+import numpy as np
 
 def parse_trial_description_pythonic(file_path):
     """
@@ -49,8 +50,10 @@ def parse_trial_description_pythonic(file_path):
             else:
                 data[key] = val
         else:
-            print(f"Error: Could not find value for {key} using pattern '{pattern}'", file=sys.stderr)
-            return None
+            print(f"WARNING: Could not find value for {key} using pattern '{pattern}' (FILE={file_path})", file=sys.stderr)
+            data[key] = np.nan;
+            pass;
+        pass;
 
     # 2. Logic Validations (mirroring C++ logic)
     if data.get('hflip') == "True":
@@ -112,7 +115,7 @@ def parse_trial_description_pythonic(file_path):
         data['rawdaytime'] = time_part
         
         # Trial Name construction
-        data['trialName'] = f"{monkey_name}_{data['year']}_{data['month']}_{data['day']}_{data['time']}_{data['videoname']}"
+        data['trialName'] = f"{monkey_name}_{data['year']}_{data['month']}_{data['day']}_{data['time']}_{data['video']}"
         
         # Saliency Paths
         data['trialTag'] = f"{monkey_name}_{date_part}_{time_part}"
@@ -147,10 +150,77 @@ def print_trial_data(data):
     return;
 
 
-
 import sys;
 import os;
+import pandas as pd;
+
 def main():
+    datdir=sys.argv[1];
+    idxs=sys.argv[2:];
+
+    idxlist=list();
+    for i in idxs:
+        df = pd.read_csv(i, sep=' ');
+        print(df);
+        idxlist.append(df);
+        pass;
+
+    trialcsvdf = pd.concat( idxlist );
+    print(trialcsvdf);
+
+    dictlist=list();
+    for idx, row in trialcsvdf.iterrows():
+        fpath =  os.path.join( datdir, getattr(row, 'trialcsv'));
+        prepath = os.path.dirname(fpath);
+        print(fpath);
+        if( False == os.path.isfile( fpath ) ):
+            raise Exception("File does not exist? {}".format(fpath));
+        data = parse_trial_description_pythonic( os.path.join( datdir, getattr(row, 'trialcsv')) );
+        print(data);
+        species = getattr(row, 'species');
+        data['species'] = species;
+        if( species == 'macaq' ):
+            toremove = "_macaca";
+            print("REV: {} replacing incorrect filename for macaq species (removing {})".format(fpath, toremove));
+            data['saliencyCsvFileFullName'] = data['saliencyCsvFileFullName'].replace(toremove, "");
+            data['saliencyCsvFileName'] = data['saliencyCsvFileName'].replace(toremove, "");
+            pass;
+        #For some, need to replace "marmoset" with "movieclip"
+        print_trial_data(data);
+        salfile = os.path.join( prepath, data['saliencyCsvFileFullName'] );
+        print("Expecting full file in {}".format(salfile));
+        if( False == os.path.isfile( salfile ) ):
+            print(" ++!!!!!!!!!!!    Trial has no CSV gaze data {} !!!!!!!!!!!!!!!!".format(salfile));
+            continue;
+        else:
+            print("GOOD DATA");
+            pass;
+        
+        dictlist.append(data);
+        
+        pass;
+    
+    fulldf=pd.DataFrame(dictlist);
+    print(fulldf);
+
+    fulldf = fulldf.rename( columns={'subjectName':'subj'} );
+
+    print("Expected: {}".format(len(trialcsvdf.index)));
+    #REV: some trials are missing vid wid/hei...why? Just didnt write to file before started I guess...
+    
+    #REV: just use pure pixel values haha.
+    print(fulldf.columns);
+    fulldf['video'] = fulldf['video'].str[:-4];
+    result = fulldf.groupby(['species', 'subj', 'video']).size();
+
+    pd.set_option('display.max_rows', None)
+    print(result);
+    
+    return 0;
+
+
+
+def example():
     fname = sys.argv[1];
     data = parse_trial_description_pythonic(fname);
     print_trial_data(data);
