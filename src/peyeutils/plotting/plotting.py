@@ -32,7 +32,7 @@ def plot_gaze_chunks(
     max_points_per_sec=None,
     max_chunks_per_fig=10,
     ylim=None,
-    proplist=None,
+    proplist=list(),
 ):
     """
     Plots gaze data in paginated chunks using ABSOLUTE timestamps.
@@ -267,7 +267,8 @@ def plot_gaze_chunks(
             pass;
         title = '';
         line='';
-        proplist.sort(key=len);
+        print("PROP LIST", proplist);
+        proplist = sorted(proplist, key=len);
         for i in proplist:
             line = line+'{} '.format(i);
             if( len(line) > 30 ):

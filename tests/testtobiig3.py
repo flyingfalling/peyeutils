@@ -13,7 +13,7 @@ def main():
 
     mydir=sys.argv[1];
     outcsv='tobiig3csvs';
-
+    
     recobj = pu.tobiig3.tobiig3_official_recording(mydir, outcsv, overwrite=False);
     sr=500;
     
@@ -21,8 +21,8 @@ def main():
     
     recobj.convert_to_nwu(create_csvs=True);
     recobj.gaze_to_ypr_deg(create_csvs=True);
-
-
+    
+    
     vid = recobj.fullscenepath;
     cap = cv2.VideoCapture(vid);
     if( False == cap.isOpened() ):
@@ -97,7 +97,7 @@ def main():
     print(df.columns);
 
     blinkev = pu.preproc.blink_df_from_samples(df);
-    sacc=False;
+    sacc=True;
     if(sacc):
         print("remodnav: preproc eyetrace");
         rdf = rv.remodnav_preprocess_eyetrace2d(eyesamps=df, params=params);
