@@ -237,10 +237,12 @@ class tobiig3_official_recording():
         
         self.outpath=outpath;
         if(outpath is None):
-            outpath=self.mypath;
+            print("OUTPATH IS NONE, setting to mypath: {}".format(self.mypath));
+            self.outpath=self.mypath;
             pass;
         else:
-            create_dir(outpath);
+            print("SAVING DERIVATIVES TO {}".format(outpath));
+            create_dir(self.outpath);
             pass;
         
         self.tcol = 'timestamp';

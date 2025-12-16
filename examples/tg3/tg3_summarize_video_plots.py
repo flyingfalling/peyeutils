@@ -27,7 +27,7 @@ def gaussian_kernel_convolution(t, v, sigma):
     sigma: The standard deviation of the Gaussian kernel.
 
   """
-
+  
   # Create a new time vector for the convolved signal
   #t_new = np.linspace(min(t), max(t), len(t) * 10)  # Increased resolution for smoother output
   
@@ -44,7 +44,8 @@ def gaussian_kernel_convolution(t, v, sigma):
     
     # Convolve the kernel with the signal values
     v_new[i] = np.sum(v * weights)
-
+    pass;
+  
   return v_new;
 
 
@@ -330,28 +331,28 @@ def plot_gaze_histo( df, tcol, xcol, ycol ):
 
 def main():
     mypath = sys.argv[1]
-    recobj = tobiig3_official_recording(mypath, overwrite=True); 
+    recobj = pu.tobiig3.tobiig3_official_recording(mypath, overwrite=True); 
 
     sr=100;
     recobj.resample_interpolate_dfs(create_csvs=True, sr_hzsec=sr);
 
     recobj.convert_to_nwu(create_csvs=True);
     recobj.gaze_to_ypr_deg(create_csvs=True);
-
-
-
+    
+    
+    
     vid = recobj.fullscenepath;
     cap = cv2.VideoCapture(vid);
     if( False == cap.isOpened() ):
-        raise Exception("Can't open cap?");
-
+      raise Exception("Can't open cap?");
+    
     nframes = cap.get(cv2.CAP_PROP_FRAME_COUNT);
     fps = cap.get(cv2.CAP_PROP_FPS);
     if( fps < 2 or fps > 100 ):
-        raise Exception("Something weird, FPS weirdly high/low {}".format(fps));
-
+      raise Exception("Something weird, FPS weirdly high/low {}".format(fps));
+    
     vidlensec=(nframes/fps);
-
+    
     df = recobj.gazeimudf;
     
     ahrsdf = pu.imu.ahrs_pose_heading( df, pretburnin=15, kind='tobiig3', srhzsec=100 ); #REV: other settings...
@@ -360,6 +361,12 @@ def main():
     df2 = df[ abs(df.gaze2d_lr_01) < 2 ];
     df2 = df2[ abs(df2.gaze2d_du_01) < 2 ];
     
+    print(df2);
     
     
     return 0;
+
+if __name__=='__main__':
+  exit(main());
+
+  
