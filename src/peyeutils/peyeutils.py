@@ -47,9 +47,11 @@ def preproc_peyefv_edf( in_edf_path : str,
         pass
     try:
         import pyedfread;
+        hasPYEDF=True;
         print("Found PYEDFREAD");
         pass;
     except:
+        hasPYEDF=False;
         print("Could not find PYEDFREAD, will not be able to handle EDF files");
         pass;
     

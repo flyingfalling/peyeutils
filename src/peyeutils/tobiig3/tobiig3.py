@@ -1011,3 +1011,45 @@ def resample_tobii3_json_to_csv(jsonfname, resample_hz_sec=100.0, tb_hz_sec=9000
 
 
 
+
+def wrangle_tobiig3_imu_sensor_data( adf, tcol, axis_order = [2,0,1] ):
+    import numpy as np
+    import pandas as pd
+    if( len(adf.index) < 1 ):
+        raise Exception("You can not call wrangle with zero length df....");
+    
+    intcols = [c for c in adf.columns if ('magneto' in c or 'accel' in c or 'gyro' in c) ];
+    print(intcols);
+    
+    adf = adf.sort_values(by=tcol).reset_index(drop=True);
+    
+    acccols = [ c for c in adf.columns if 'accel' in c ];
+    for c in acccols:
+        adf[c] /= 9.807;
+        pass;
+        
+    tsec = adf[ [tcol] ];
+    if( len(tsec.index) != len(tsec.dropna().index) ):
+        raise Exception("Some timestamps are NAN?");
+    
+    
+    #REV: I.e. will take 2, 0, 1 (Z->X, X->Y, Y->Z)
+    acc = adf[ ['accelerometer_' + str(x) for x in axis_order ] ];
+    
+    gyr = adf[ ['gyroscope_' + str(x) for x in axis_order ] ];
+    
+    if( 'magnetometer_0' in adf.columns ):
+        deg12 = np.radians(0);
+        mag = np.array(adf[ ['magnetometer_' + str(x) for x in range(3)] ]);
+        mag2 = mag.copy();
+        for i in range(3):
+            mag2[:,i] = mag[:,axis_order[i]]; # 0 is FROM 2, 1 is FROM 0, etc. OK
+            mag2[:,i] -= np.nanmean(mag2[:,i]); # absolute value is irrelevant...
+            pass;
+        mag=mag2;
+        
+        return tsec, acc, gyr, mag;
+    else:
+        return tsec, acc, gyr, None;
+    
+    raise Exception("Should never get here");
