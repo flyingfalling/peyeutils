@@ -45,8 +45,13 @@ def preproc_peyefv_edf( in_edf_path : str,
         
         pu.utils.create_dir(out_csv_path);
         pass
-    
-    import pyedfread;
+    try:
+        import pyedfread;
+        print("Found PYEDFREAD");
+        pass;
+    except:
+        print("Could not find PYEDFREAD, will not be able to handle EDF files");
+        pass;
     
     row=dict();
     haseyetracking=True;
