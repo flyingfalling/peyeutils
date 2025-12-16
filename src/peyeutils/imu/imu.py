@@ -1,6 +1,7 @@
 import peyeutils as pu;
 import numpy as np;
 import pandas as pd;
+import imufusion;
 
 def extract_cols( df, tcol ):
     tsec = df[tcol];
