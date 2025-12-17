@@ -3,7 +3,6 @@
 
 ## Note we want to include head rotation/gaze/etc.
 
-
 import argparse
 import pandas as pd
 import cv2
@@ -328,6 +327,163 @@ def plot_gaze_histo( df, tcol, xcol, ycol ):
     #plt.show();
     return g.figure;
 
+import matplotlib.pyplot as plt
+from matplotlib.backends.backend_pdf import PdfPages
+import pandas as pd
+
+def paginate_timecourse(df, plot_func, output_filename, page_duration, time_col, **kwargs):
+    """
+    Slices a dataframe by time and saves plots to a multi-page PDF.
+    
+    Args:
+        df (pd.DataFrame): The source data.
+        plot_func (callable): Function taking (df, **kwargs) that creates a plot.
+        output_filename (str): Name of the PDF file to save.
+        page_duration (float/offset): The duration of time to show on one page.
+        time_col (str, optional): The column to slice by. If None, uses index.
+        **kwargs: Additional arguments passed to the plot_func.
+    """
+    # 1. Setup time boundaries
+    time_series = df[time_col] if time_col else df.index
+    start_time = time_series.min()
+    end_time = time_series.max()
+    
+    with PdfPages(output_filename) as pdf:
+        current_start = start_time
+        
+        while current_start < end_time:
+            current_end = current_start + page_duration
+            
+            # 2. Slice the dataframe for the current "page"
+            if time_col:
+                mask = (df[time_col] >= current_start) & (df[time_col] < current_end)
+                df_page = df.loc[mask]
+            else:
+                df_page = df.loc[current_start:current_end]
+            
+            # 3. Generate the plot if data exists for this window
+            if not df_page.empty:
+                # We pass the subsetted df and any extra styling kwargs
+                fig = plot_func(df_page, page_duration=page_duration, **kwargs)
+                
+                # Ensure we are capturing the current figure if plot_func doesn't return one
+                if fig is None:
+                    fig = plt.gcf()
+                
+                # 4. Save page and close figure to save memory
+                pdf.savefig(fig)
+                plt.close(fig)
+            
+            current_start = current_end
+            
+    print(f"Successfully saved timecourse to {output_filename}")
+    return;
+
+def plot_head_eye_gaze(df2, page_duration):
+    fig, axs = plt.subplots(nrows=3, ncols=1, figsize=(24,14));
+    axs[0].plot(df2['Tsec0'], df2['gaze3d_yaw'], label='Yaw_EYE (Right=Positive)');
+    axs[0].plot(df2['Tsec0'], df2['gaze3d_pitch'], label='Pitch_EYE');
+    axs[0].plot(df2['Tsec0'], df2['gaze3d_roll'], label='Roll_EYE');
+    axs[0].legend();
+    axs[0].set_ylim([-50, 50]);
+    axs[0].set_xlim([df2['Tsec0'].min(), df2['Tsec0'].min()+page_duration]);
+    axs[0].set_ylabel('Eye-in-Head (NWU deg)');
+    
+    axs[1].plot(df2['Tsec0'], df2['eulerx'], label='Pitch_X_Head');
+    axs[1].plot(df2['Tsec0'], df2['eulery'], label='Roll_Y_Head');
+    axs[1].plot(df2['Tsec0'], df2['eulerz'], label='Yaw_Z_Head (Right=Positive)'); #"real" tobii, X is LEFT, z is up? Y is forward?
+    axs[1].legend();
+    axs[1].set_ylim([-180, 180]);
+    axs[1].set_xlabel('Time (sec)');
+    axs[1].set_xlim([df2['Tsec0'].min(), df2['Tsec0'].min()+page_duration]);
+    axs[1].set_ylabel('Head-in-Compass (NWU deg)');
+
+    
+    axs[2].plot(df2['Tsec0'], df2['eulerx']+df2['gaze3d_pitch'], label='Pitch_X_Gaze');
+    axs[2].plot(df2['Tsec0'], df2['eulery']+df2['gaze3d_roll'], label='Roll_Y_Gaze');
+    axs[2].plot(df2['Tsec0'], df2['eulerz']+df2['gaze3d_yaw'], label='Yaw_Z_Gaze (Right=Positive)'); #"real" tobii, X is LEFT, z is up? Y is forward?
+    axs[2].legend();
+    axs[2].set_ylim([-180, 180]);
+    axs[2].set_xlabel('Time (sec)');
+    axs[2].set_xlim([df2['Tsec0'].min(), df2['Tsec0'].min()+page_duration]);
+    axs[2].set_ylabel('Gaze-in-Compass (NWU deg)');
+    return fig;
+  
+
+
+def create_video_overlay(recobj, df):
+  vid = recobj.fullscenepath;
+  cap = cv2.VideoCapture(vid);
+  if( False == cap.isOpened() ):
+    raise Exception("Can't open cap?");
+  
+  nframes = cap.get(cv2.CAP_PROP_FRAME_COUNT);
+  wid = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH));
+  hei = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT));
+  fps = int(round(cap.get(cv2.CAP_PROP_FPS)));
+  if( fps < 2 or fps > 100 ):
+    raise Exception("Something weird, FPS weirdly high/low {}".format(fps));
+  
+  vidlensec=(nframes/fps);
+  vidtsdf = recobj.vidtsdf;
+  print(vidtsdf.columns);
+  overlaid = vid + '.gaze.mp4';
+  print("Writing to {}".format(overlaid));
+  fourcc = cv2.VideoWriter_fourcc(*'mp4v');
+  vw = cv2.VideoWriter(overlaid, fourcc, fps, (wid, hei));
+  
+  fidx: int =0;
+  while(True):
+    ret, fr = cap.read();
+    if( not ret ):
+      print("Finished Video");
+      break;
+    myrow= vidtsdf[ vidtsdf['idx'] == fidx ];
+    if( len(myrow.index) != 1 ):
+      raise Exception("No row in vidtsdf");
+    myrow = myrow.iloc[0];
+    stt= (myrow['Tsec'] - 0.050)
+    ent = myrow['Tsec'];
+    #print("{} - {}".format(stt,ent));
+    
+    mydf=df[ (df['Tsec0'] > stt) & (df['Tsec0'] <= ent) ];
+    #print(mydf);
+    for i, row in mydf.iterrows():
+      #print(row);
+      if( np.isfinite(row.gaze2d_0) ):
+        x=int(row.gaze2d_0*wid)
+        y=int(row.gaze2d_1*hei);
+        fr = cv2.circle(fr, (x,y), 24, (30,50,255), thickness=4);
+        pass;
+      pass;
+    
+    vw.write(fr);
+    #cv2.imshow("Vid", fr);
+    #key = cv2.waitKey(1);
+    #if(key==ord('q')):
+    #  exit(0);
+    fidx+=1;
+    pass;
+  cap.release();
+  vw.release();
+  
+  from moviepy import VideoFileClip, AudioFileClip
+  print("Merging audio and encoding to H264...")
+  original_clip = VideoFileClip(vid)
+  
+  processed_video = VideoFileClip(overlaid)
+  
+  # Attach original audio to processed video
+  final_clip = processed_video.with_audio(original_clip.audio)
+
+  mergedname=overlaid + '.merged.mp4';
+  # Write final file with H264 encoding
+  final_clip.write_videofile(mergedname, codec="libx264", audio_codec="aac")
+  
+  # Cleanup
+  processed_video.close();
+  original_clip.close();
+  return;
 
 def main():
     mypath = sys.argv[1]
@@ -338,10 +494,12 @@ def main():
 
     recobj.convert_to_nwu(create_csvs=True);
     recobj.gaze_to_ypr_deg(create_csvs=True);
-    
+    #Gaze is now in Yaw, Pitch, Roll (deg).
+    ## Note this is GAZE IN HEAD-CENTERED
     
     
     vid = recobj.fullscenepath;
+    
     cap = cv2.VideoCapture(vid);
     if( False == cap.isOpened() ):
       raise Exception("Can't open cap?");
@@ -350,6 +508,7 @@ def main():
     fps = cap.get(cv2.CAP_PROP_FPS);
     if( fps < 2 or fps > 100 ):
       raise Exception("Something weird, FPS weirdly high/low {}".format(fps));
+    cap = None;
     
     vidlensec=(nframes/fps);
     
@@ -361,12 +520,26 @@ def main():
     df2 = df[ abs(df.gaze2d_lr_01) < 2 ];
     df2 = df2[ abs(df2.gaze2d_du_01) < 2 ];
     
-    print(df2);
+        
+    print(df2.columns);
+    
+    savepath=os.path.join(mypath,'head_eye_gaze.pdf')
+    print("Saving to: {}".format(savepath));
+    #plt.savefig(savepath);
+    paginate_timecourse(df2, plot_head_eye_gaze, savepath, time_col='Tsec0', page_duration=60);
+    #plt.show();
+    
+
+    #REV: fuck need to handle audio too?
+    create_video_overlay(recobj, df2); #could add plots to bottom e.g. with head acceleration etc?
     
     
     return 0;
 
+
+
+
 if __name__=='__main__':
   exit(main());
+  pass;
 
-  

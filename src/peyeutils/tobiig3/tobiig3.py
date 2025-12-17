@@ -554,6 +554,8 @@ class tobiig3_official_recording():
         self.gazeimudf['gaze3d_yaw'] = y;
         self.gazeimudf['gaze3d_pitch'] = p;
         self.gazeimudf['gaze3d_roll'] = r; #REV: this should actually be 0.
+        #This is HEAD-CENTERED gaze3d.
+        
         
         ## EYELEFT
         #REV: could compute gaze direction from left/right eye...i.e. vergence angles. This will depend on subtracting origin.
