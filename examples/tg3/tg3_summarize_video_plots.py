@@ -380,33 +380,79 @@ def paginate_timecourse(df, plot_func, output_filename, page_duration, time_col,
     return;
 
 def plot_head_eye_gaze(df2, page_duration):
-    fig, axs = plt.subplots(nrows=3, ncols=1, figsize=(24,14));
-    axs[0].plot(df2['Tsec0'], df2['gaze3d_yaw'], label='Yaw_EYE (Right=Positive)');
-    axs[0].plot(df2['Tsec0'], df2['gaze3d_pitch'], label='Pitch_EYE');
-    axs[0].plot(df2['Tsec0'], df2['gaze3d_roll'], label='Roll_EYE');
+    nrows=5;
+    ncols=1;
+    perrow=5;
+    percol=24;
+    pitch_color=(0.8, 0.5, 0.3);
+    roll_color=(0.7,0.7,0.7);
+    fig, axs = plt.subplots(nrows=nrows, ncols=ncols, figsize=(perrow*nrows, percol*ncols));
+    axs[0].plot(df2['Tsec0'], df2['gaze3d_yaw'], label='Yaw_EYE (Right=Positive)', color='red');
+    axs[0].plot(df2['Tsec0'], df2['gaze3d_pitch'], label='Pitch_EYE', color=pitch_color);
+    axs[0].plot(df2['Tsec0'], df2['gaze3d_roll'], label='Roll_EYE', color=roll_color);
     axs[0].legend();
     axs[0].set_ylim([-50, 50]);
     axs[0].set_xlim([df2['Tsec0'].min(), df2['Tsec0'].min()+page_duration]);
     axs[0].set_ylabel('Eye-in-Head (NWU deg)');
+    axs[0].axhline(0, color='gray', linestyle='--');
     
-    axs[1].plot(df2['Tsec0'], df2['eulerx'], label='Pitch_X_Head');
-    axs[1].plot(df2['Tsec0'], df2['eulery'], label='Roll_Y_Head');
-    axs[1].plot(df2['Tsec0'], df2['eulerz'], label='Yaw_Z_Head (Right=Positive)'); #"real" tobii, X is LEFT, z is up? Y is forward?
+
+    axs[1].plot(df2['Tsec0'], df2['eulerz'], label='Yaw_Z_HEAD (Right=Positive)', color='red'); #"real" tobii, X is LEFT, z is up? Y is forward?
+    axs[1].plot(df2['Tsec0'], df2['eulerx'], label='Pitch_X_HEAD', color=pitch_color);
+    axs[1].plot(df2['Tsec0'], df2['eulery'], label='Roll_Y_HEAD', color=roll_color);
+    
     axs[1].legend();
     axs[1].set_ylim([-180, 180]);
-    axs[1].set_xlabel('Time (sec)');
+    #axs[1].set_xlabel('Time (sec)');
     axs[1].set_xlim([df2['Tsec0'].min(), df2['Tsec0'].min()+page_duration]);
     axs[1].set_ylabel('Head-in-Compass (NWU deg)');
-
+    axs[1].axhline(0, color='gray', linestyle='--');
     
-    axs[2].plot(df2['Tsec0'], df2['eulerx']+df2['gaze3d_pitch'], label='Pitch_X_Gaze');
-    axs[2].plot(df2['Tsec0'], df2['eulery']+df2['gaze3d_roll'], label='Roll_Y_Gaze');
-    axs[2].plot(df2['Tsec0'], df2['eulerz']+df2['gaze3d_yaw'], label='Yaw_Z_Gaze (Right=Positive)'); #"real" tobii, X is LEFT, z is up? Y is forward?
+    axs[2].plot(df2['Tsec0'], df2['eulerx']+df2['gaze3d_pitch'], label='Pitch_X_Gaze', color='red');
+    axs[2].plot(df2['Tsec0'], df2['eulerz']+df2['gaze3d_yaw'], label='Yaw_Z_Gaze (Right=Positive)', color=pitch_color); #"real" tobii, X is LEFT, z is up? Y is forward?
+    axs[2].plot(df2['Tsec0'], df2['eulery']+df2['gaze3d_roll'], label='Roll_Y_Gaze', color=roll_color);
+    
     axs[2].legend();
     axs[2].set_ylim([-180, 180]);
-    axs[2].set_xlabel('Time (sec)');
     axs[2].set_xlim([df2['Tsec0'].min(), df2['Tsec0'].min()+page_duration]);
     axs[2].set_ylabel('Gaze-in-Compass (NWU deg)');
+    axs[2].axhline(0, color='gray', linestyle='--');
+    
+    df2 = df2.sort_values(by='Tsec0').reset_index(drop=True);
+    dt = df2['Tsec0'].diff();
+    eyesigma=0.020;
+    df2['seyeyaw'] = gaussian_kernel_convolution( df2['Tsec0'], df2['gaze3d_yaw'], eyesigma );
+    
+    df2['deyeyaw'] = df2['seyeyaw'].diff() / dt;
+    
+    CUTOFF=150;
+    df2 = df2[ abs(df2['deyeyaw']) < CUTOFF ]; #dropping saccades... (should smooth first...)
+    
+    deyesigma=0.030;
+    df2['deyeyaw'] = gaussian_kernel_convolution( df2['Tsec0'], df2['deyeyaw'], deyesigma );
+    
+    df2['dheadyaw'] = df2['eulerz'].diff() / dt;
+    df2['gainyaw'] = -df2['deyeyaw'] / df2['dheadyaw'];
+    
+
+    axs[3].plot(df2['Tsec0'], df2['deyeyaw'], label='Yaw_EYE_VEL', color='orange');
+    axs[3].plot(df2['Tsec0'], df2['dheadyaw'], label='Yaw_HEAD_VEL', color='purple');
+    #axs[3].plot(df2['Tsec0'], df2['deyeyaw']+df2['dheadyaw'], label='Yaw_SUM_VEL', color='black');
+    axs[3].legend();
+    axs[3].set_xlim([df2['Tsec0'].min(), df2['Tsec0'].min()+page_duration]);
+    axs[3].set_ylabel('Velocity (NWU deg)');
+    axs[3].set_ylim([-100, 100]);
+    axs[3].axhline(0, color='gray', linestyle='--');
+    
+    lpfsigma=0.500;
+    df2.loc[abs(df2.gainyaw) > 2, 'gainyaw' ] = np.nan;
+    sgain = gaussian_kernel_convolution( df2['Tsec0'], df2['gainyaw'], lpfsigma );
+    axs[4].plot(df2['Tsec0'], sgain, label='Yaw_EYE_HEAD_gain', color='red');
+    axs[4].set_ylabel('Gain (Eye/Head, LPF sigma={}s)'.format(lpfsigma));
+    axs[4].set_xlabel('Time (sec)');
+    axs[4].set_xlim([df2['Tsec0'].min(), df2['Tsec0'].min()+page_duration]);
+    axs[4].set_ylim([-1, 2]);
+    axs[4].axhline(0, color='gray', linestyle='--');
     return fig;
   
 
@@ -526,7 +572,7 @@ def main():
     savepath=os.path.join(mypath,'head_eye_gaze.pdf')
     print("Saving to: {}".format(savepath));
     #plt.savefig(savepath);
-    paginate_timecourse(df2, plot_head_eye_gaze, savepath, time_col='Tsec0', page_duration=60);
+    paginate_timecourse(df2, plot_head_eye_gaze, savepath, time_col='Tsec0', page_duration=30);
     #plt.show();
     
 
