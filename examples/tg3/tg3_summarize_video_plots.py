@@ -422,16 +422,19 @@ def plot_head_eye_gaze(df2, page_duration):
     dt = df2['Tsec0'].diff();
     eyesigma=0.020;
     df2['seyeyaw'] = gaussian_kernel_convolution( df2['Tsec0'], df2['gaze3d_yaw'], eyesigma );
+    df2['sheadyaw'] = gaussian_kernel_convolution( df2['Tsec0'], df2['eulerz'], eyesigma );
     
     df2['deyeyaw'] = df2['seyeyaw'].diff() / dt;
     
-    CUTOFF=150;
+    CUTOFF=70;
     df2 = df2[ abs(df2['deyeyaw']) < CUTOFF ]; #dropping saccades... (should smooth first...)
+    
     
     deyesigma=0.030;
     df2['deyeyaw'] = gaussian_kernel_convolution( df2['Tsec0'], df2['deyeyaw'], deyesigma );
     
-    df2['dheadyaw'] = df2['eulerz'].diff() / dt;
+    df2['dheadyaw'] = df2['sheadyaw'].diff() / dt;
+    df2 = df2[ abs(df2['dheadyaw']) < CUTOFF ]; #dropping saccades... (should smooth first...)
     df2['gainyaw'] = -df2['deyeyaw'] / df2['dheadyaw'];
     
 
@@ -444,7 +447,7 @@ def plot_head_eye_gaze(df2, page_duration):
     axs[3].set_ylim([-100, 100]);
     axs[3].axhline(0, color='gray', linestyle='--');
     
-    lpfsigma=0.500;
+    lpfsigma=0.300;
     df2.loc[abs(df2.gainyaw) > 2, 'gainyaw' ] = np.nan;
     sgain = gaussian_kernel_convolution( df2['Tsec0'], df2['gainyaw'], lpfsigma );
     axs[4].plot(df2['Tsec0'], sgain, label='Yaw_EYE_HEAD_gain', color='red');
@@ -535,9 +538,9 @@ def main():
     mypath = sys.argv[1]
     recobj = pu.tobiig3.tobiig3_official_recording(mypath, overwrite=True); 
 
-    sr=100;
+    sr=250;
     recobj.resample_interpolate_dfs(create_csvs=True, sr_hzsec=sr);
-
+    
     recobj.convert_to_nwu(create_csvs=True);
     recobj.gaze_to_ypr_deg(create_csvs=True);
     #Gaze is now in Yaw, Pitch, Roll (deg).
@@ -560,11 +563,58 @@ def main():
     
     df = recobj.gazeimudf;
     
-    ahrsdf = pu.imu.ahrs_pose_heading( df, pretburnin=15, kind='tobiig3', srhzsec=100 ); #REV: other settings...
+    ahrsdf = pu.imu.ahrs_pose_heading( df, pretburnin=15, kind='tobiig3', srhzsec=500 ); #REV: other settings...
     df = pd.merge(df, ahrsdf, left_on='timestamp', right_on='tsec', how='outer');
+    
+    print(ahrsdf.columns);
+    print(df.columns);
+    print("DF", df.tsec.min(), df.tsec.max())
+    print(df);
+    
+    print("AHRS", ahrsdf.tsec.min(), ahrsdf.tsec.max())
+    print(ahrsdf);
+    
+    
     
     df2 = df[ abs(df.gaze2d_lr_01) < 2 ];
     df2 = df2[ abs(df2.gaze2d_du_01) < 2 ];
+
+
+    '''
+    #REV: use peyeutils here...
+    import peyeutils.eyemovements.remodnav as rv;
+    
+    params1 = rv.make_default_preproc_params(samplerate_hzsec=sr, timeunitsec=1, dva_per_px=1, xname='gaze2d_lr_dva',
+                                             yname='gaze2d_du_dva',
+                                             tname='Tsec0');
+    params2 = rv.make_default_params(samplerate_hzsec=sr);
+    params = params1 | params2;
+    
+    
+    #REV: need to do peyeutils preprocessing as well?
+    df2['eye']='B';
+    df2 = pu.preproc.preproc_SHARED_pupilsize(df2, timecol='Tsec0',
+                                             pacol='eyeleft_pupildiameter_0', eyecol='eye');
+
+    df2 = pu.preproc.preproc_SHARED_label_blinks(
+        df=df2,
+        sr_hzsec=sr,
+        tsecname='Tsec0',
+        eyecol='eye',
+        valcol='gaze2d_lr_dva',
+        pacol='eyeleft_pupildiameter_0',
+    );
+
+    blinkev = pu.preproc.blink_df_from_samples(df2);
+
+    print("remodnav: preproc eyetrace");
+    rdf = rv.remodnav_preprocess_eyetrace2d(eyesamps=df2, params=params);
+    
+    print("remodnav: classify");
+    ev = rv.remodnav_classify_events(rdf, params);
+    ev = pd.concat( [ev, blinkev] );
+    df2=rdf;
+    '''
     
         
     print(df2.columns);
