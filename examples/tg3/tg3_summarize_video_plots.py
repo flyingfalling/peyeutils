@@ -408,8 +408,8 @@ def plot_head_eye_gaze(df2, page_duration):
     axs[1].set_ylabel('Head-in-Compass (NWU deg)');
     axs[1].axhline(0, color='gray', linestyle='--');
     
-    axs[2].plot(df2['Tsec0'], df2['eulerx']+df2['gaze3d_pitch'], label='Pitch_X_Gaze', color='red');
-    axs[2].plot(df2['Tsec0'], df2['eulerz']+df2['gaze3d_yaw'], label='Yaw_Z_Gaze (Right=Positive)', color=pitch_color); #"real" tobii, X is LEFT, z is up? Y is forward?
+    axs[2].plot(df2['Tsec0'], df2['eulerx']+df2['gaze3d_pitch'], label='Pitch_X_Gaze', color=pitch_color);
+    axs[2].plot(df2['Tsec0'], df2['eulerz']+df2['gaze3d_yaw'], label='Yaw_Z_Gaze (Right=Positive)', color='red'); #"real" tobii, X is LEFT, z is up? Y is forward?
     axs[2].plot(df2['Tsec0'], df2['eulery']+df2['gaze3d_roll'], label='Roll_Y_Gaze', color=roll_color);
     
     axs[2].legend();

@@ -8,7 +8,7 @@ version = "0.0.1"
 authors = [
   { name="Richard Veale", email="richard.e.veale@gmail.com" },
 ]
-dependencies=["numpy", "scipy", "pandas", "statsmodels", "matplotlib",]
+dependencies=["numpy", "scipy", "pandas", "statsmodels", "matplotlib", "av", "opencv-python"]
 #optional_dependencies=["psychopy", "pyedfread",]
 description = "p(e)y(e) utils -- utilities for running/analyzing eyetracking and neurophysiology experiments"
 readme = "README.md"
