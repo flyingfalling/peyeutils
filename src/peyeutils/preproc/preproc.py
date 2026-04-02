@@ -696,17 +696,23 @@ def preproc_SHARED_label_blinks(df,
 
 
 def blink_df_from_samples(df,
-                          badcol='bad',
-                          tcol='Tsec',
+                          badcol, #='bad',
+                          tcol, #='Tsec',
                           stcol='stsec',
-                          encol='ensec'
+                          encol='ensec',
+                          stidx='stidx',
+                          enidx='enidx',
                           ):
     if( badcol not in df.columns ):
         raise Exception("No column {} in df".format(badcol));
     ev = pu.utils.cond_rle_df( df[badcol], val=True, t=df[tcol] );
+    
     ev = ev[ ev['v'] == True ].reset_index(drop=True);
     ev[stcol] = ev['st'];
     ev[encol] = ev['et'];
+    ev[stidx] = ev['sidx'];
+    ev[enidx] = ev['eidx'];
+    
     ev['label'] = 'BLNK';
     ev = ev[ [ c for c in ev if c in [stcol, encol, 'label'] ] ];
     return ev;

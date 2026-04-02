@@ -681,7 +681,28 @@ def remodnav_classify_events(eyesamps, params): #sac_window_sec=1.0):
 
 
 
-
+def recompute_params(params):
+    newdict={};
+    if('samplerate_hzsec' not in params ):
+        raise Exception("Expected samplerate (samplerate_hzsec) in params");
+    samplerate_hzsec = params['samplerate_hzsec'];
+    for p in params:
+        if 'dur_sec' in p:
+            newdict[ p[:-4] ] = int(params[p] * samplerate_hzsec);
+            pass;
+        elif 'freq_sec' in p:
+            newdict[ p[:-4] ] = int(params[p] / samplerate_hzsec);
+            pass;
+        else:
+            pass;
+        pass;
+    
+    params = {**params, **newdict};
+    
+    #params['samplerate_hzsec'] = samplerate;
+    #params['dva_per_px'] = dva_per_px;
+    
+    return params;
 
 def make_default_params(samplerate_hzsec): #samplerate_hzsec, dva_per_px): # samplerate, dva_per_px ):
     #REV: these are represented in seconds. Need to mult by sample rate...
@@ -711,26 +732,10 @@ def make_default_params(samplerate_hzsec): #samplerate_hzsec, dva_per_px): # sam
                  noiseconst=8.0,
                  sac_window_sec=1.0, #1
                  pursuit_velthresh=2.0,
-                 filterspikes=True );
+                 filterspikes=True,
+                 samplerate_hzsec=samplerate_hzsec);
     
-    newdict={};
-    for p in params:
-        if 'dur_sec' in p:
-            newdict[ p[:-4] ] = int(params[p] * samplerate_hzsec);
-            pass;
-        elif 'freq_sec' in p:
-            newdict[ p[:-4] ] = int(params[p] / samplerate_hzsec);
-            pass;
-        else:
-            pass;
-        pass;
-    
-    params = {**params, **newdict};
-    
-    #params['samplerate_hzsec'] = samplerate;
-    #params['dva_per_px'] = dva_per_px;
-    
-    return params;
+    return recompute_params(params);
 
 
 
@@ -780,6 +785,7 @@ def make_default_preproc_params(samplerate_hzsec, timeunitsec, dva_per_px, xname
 ### TIME MUST BE MONOTONIC INCREASING, WILL SORT TO MAKE SURE (will resample to regular sampling rate with NANs)
 
 #REV: note, this does NOT DETECT BLINKS (assumes they are already detected as NANs).
+#REV: oh shit, savgol will not allow NAN...
 def remodnav_preprocess_eyetrace2d(eyesamps : pd.DataFrame,
                                    params : dict):
     
@@ -882,8 +888,14 @@ def remodnav_preprocess_eyetrace2d(eyesamps : pd.DataFrame,
     if(allnan(eyesamps[xname]) or allnan(eyesamps[yname])):
         print("EYEUTILS -> PREPROC AFTER SAVGOL -> ALL NAN");
         return eyesamps;
+    
 
-
+    if( 'blinkcol' in params ):
+        bcol=params['blinkcol'];
+        print("Re-NANing x/y based on blinkcolumn [{}]".format(bcol));
+        eyesamps.loc[ (eyesamps[bcol]==True), [xname, yname] ] = np.nan;
+        pass;
+    
     #print('after savgol', len(eyesamps));
     
     ############# REMOVE INSANE VALUES #####################
@@ -939,7 +951,7 @@ def remodnav_preprocess_eyetrace2d(eyesamps : pd.DataFrame,
         
     
     if( dva_per_px != 1 ):
-        raise Exception("DVAPPX NOT 1");
+        raise Exception("DVAPPX NOT 1 (convert your x/y to dva before passing to this function!)");
     
     #print('before median', len(eyesamps));
     med_vels = eyesamps.vel;

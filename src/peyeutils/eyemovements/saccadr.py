@@ -647,7 +647,7 @@ def method_nh(df, params, eyepfix):
         ibelow = isgood & (vel<pt);
         mu = np.nanmean(vel[ibelow]);
         sig = np.nanstd(vel[ibelow]);
-        noiseconst = 6;
+        noiseconst = 6; #params['noiseconst'];
         newPT = mu + noiseconst * sig; #REV: noise
         pass;
     
