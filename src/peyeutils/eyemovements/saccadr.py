@@ -1,3 +1,15 @@
+import numpy as np;
+import pandas as pd;
+import math;
+import sklearn;
+
+from peyeutils.utils.tsutils import get_dilated_nan_mask, rle, inverse_rle;
+
+from pandas.api.types import is_numeric_dtype
+from pandas.api.types import is_string_dtype
+def safe_agg( df, numfunc, strfunc=(lambda i:';'.join(i.unique()))):
+    return {colname:(numfunc if True==is_numeric_dtype(df[colname]) else strfunc) for colname in df.columns };
+
 
 #REV: roll won't work because it re-introduces on other side...
 def shift_elements(arr, num, fill_value):
@@ -647,7 +659,7 @@ def method_nh(df, params, eyepfix):
         ibelow = isgood & (vel<pt);
         mu = np.nanmean(vel[ibelow]);
         sig = np.nanstd(vel[ibelow]);
-        noiseconst = 6; #params['noiseconst'];
+        noiseconst = params['noiseconst'];
         newPT = mu + noiseconst * sig; #REV: noise
         pass;
     
@@ -745,22 +757,23 @@ def default_saccadr_params():
     d = dict(nh_max_vel_degsec=1e3,
              nh_max_acc_degsecsec=1e5,
              nh_init_vel_thresh_degsec=100, #REV: 300 in remodnav??!
-             nh_savgol_order=2, #not used unless diff_nh
-             nh_savgol_window_sec=0.019, # not used unless diff_nh
+             nh_savgol_order=0, #2, #not used unless diff_nh
+             nh_savgol_window_sec=0, #0.019, # not used unless diff_nh
              om_min_inter_peak_sec=0.030,
              om_max_peaks_per_sec=5,
              om_vel_thresh_degsec=5, #REV: was 3 wtf?
              om_vel_peak_detect_shift_sec=0.0075,
              #om_pca_var_thresh_degsec=0.05, #not used (currently)
-             ek_vel_thresh_lambda=6,
+             ek_vel_thresh_lambda=6, #6
              ek_min_dur_sec=0.012,
              #ek_min_sep_sec=0.012, #REV: not currently used
              ek_vel_window_sec=0.024, #REV: 24 msec in original paper
-             dilate_nan_win_sec=0.015,
+             dilate_nan_win_sec=0, #0.015,
              min_blink_sec=0.010, #REV: only dilate nans longer
              saccadr_min_sep_sec=0.040, #0.012,
              saccadr_min_dur_sec=0.012,
-             blink_vel_thresh_degsec=2500,
+             blink_vel_thresh_degsec=2e3,
+             noiseconst=6,
              );
     return d;
 
@@ -818,11 +831,12 @@ def saccadr_sacc( sampdf,
     blink_vel_thresh_degsec = params['blink_vel_thresh_degsec'];
     
     vote_thresh=0.99*(len(methods)-1)/len(methods);
-    
+
+    '''
     isreg = is_regular_samples( sampdf, sr, tname=tsecname );
     if( False == isreg ):
         raise Exception("Error, saccadr_sacc expects regularly resampled (dense) times");
-        
+    ''' 
     
     sampdf = sampdf.sort_values(by=tsecname).reset_index(drop=True);
     
@@ -998,8 +1012,8 @@ def saccadr_sacc( sampdf,
         evdf['dxdva'] = evdf.enx - evdf.stx;
         evdf['dursec'] = evdf.ensec - evdf.stsec;
         evdf['angle'] = np.arctan2( evdf.dydva, evdf.dxdva );
-        evdf['ampl'] = np.sqrt( evdf.dydva**2 + evdf.dxdva**2 );
-
+        evdf['ampldva'] = np.sqrt( evdf.dydva**2 + evdf.dxdva**2 );
+        
         pass;
     else:
         evdf = pd.DataFrame();

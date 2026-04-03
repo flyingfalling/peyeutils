@@ -694,27 +694,89 @@ def preproc_SHARED_label_blinks(df,
 
 
 
-
+#REV: use time not indices? Bad? stidx, etc.
 def blink_df_from_samples(df,
                           badcol, #='bad',
                           tcol, #='Tsec',
+                          dva_per_px,
                           stcol='stsec',
                           encol='ensec',
                           stidx='stidx',
                           enidx='enidx',
+                          xcol : str = '',
+                          ycol : str = '',
+                          use_index=True,
                           ):
     if( badcol not in df.columns ):
         raise Exception("No column {} in df".format(badcol));
-    ev = pu.utils.cond_rle_df( df[badcol], val=True, t=df[tcol] );
+
+    if(len(df.index) < 2 ):
+        raise Exception("df has no data,  < 2 rows");
     
+    df = df.sort_values(by=tcol).reset_index(drop=True);
+    
+    if(use_index):
+        ev = pu.utils.cond_rle_df( df[badcol], val=True, t=df.index ); #REV: will ignore time.
+        ev[stidx] = ev['sidx'];
+        ev[enidx] = ev['eidx'];
+
+        pass;
+    else:
+        ev = pu.utils.cond_rle_df( df[badcol], val=True, t=df[tcol] );
+        raise Exception("Must use index to ensure previous timepoint is used for X/Y");
+    
+        
     ev = ev[ ev['v'] == True ].reset_index(drop=True);
-    ev[stcol] = ev['st'];
-    ev[encol] = ev['et'];
-    ev[stidx] = ev['sidx'];
-    ev[enidx] = ev['eidx'];
+    
+    ev[stidx] = ev['st'];
+    ev[enidx] = ev['et'];
+        
+    #REV; shit, since it's a blink, there is by definition NAN at start/end time? So I need to do at least -1 and +1 to get "position"?
+    ev[stidx] -= 1; #REV: assume "time difference" (error) is very small...
+    ev[enidx] += 1;
+    
+    ev.loc[ev[stidx]<0, stidx] = 0; #REV: make any that would be negative 0 so it doesnt read outside df
+    ev.loc[ev[enidx]>len(df.index), enidx] = len(df.index)-1; #REV: make any that would be negative 0 so it doesnt read outside df
+    
+    print(ev);
+    
+    if( xcol and ycol ):
+        print("Computing X/Y for blinks!");
+        
+        tmpdf = df[[tcol, xcol, ycol ]];
+        tmpdf['index'] = tmpdf.index;
+        print(tmpdf);
+        stev = pd.merge( left=ev, right=tmpdf, left_on=stidx, right_on='index', how='left' );
+        print(stev);
+        ev['stx'] = stev[xcol];
+        ev['sty'] = stev[ycol];
+        ev[stcol] = stev[tcol];
+        
+        enev = pd.merge( left=ev, right=tmpdf, left_on=enidx, right_on='index', how='left' );
+        ev['enx'] = enev[xcol];
+        ev['eny'] = enev[ycol];
+        ev[encol] = enev[tcol];
+    
+        ev["dxdva"] = dva_per_px * (ev["enx"] - ev["stx"]);
+        ev["dydva"] = dva_per_px * (ev["eny"] - ev["sty"]);
+        
+        import math;
+        ev["angle"] = np.rad2deg( np.atan2( ev["dydva"], ev["dxdva"] ) ); #REV: why is this x and y, shouldn't be Y/X?a
+        ev["ampldva"] = np.sqrt( (ev["dxdva"])**2 + (ev["dydva"])**2  ); #REV: assumes these are pitch/yaw angles.
+        pass;
+    
     
     ev['label'] = 'BLNK';
-    ev = ev[ [ c for c in ev if c in [stcol, encol, 'label'] ] ];
+    ev['dursec'] = ev[encol] - ev[stcol];
+    
+    ev = ev[ [ c for c in ev if c in ['label', stcol, encol, stidx, enidx, 'dursec', 'stx', 'sty', 'enx', 'eny', 'dxdva', 'dydva', 'ampldva', 'angle' ] ] ];
+    
+    
+    
+        
+        
+        
+        
     return ev;
 
 

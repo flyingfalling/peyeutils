@@ -186,21 +186,21 @@ def make_event(mydata, idx, lab, stidx, enidx, params={}):
         event["medvel"] = np.nanmedian( mydata.vel );
         event["avgvel"] = np.nanmean( mydata.vel );
         
-        
-        event["angle"] = math.degrees( math.atan2( event["dxdva"], event["dydva"] ) );
-        event["ampl"] = math.sqrt( (event["dxdva"])**2 + (event["dydva"])**2  ); #REV: assumes these are pitch/yaw angles.
+        #REV: fixed dx, dy in atan to dy, dx... (20260402)
+        event["angle"] = math.degrees( math.atan2( event["dydva"], event["dxdva"] ) );
+        event["ampldva"] = math.sqrt( (event["dxdva"])**2 + (event["dydva"])**2  ); #REV: assumes these are pitch/yaw angles.
         pass;
     else:
         event["dxdva"] = np.nan;
         event["dydva"] = np.nan;
-
+        
         event["pvel"] = np.nan;
         event["medvel"] = np.nan;
         event["avgvel"] = np.nan;
         event["peakvel"] = np.nan;
         
         event["angle"] = np.nan;
-        event["ampl"] = np.nan;
+        event["ampldva"] = np.nan;
         pass;
     
     return event;
@@ -670,7 +670,7 @@ def remodnav_classify_events(eyesamps, params): #sac_window_sec=1.0):
     if( len(df.index) > 0 ):
         df['stsec'] = df['stidx'] / samplerate + firstsec;
         df['ensec'] = df['enidx'] / samplerate + firstsec;
-        
+        df['dursec'] = df['ensec'] - df['stsec'];
         df.sort_values( inplace=True, by='stidx' );
         df.reset_index( inplace=True, drop=True );
         pass;
@@ -889,11 +889,12 @@ def remodnav_preprocess_eyetrace2d(eyesamps : pd.DataFrame,
         print("EYEUTILS -> PREPROC AFTER SAVGOL -> ALL NAN");
         return eyesamps;
     
-
+    
     if( 'blinkcol' in params ):
         bcol=params['blinkcol'];
-        print("Re-NANing x/y based on blinkcolumn [{}]".format(bcol));
+        print("1st) Re-NANing x/y based on blinkcolumn [{}] (in case smoothing added?)".format(bcol));
         eyesamps.loc[ (eyesamps[bcol]==True), [xname, yname] ] = np.nan;
+        eyesamps.loc[ (eyesamps[xname].isna()), bcol ] = True;
         pass;
     
     #print('after savgol', len(eyesamps));
@@ -942,7 +943,14 @@ def remodnav_preprocess_eyetrace2d(eyesamps : pd.DataFrame,
     
     postn = eyesamps[ eyesamps[cols].isna().any(axis=1) ]; #  len(eyesamps[ eyesamps[cols].isna() ].index);
     print("Dilated from {}->{} NAN".format(len(pren.index), len(postn.index)));
+
     
+    if( 'blinkcol' in params ):
+        bcol=params['blinkcol'];
+        print("2nd) Re-NANing x/y based on blinkcolumn [{}]".format(bcol));
+        eyesamps.loc[ (eyesamps[bcol]==True), [xname, yname] ] = np.nan;
+        eyesamps.loc[ (eyesamps[xname].isna()), bcol ] = True;
+        pass;
     
     ############# END REMOVE INSANE VALUES ################
     
@@ -976,6 +984,14 @@ def remodnav_preprocess_eyetrace2d(eyesamps : pd.DataFrame,
     cols = ['medvel'];
     eyesamps = dilate_nans(eyesamps, cols, params);
 
+    
+    if( 'blinkcol' in params ):
+        bcol=params['blinkcol'];
+        print("3rd) Re-NANing x/y based on blinkcolumn [{}]".format(bcol));
+        eyesamps.loc[ (eyesamps[bcol]==True), [xname, yname] ] = np.nan;
+        eyesamps.loc[ (eyesamps[xname].isna()), bcol ] = True;
+        pass;
+    
     #print('after med nans', len(eyesamps));
     
     #print("Filtering out >1k deg/s");
