@@ -7,7 +7,9 @@ from peyeutils.utils.tsutils import get_dilated_nan_mask, rle, inverse_rle;
 
 from pandas.api.types import is_numeric_dtype
 from pandas.api.types import is_string_dtype
+
 def safe_agg( df, numfunc, strfunc=(lambda i:';'.join(i.unique()))):
+    #print({colname:(numfunc if True==is_numeric_dtype(df[colname]) else strfunc) for colname in df.columns });
     return {colname:(numfunc if True==is_numeric_dtype(df[colname]) else strfunc) for colname in df.columns };
 
 
@@ -97,6 +99,7 @@ def diff_ek(x, y, params):
 
 def dilate_nans( df, cols, params ):
     sr=params['samplerate'];
+    df = df.copy();
     dilate_nan_win_samp = math.ceil(params['dilate_nan_win_sec'] * sr);
     #min_blink_samp = int(params['min_blink_sec'] * sr);
     mask = np.full( len(df.index), False );
@@ -106,7 +109,11 @@ def dilate_nans( df, cols, params ):
         pass;
     
     for col in cols:
-        df[col][mask] = np.nan;
+        #tmp = df[col].to_numpy().copy();
+        #tmp[mask] = np.nan;
+        #df[col] = tmp;
+        #df[col][mask] = np.nan;
+        df.loc[(mask==False), col] = np.nan;
         pass;
     
     return df;

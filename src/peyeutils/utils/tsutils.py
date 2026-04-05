@@ -4,6 +4,8 @@ import peyeutils as pu;
 import math;
 
 from scipy import ndimage;
+from pandas.api.types import is_numeric_dtype
+from pandas.api.types import is_string_dtype
 
 def select_legal_timepoints4(ts, vals, maxdt):
     """
@@ -286,10 +288,36 @@ def interpolate_df_to_samplerate(df, tcol, targ_srhzsec, tcolunit_s, truesrs=dic
         print(mdf[tcol].iloc[np.where(mdf[tcol].duplicated())]);
         raise Exception("Tcol is not unique (you need to have unique times, suggest groupby(tcol).mean() for example)!");
     
-    mdf = mdf.set_index( mdf[tcol] ); 
-    mdf = mdf.interpolate(method=method, order=order);
+    #mdf = mdf.set_index( mdf[tcol] );
+
+
+    ## REV: handle string columns existing...?
+
+    mdf = mdf.sort_values(by=tcol).reset_index(drop=True);
     
-    mdf = mdf.reset_index(drop=True);
+    interpcolumns = [ colname  for colname in mdf.columns if (True==is_numeric_dtype(mdf[colname])) ]
+    notinterpcolumns = [ colname  for colname in mdf.columns if (False==is_numeric_dtype(mdf[colname]))]
+    
+    
+    strdf = mdf[ notinterpcolumns ];
+    strdf = strdf.ffill();
+    
+    print("WILL NOT INTERP", notinterpcolumns, strdf.dtypes);
+    
+    tmpdf = mdf[ interpcolumns ];
+    print("WILL INTERP", interpcolumns, tmpdf.dtypes);
+    
+    tmpdf = tmpdf.set_index( tmpdf[tcol] );
+    tmpdf = tmpdf.interpolate(method=method, order=order);
+    tmpdf = tmpdf.reset_index(drop=True); #REV: assume index will be tight and unimodal?
+    
+    #mdf = mdf.interpolate(method=method, order=order);
+    mdf = pd.merge( left=tmpdf, right=strdf, how='inner', left_index=True, right_index=True );
+    #strdf[ interpcolumns ] = tmpdf;
+    #mdf = strdf;
+    
+    
+    #mdf = mdf.reset_index(drop=True);
     
     for c in nontcol:
         toset= (maskdf[c] == False);
@@ -471,6 +499,98 @@ def cond_rle_df( x, val, t=None):
         pass;
     
     vals, starts, lens = rle(boolarr); #, include_end=include_end);
+    #(np.array(x)==np.fill(len(x), val)));
+    
+    #if(len(t) > 0 ):
+    #    print(t[0]);
+    #    #exit(0);
+    
+    alist=list();
+    #REV: -1 as end is the index AFTER it.
+    
+    #REV: sum of all durations should be start-to-end time? (assuming no skips).
+    #REV: note intervening "NAN" will break things?
+    
+    #REV: the last len will be one short...just make it NAN? Make first one NAN also? Unknown lengths
+    #if(len(lens) > 0 ):
+    #    lens[-1] -= 1;
+    #    pass;
+    
+    #REV: start and end TIME will be correct (not end inclusive, i.e. >= and <)
+    #REV: however, length will be meaningless...? Since time "this" to "next" is not really defined...
+    
+    for v, s, l in zip(vals[:-1], starts[:-1], lens[:-1]):
+        d = dict( v=v,
+                  sidx=s,
+                  lidx=l,
+                  eidx=s+l,
+                  st=t[s],
+                  et=t[s+l], #REV: should end time "include" 
+                  lent=(t[s+l]-t[s]) #REV: so this will cause them to be "short" but last one also, length 0.
+                 );
+        
+        alist.append(d);
+        pass;
+    v=vals[-1];
+    s=starts[-1];
+    l=lens[-1];
+    d = dict(v=v,
+             sidx=s,
+             lidx=l,
+             eidx=s+l,
+             st=t[s],
+             et=t[s+l-1], #REV: should end time "include" 
+             lent=(t[s+l-1]-t[s])
+             );
+    alist.append(d);
+    
+    evdf = pd.DataFrame(alist).sort_values(by='sidx').reset_index(drop=True);
+    #evdf.iloc[-1]['lent'] = np.nan;
+    #evdf.iloc[-1]['et'] = np.nan;
+    
+    return evdf;
+
+
+def rle_df( x, t=None):
+    """Compute lengths of chunks and put in df.
+    Note that the final chunk will have time of one less than expected (since no defined DT)
+    Note that INDEXES are NON INCLUSIVE of endpoint.
+
+    Parameters
+    ----------
+    x :
+        
+    val :
+        
+    t :
+         (Default value = None)
+
+    Returns
+    -------
+
+    """
+    
+    #if( t is None ):
+    #    t = range(0, len(x));
+    #    pass;
+    
+    if( t is not None):
+        t = np.array(t); #REV: remove weird indexing shit? Assume sorting is identical.
+        if( len(t) != len(x) ):
+            raise Exception("Time length is {}, neq X length {} (events_over_thresh)".format(len(t), len(x)));
+        pass;
+    else:
+        t = [np.nan]*len(x);
+        pass;
+    
+    if( len(x) < 1 ):
+        #raise Exception("Input x len is <1");
+        print("Input x len is <1");
+        return pd.DataFrame();
+    
+    
+    
+    vals, starts, lens = rle(x); #, include_end=include_end);
     #(np.array(x)==np.fill(len(x), val)));
     
     #if(len(t) > 0 ):
