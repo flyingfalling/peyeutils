@@ -1,0 +1,25 @@
+
+Quality control:
+
+
+1) Detect "physiologically" unnatural periods i.e. artifacts (based on e.g. Hz, oscillation, fourier transform, etc.)
+For example, nose is detected as "pupil" (with IR reflection off nose peak as CR). -- common in eyelink with kids leaning back.
+
+2) Detect "oscillations" or drift (e.g. in FMRI study) based on some known/correlations? Drift away from "center"? Or estimate as linear
+from start/end? Or per 1-minute chunk...? Or correlation with out-of-scanner (or with "typical" whole-video distribution of all patients/subjs?).
+
+3) Remove "unrealistic" eye movements based on physiological properties like main sequence error bars? Could check "video" to see what they
+are actually looking at (does it make sense) -- but that is a lot of work.
+
+4) Remove "blinks" -- combine blinks/saccades into single events (with low ISI)
+
+5) Compute ISI (both saccs/blinks). What is "intersaccade drift" (of other models such as remodnav?). Right now I classify a "fixation".
+
+6) For wearable trackers -- How about "subtracting" detected head accelerations (combine with it to classify as "VOR" or "VOR + OKR" or "pursuit" (or drift?)).
+
+7) Binocular combination based on eye distance (pixels? DVA? DVA is meaningless...) (after "sane" filtering of eye movements based on e.g. fourier transform, physiological parameters such as eye speed, ISI, etc.) -- PROBLEM: fMRI EPI caused "unrealistic" oscillations, or e.g. bad IR or vibrations cause weird oscillations. We can ignore/filter those out separately? And use times of "no eye moements" (at normal rate) to filter out likely other artifacts...
+
+OR handle each eye separately, but remove "bad eyes" (periods) first based on unnatural behavior.
+
+8) "Shifted" (shuffled) and error-added values to compare (null models). -> To check both size (resolution)-based correlation, as well as suprious correlations based on different errors (either constant error per subject, non-linear error in one direction possibly with warp based on X/Y position, or random (gaussian etc.) error per time-step (or random walk?). Best is simply "linear" error in one direction per model (or, train a model using similar "calibration" with each point having a certain error in a random direction and random amount... Likely error is <5 deg, probably more like 2 deg with error up to 4 in some cases (looking at my watch?). And due to head movement.
+
