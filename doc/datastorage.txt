@@ -1,0 +1,170 @@
+
+
+REV: need a good method to do data storage and updates that is robust across machines and convenient...
+
+REV: individual CSVs is one way but NASTY, and difficult to keep track of meta-CSVs.
+
+REV: better to have one way to specify where things are stored.
+
+
+One approach: BIDS format. (like that python format?) MNE?
+
+PyNWB?
+
+Of course backend will be ZARR....preferably with locks for simultaneous access? Problem is if implementation is via filesystem or otherwise?
+
+Leave it up to user to stop threads/machines/hosts from reading/writing same file at same time?
+
+I.e. only let one do a subject at a time...
+
+User has to plan out their pipeline, or define pipeline and the have us compile it into a graph which has no clashes of parallelism.
+
+Let us "export" to bids format maybe?
+
+Keep my own format, or use theirs?
+
+I still must "define" some scaffold.
+
+
+Requirements:
+
+Accessible from multiple threads and/or multiple MACHINES (hosts) at same time. Preferably via filesystem access, although filesystem-based locking is not ideal.
+
+Storage of many datatypes/data in same location, sorted with links to metadata/subject/experiment etc.
+
+Want 'class-based' access, like ORM? Problem is that database is nasty for accessing directly.
+
+Best idea is to combine database for high-level stuff (metadata/etc.) and then that will specify file locations and structure?
+
+Basically HDF5, problem is HDF5 also has problems with locking and multithreading/parallel access (even just reads).
+
+
+
+Ideal to keep 'all data' together, so history can be seen. Problem is that it will be big.
+
+We want a way to extract only the results also, to be copied...
+
+
+Then export to e.g. BIDS format? Specify workspace etc...
+Need a way of storing spike data etc., all in one place, to link shit together. Need a good way of accessing it..."naturally"
+
+
+
+
+Need simultaneous/safe way of writing, like the one I had before. I was testing the ZARR thing -- do that first?
+
+Problem is also agreeing on "format" to store in (i.e. hierarchical structure/names of databases/names of metadata "files", etc.).
+
+--> Easiest is offer hard-coded functions which automatically access correct names, for "common" tasks.
+
+
+
+#neuroconv
+https://neuroconv.readthedocs.io/en/main/conversion_examples_gallery/combinations/spikeglx_and_phy.html
+
+
+Neuroscience Without Borders (NWB).
+
+Best is to output to some "BIDS" format (automatically?). I.e. separate by 'session'? But how will user know 'session'. Have it included together. Problem is that 'session' is what? A trial? A task? A condition? A session should not include multiple "conditions" I assume. How about "run"?
+
+OK, add 'events'  tsv to talk about condition I guess.
+
+So within session there will be many video trials.
+
+How to actually process them with saliency etc.? Do it all in here? Need to keep track of full null model etc. for sampling.
+
+Better to let user describe their own "ontology" (hierarchy)? Or have one "fixed" which they have to conform to?
+
+Confusing representation of "trials" "blocks" "sessions" etc... "events"?
+
+Just do CSV for now is fine, problem is adding additional columns is very wasteful. Better to not use CSV, and/or use denser representation (ZARR).
+
+Problem for simultaneous access reading/writing. This is another main issue. File locking.
+
+
+
+
+Primary issue is not only "data storage" and front-end, but how to "represent" things. If user can just access raw xarray they can fuck it up.
+So, better to have "protected" functions to access stuff.
+
+
+
+Also, putting arbitrary dictionary names is bad, but honestly it's how user will built his own "ontology/schema"?
+
+So, make it "flexible" (with raw names) and then "specialize" it? I.e. add "sensor type" and "class" and "synch method" or something?
+
+Just add the raw data, and then let user "create" his own new "synchronized" guys in some kind of "derivatives" or "processed"?
+
+
+How to handle separating/concatenating for e.g. sessions/trials?
+
+
+Better to do this for gaze data than use some kind of "overall" database? Problem is accidentally deleting original? How about copying?
+
+One problem is if I use a filesystem, it's nice but many small writes will cause issues (for e.g. cephfs). Better to use RADOS kind of object storage...
+
+
+How about "document" database? In my case it's basically a simplified document database. Downside? Note zarr can use online store e.g. S2 etc.
+
+
+let user create that side of things?
+
+
+
+Start with only gaze I guess, and do appropriate corrections. Link it with e.g. peyeutils for reading stuff?
+
+
+Make the store a kind of wrapper that can just separate "trials" and "tensors" and stuff into some 'categories' (with metadata),
+and communicate with data of various types, e.g. add pandas DF or export to it, etc.
+
+Types will be e.g. "event" types, "slice" types, which user can set separately in "named tensor" type things. Problem is "synchronizing" between
+them e.g. for derivatives. Specify some kind of "time base" for each? I.e. a reference time. Time-reference or unit-reference? There needs to be a "space" for each variable...not just units, but space.
+
+Add/update/delete.
+
+
+How about for "splitting" stuff? Add it as new "derived" in a trial? I.e. have a separate "wrapper" around it which specifies trials/data that has been extracted/derived from other (i.e. is subset of) other single, or is a combination of multiple. And then "re-add" to the data.
+
+Specify a "zero time" for each, in reference to a specified time (of a specified variable) of another tensor.
+
+PEYEUTILS "peyeutils fv" or something?
+
+These are all "read-in" type things. 
+
+How to REPRESENT (and easily access etc.)
+
+Convert everything to DF will not work if too large....so maybe use numpy "named arrays"? Representation is fine (same), columnar?
+Ddatatypes will be float64 though...
+
+Need some way of "backend vectorizing it" the whole point...of using e.g. xarray...
+
+
+OK great...
+Problem: filesystem? No, can use rocksdb. Fine.
+
+So, zarr/icechunk is ideal.
+
+I just need to do it correctly, use XARRAY. Problem is how to 'orgainze' it, or leave it up to user?
+
+What are my requirements:
+
+1) in/out of pandas DFs (or numpy structured arrays) (record arrays, which allow array.VAR)
+2) "units" and etc., "updates"? (i.e. derivatives).
+3) multiple 'datasets' (groups of tensors?) and 'dataarrays' (tensors), which have named columns (or not?)
+4) Methods to "align" clearly the things, but names will be arbitrary (which is bad) so need to keep track of them.
+-> But, want it to be flexible enough for user...e.g. arbitrary keywords/parameters.
+
+How to handle "hierarchical" concepts such as events with start/end?
+I.e. "zeros" with offsets...
+
+
+So there are both "units" (e.g. seconds) and "coordinates"? (i.e. zeroed coordinate), and we transform (or resample?) to others.
+
+Every tensor (dimension?) must have a coordinate?
+
+How can I access/reference or update them without reading them in and then re-writing them?
+
+
+I.e. a "reference" to a tensor/array will be in a memory copy of it... BUT I want to modify it "in place"...
+
+Just the dataset? Or?
