@@ -1,0 +1,7 @@
+1) Check random movements in each dir etc., with various STDEV
+a) or fixed in each dir.
+-> PROBLEM, is saliency (AUROC) more likely to happen in periphery (because of null center bias?). In which case, higher gaze error measurement bias far from center will cause non-uniform bias in distances?
+
+2) Plot saliency likelyhood over video (image), is it uniform? No, of course
+stimuli are more likely to have near center due to "framing" bias of human
+images...
