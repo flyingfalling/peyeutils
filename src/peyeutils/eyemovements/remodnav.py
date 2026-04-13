@@ -1,6 +1,7 @@
 from peyeutils.utils import filter_spikes, allnan, dilate_nans;
 
 
+
 import numpy as np;
 import pandas as pd;
 import math;
@@ -769,10 +770,20 @@ def make_default_preproc_params(samplerate_hzsec, timeunitsec, dva_per_px, xname
     
     return params;
 
-
-
-
-
+'''
+def temporary_impute(df):
+    interpcolumns = [ colname  for colname in df.columns if (True==is_numeric_dtype(df[colname])) ]
+    notinterpcolumns = [ colname  for colname in df.columns if (False==is_numeric_dtype(df[colname]))]
+    print(interpcolumns);
+    print(notinterpcolumns);
+    strdf = df[ notinterpcolumns ];
+    strdf = strdf.ffill();
+    tmpdf = df[ interpcolumns ];
+    tmpdf = tmpdf.interpolate(method="linear");
+    df = pd.merge( left=strdf, right=tmpdf, how='inner', left_index=True, right_index=True );
+    df = df.dropna();
+    pass;
+'''
 
 
 
@@ -881,8 +892,24 @@ def remodnav_preprocess_eyetrace2d(eyesamps : pd.DataFrame,
     
     
     if( savgol_window > 0 ):
+
+        #REV: note savgol requires no NAN...so we need to artificially impute ALL values (even bad ones) and then throw
+        ## away the old ones.
+        from peyeutils.utils import refill_interpolate_NANs, strsafe_interpolate;
+
+        #REV: linear interpolate...
+        eyesamps = strsafe_interpolate( df=eyesamps, tcol=tname, method='linear' );
+        
         eyesamps[xname] = savgol_filter(eyesamps[xname], savgol_window, savgolorder);
         eyesamps[yname] = savgol_filter(eyesamps[yname], savgol_window, savgolorder);
+        
+        #REV: remove NA at the end? After I re-merge?
+        '''
+        before=len(eyesamps.index);
+        eyesamps = eyesamps.dropna(); #REV: does this drop non-numeric? If it is "None" it will, 
+        if( len(eyesamps.index) != before ):
+            raise Exception("Interpolation failed, b4 not same as after? There should be no NAN... possibly due to string NAN?");
+        '''
         pass;
     
     if(allnan(eyesamps[xname]) or allnan(eyesamps[yname])):

@@ -18,13 +18,15 @@ from pandas.api.types import is_string_dtype
 
 
 def load_gaze_session( fn,
-                       tcoltouse='RTtime', ## REV: change to use RTtime for match with outcome "onset" time... UNITS: MSEC
+                       tcoltouse='RTTime', ## REV: change to use RTtime for match with outcome "onset" time... UNITS: MSEC
                        tunits_hzsec=1e3,
                        xcol='CursorX', #'XGazePosLeftEye'
                        ycol='CursorY', #'YGazePosLeftEye'
                        PLOT=True, #False,
                       ):
 
+    print("Processing for FN {}".format(fn));
+    
     ### HARD-CODED CONSTANTS #####
     whratio = 4/3;
     wpx = 1024;
@@ -76,9 +78,11 @@ def load_gaze_session( fn,
         
     DROP_BAD_DATA=True;
     if(DROP_BAD_DATA):
-        df.loc[ (df['CursorX'] <= -0.9), ['XGazePosLeftEye', 'YGazePosLeftEye', 'XGazePosRightEye', 'YGazePosRightEye', 'CursorX', 'CursorY'] ] = np.nan;
-        df.loc[ (df['ValidityLeftEye'] != 0), ['XGazePosLeftEye', 'YGazePosLeftEye'] ] = np.nan; #REV: remove bad data, assume validity 0 is OK, nonzero is error.
-        df.loc[ (df['ValidityRightEye'] != 0), ['XGazePosRightEye', 'YGazePosRightEye'] ] = np.nan; #REV: remove bad data, assume validity 0 is OK, nonzero is error.
+        df.loc[ (df['DiameterPupilRightEye'] <= 0), 'DiameterPupilRightEye'] = np.nan;
+        df.loc[ (df['DiameterPupilLeftEye'] <= 0), 'DiameterPupilLeftEye'] = np.nan;
+        df.loc[ (df['CursorX'] <= -0.9), ['XGazePosLeftEye', 'YGazePosLeftEye', 'XGazePosRightEye', 'YGazePosRightEye', 'CursorX', 'CursorY', 'DiameterPupilLeftEye', 'DiameterPupilRightEye'] ] = np.nan;
+        df.loc[ (df['ValidityLeftEye'] != 0), ['XGazePosLeftEye', 'YGazePosLeftEye', 'DiameterPupilLeftEye'] ] = np.nan; #REV: remove bad data, assume validity 0 is OK, nonzero is error.
+        df.loc[ (df['ValidityRightEye'] != 0), ['XGazePosRightEye', 'YGazePosRightEye', 'DiameterPupilRightEye'] ] = np.nan; #REV: remove bad data, assume validity 0 is OK, nonzero is error.
         
         df.loc[ ((df['ValidityLeftEye'] != 0) & (df['ValidityRightEye'] != 0)), ['CursorX', 'CursorY'] ] = np.nan; #REV: remove bad data, assume validity 0 is OK, nonzero is error.
         pass;
@@ -103,20 +107,31 @@ def load_gaze_session( fn,
              'YCameraPosRightEye', 'DiameterPupilRightEye',
              'DistanceRightEye', 'ValidityRightEye', 'TrialId',
              'UserDefined_1']];
-
+    
     tostrcols = [ 'Subject', 'Session', 'ID', 'ValidityRightEye', 'TrialId' ];
     for c in tostrcols:
-        df[c] = df[c].astype(str);
+        df[c] = df[c].astype(str); #REV: this will not remove None types, and they will be dropped by dropna!! So, problem...
         pass;
     
     df['ShowingSlide'] = ~( df['UserDefined_1'].isna() );
     df = df[ [ c for c in df.columns if c!='UserDefined_1'] ]; #What a hack.
-
+    
     df['ShowingTrial'] = df['TrialId'];
     df.loc[ (~df['ShowingSlide']), 'ShowingTrial' ] = '-1';
     
     df['ShowingSlide'] = df[c].astype(str);
 
+
+    #REV: TODO compute "continuous" values? E.g. pupil values, for period? (rather than events)
+    #df[] = np.nanmean([df['DiameterPupilLeftEye'], df['DiameterPupilRightEye']],axis=0);
+    df = df.rename(columns={'DiameterPupilLeftEye':'lpupil', 'DiameterPupilRightEye':'rpupil'});
+    pupil = df[['time','lpupil','rpupil']].copy();
+    #df['pupil'] = np.nanmean([df['DiameterPupilLeftEye'], df['DiameterPupilRightEye']],axis=0);
+    #df['pupil'] = np.nanmean([df['DiameterPupilLeftEye'], df['DiameterPupilRightEye']],axis=0);
+    #print(df.pupil);
+    #plt.plot(df.time, df.pupil);
+    #plt.show();
+    #exit(0);
     
     
     #df.loc[ (df['UserDefined_1'].isna()), 'UserDefined_1' ] = ''; #REV: fill weird mixed with ''?;
@@ -135,6 +150,11 @@ def load_gaze_session( fn,
     
     df['xcdva'] = (df.x - wpx/2)*dvappx; #REV: center and convert to dva...
     df['ycdva'] = (df.y - hpx/2)*dvappx;
+
+    ## REV: remove "outsid escreen" values ?
+    #REV: set to NAN
+    maxdva=20;
+    df.loc[ ((df.xcdva < -maxdva) | (df.ycdva < -maxdva) | (df.xcdva > maxdva) | (df.ycdva > maxdva)) , ['xcdva', 'ycdva'] ] = np.nan;
 
 
     blbr_tm_dist=np.sqrt( (912-512)**2 + (660-112)**2 );
@@ -201,6 +221,8 @@ def load_gaze_session( fn,
     
     DROPNA=True;
     if(DROPNA):
+        #ut.strsafe_interpolate( df=df, tcol=tname, method='linear');
+        '''
         interpcolumns = [ colname  for colname in df.columns if (True==is_numeric_dtype(df[colname])) ]
         notinterpcolumns = [ colname  for colname in df.columns if (False==is_numeric_dtype(df[colname]))]
         print(interpcolumns);
@@ -216,13 +238,14 @@ def load_gaze_session( fn,
         df = df.dropna();
         #print(df);
         #exit(0);
+        '''
         pass;
     
     print(df);
         
     
     sdf = rv.remodnav_preprocess_eyetrace2d(eyesamps=df, params=params);
-
+    
     sparams = saccr.default_saccadr_params();
     sparams['samplerate'] = 1000;
     sparams['noiseconst'] = 4; #REV: 4 works.
@@ -440,7 +463,7 @@ def load_gaze_session( fn,
     
     
     
-    return sdf, ev, trialevents;
+    return sdf, ev, trialevents, pupil;
 
 
 def gaze_preproc_for_session( gazedata_path, condition, subject, session, outdir='.', skip_if_exists=False, SHAM=False ):
@@ -455,7 +478,8 @@ def gaze_preproc_for_session( gazedata_path, condition, subject, session, outdir
     sampfn = fn + '.samples.csv';
     evfn = fn + '.events.csv';
     trialfn = fn + '.trials.csv';
-    outdict = dict(samplescsv=sampfn, eventscsv=evfn, trialscsv=trialfn);
+    pupilfn = fn + '.pupil.csv';
+    outdict = dict(samplescsv=sampfn, eventscsv=evfn, trialscsv=trialfn, pupilcsv=pupilfn);
 
     
     
@@ -472,7 +496,7 @@ def gaze_preproc_for_session( gazedata_path, condition, subject, session, outdir
             print("COULD NOT FIND Preprocessed CSV files for {} ({}, {}), RECOMPUTING".format(fn,
                                                                                               os.path.join(outdir, evfn),
                                                                                               os.path.join(outdir, trialfn ) ) );
-            samps, ev, trialevents = load_gaze_session( fpath,
+            samps, ev, trialevents, pupil = load_gaze_session( fpath,
                                                         tcoltouse='RTTime', ## REV: change to use RTtime for match with outcome "onset" time... UNITS: MSEC
                                                         tunits_hzsec=1e3,
                                                         xcol='CursorX', #'XGazePosLeftEye'
@@ -480,7 +504,8 @@ def gaze_preproc_for_session( gazedata_path, condition, subject, session, outdir
                                                        );
             
             os.makedirs(outdir, exist_ok=True);
-            
+
+            pupil.to_csv(os.path.join(outdir,pupilfn), index=False);
             samps.to_csv(os.path.join(outdir,sampfn), index=False);
             ev.to_csv(os.path.join(outdir,evfn), index=False);
             trialevents.to_csv(os.path.join(outdir,trialfn), index=False);
@@ -513,7 +538,7 @@ def find_file( cond, subj, sess, path ):
     
     if( os.path.isfile( os.path.join(path, fn1) ) ):
         return fn1;
-
+    
     if( cond in lut1 ):
         fn2 = cond_fn(lut1[cond],subj,sess);
         if( os.path.isfile( os.path.join(path, fn2) ) ):

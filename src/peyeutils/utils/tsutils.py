@@ -71,6 +71,42 @@ def select_legal_timepoints4(ts, vals, maxdt):
         return list(), list();
     return;
 
+def strsafe_interpolate(df, tcol, method='linear', order=1):
+    df = df.sort_values(by=tcol).reset_index(drop=True);
+    
+    interpcolumns = [ colname  for colname in df.columns if (True==is_numeric_dtype(df[colname])) ]
+    notinterpcolumns = [ colname  for colname in df.columns if (False==is_numeric_dtype(df[colname]))]
+    
+    
+    strdf = df[ notinterpcolumns ];
+    strdf = strdf.ffill();
+    
+    print("WILL NOT INTERP", notinterpcolumns, strdf.dtypes);
+    
+    tmpdf = df[ interpcolumns ];
+    print("WILL INTERP", interpcolumns, tmpdf.dtypes);
+    
+    tmpdf = tmpdf.set_index( tmpdf[tcol] );
+    tmpdf = tmpdf.interpolate(method=method, order=order);
+    tmpdf = tmpdf.reset_index(drop=True); #REV: assume index will be tight and unimodal?
+    
+    df = pd.merge( left=tmpdf, right=strdf, how='inner', left_index=True, right_index=True );
+    
+    return df;
+
+def refill_interpolate_NANs( df, maskdf, nontcol ):
+    if( len(df.index) != len(maskdf.index) ):
+        print(df, maskdf);
+        raise Exception("maskdf and df do not match length...");
+    
+    for c in nontcol:
+        toset= (maskdf[c] == False);
+        if(len(toset) > 0 ):
+            df.loc[ toset, c ] = np.nan;
+            pass;
+        pass;
+        
+    return df;
 
 def interpolate_df_to_samplerate(df, tcol, targ_srhzsec, tcolunit_s, truesrs=dict(),
                                  maxtdelta_s=None, maxtdeltas_s=dict(),
@@ -187,10 +223,11 @@ def interpolate_df_to_samplerate(df, tcol, targ_srhzsec, tcolunit_s, truesrs=dic
     tdf = pd.DataFrame();
     tdf[tcol] = samps;
     
-    
+
+    #REV: merged here to have ALL possible values (maybe having
+    ## multiple values for each timepoint?)
     mdf = pd.merge( tdf, df, left_on=tcol, right_on=tcol, how='outer' );
-    
-    
+        
     mdf = mdf.sort_values(by=tcol).reset_index(drop=True);
     
     
@@ -288,46 +325,24 @@ def interpolate_df_to_samplerate(df, tcol, targ_srhzsec, tcolunit_s, truesrs=dic
         print(mdf[tcol].iloc[np.where(mdf[tcol].duplicated())]);
         raise Exception("Tcol is not unique (you need to have unique times, suggest groupby(tcol).mean() for example)!");
     
-    #mdf = mdf.set_index( mdf[tcol] );
-
-
     ## REV: handle string columns existing...?
+    mdf = strsafe_interpolate( mdf, tcol=tcol, method=method, order=order );
 
-    mdf = mdf.sort_values(by=tcol).reset_index(drop=True);
+    #REV: and replace NAN in locations of missing data (interpolate
+    ## will have filled all holes, no matter how far from "good" data)
+    mdf = refill_interpolate_NANs( df=mdf, maskdf=maskdf, nontcol=nontcol );
     
-    interpcolumns = [ colname  for colname in mdf.columns if (True==is_numeric_dtype(mdf[colname])) ]
-    notinterpcolumns = [ colname  for colname in mdf.columns if (False==is_numeric_dtype(mdf[colname]))]
-    
-    
-    strdf = mdf[ notinterpcolumns ];
-    strdf = strdf.ffill();
-    
-    print("WILL NOT INTERP", notinterpcolumns, strdf.dtypes);
-    
-    tmpdf = mdf[ interpcolumns ];
-    print("WILL INTERP", interpcolumns, tmpdf.dtypes);
-    
-    tmpdf = tmpdf.set_index( tmpdf[tcol] );
-    tmpdf = tmpdf.interpolate(method=method, order=order);
-    tmpdf = tmpdf.reset_index(drop=True); #REV: assume index will be tight and unimodal?
-    
-    #mdf = mdf.interpolate(method=method, order=order);
-    mdf = pd.merge( left=tmpdf, right=strdf, how='inner', left_index=True, right_index=True );
-    #strdf[ interpcolumns ] = tmpdf;
-    #mdf = strdf;
-    
-    
-    #mdf = mdf.reset_index(drop=True);
-    
-    for c in nontcol:
-        toset= (maskdf[c] == False);
-        if(len(toset) > 0 ):
-            mdf.loc[ toset, c ] = np.nan;
-            pass;
-        pass;
-    
+    #REV: tdf is literally just the linstep new time column.
+    #REV: this re-merges as "inner" to ensure we only get one value
+    #REV: each?
     mdf = pd.merge(tdf, mdf, how='inner', left_on=tcol, right_on=tcol).reset_index(drop=True);
+
+    if( len(mdf.index) != len(tdf.index) ):
+        print(mdf, tdf);
+        raise Exception("REV: something failed in tsutils resample, inner join tdf/mdf should give same length as df, even though mdf was exploded with outerjoin to get different sample-rate nans...");
     
+    #REV: wait, now I'm converting to seconds? OK...
+    #REV: why not do at beginning...?
     tsec=mdf[tcol] * tcolunit_s;
     if( zeroTsec is None ):
         tsec0=tsec - tsec.min();
