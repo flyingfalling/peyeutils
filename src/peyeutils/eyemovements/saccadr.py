@@ -259,6 +259,9 @@ def method_om(df, params, eyepfix,
     #explanation)
     
     vel = df[eyepfix+'vel']; #REV: amplitude of velocity, i.e. length in vector direction. (otherwise it would be N-component)
+
+    ## will return with sacc timepoints True... (at end).
+    saccresult = np.full(len(vel), False);
     
     acc = df[eyepfix+'acc']; #REV: this is MAGNITUDE of acceleration (or decel), i.e. abs(acc)
     #BIGNUM=1e10;
@@ -296,6 +299,11 @@ def method_om(df, params, eyepfix,
     #REV: based on ordering.
     
     #REV: note we are going from highest peak velocity to lowest.
+    if( pdf.empty ):
+        print("There are no non-NA peak velocities (saccadr method OM)...");
+        return saccresult;
+
+        
     issel = [ pdf.iloc[0].pidx ];
     
     for idx, row in pdf.iloc[1:].iterrows():
@@ -557,8 +565,7 @@ def method_om(df, params, eyepfix,
 
     print(sdf);
     
-    #REV: now use start/end values to actually mark it out in time series (samples)
-    saccresult = np.full(len(vel), False);
+    
     
     for idx, row in sdf.iterrows():
         saccresult[ row.stidx:row.enidx ] = True; #REV: the +1 because it only selects for each...
@@ -821,6 +828,7 @@ def saccadr_detect_saccs( df,
 
 
 
+#REV: returns SACC and SISI for ISIs...they are always exactly filling the time space.
 #REV: sampdf is modified "in place"?
 def saccadr_sacc( sampdf,
                   params,
@@ -999,7 +1007,7 @@ def saccadr_sacc( sampdf,
                       pvel=np.nanmax(sampdf[ (sampdf[tsecname]>=sampdf[tsecname][s]) & (sampdf[tsecname]<sampdf[tsecname][e]) ][pfix+'vel'] ),
                       medvel=np.nanmedian(sampdf[ (sampdf[tsecname]>=sampdf[tsecname][s]) & (sampdf[tsecname]<sampdf[tsecname][e]) ][pfix+'vel'] ),
                       avgvel=np.nanmean(sampdf[ (sampdf[tsecname]>=sampdf[tsecname][s]) & (sampdf[tsecname]<sampdf[tsecname][e]) ][pfix+'vel'] ),
-                      label='SACC' if (True==v) else 'ISI',
+                      label='SACC' if (True==v) else 'SISI',
                       );
 
             dictlist.append(ev);

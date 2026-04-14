@@ -31,6 +31,7 @@ def plot_gaze_chunks(
     stimulus_df=None, stim_start_col=None, stim_end_col=None, stim_name_col=None,
     max_points_per_sec=None,
     max_chunks_per_fig=10,
+    #baddata=pd.DataFrame(),
     ylim=None,
     proplist=list(),
 ):
@@ -54,6 +55,8 @@ def plot_gaze_chunks(
     """
     if( ylim is None ):
         ylim = np.max( [abs(df[x_col]).max(), abs(df[y_col]).max()] );
+        print(df[[x_col, y_col]]);
+        print("SETTING YLIM TO: {}".format(ylim));
         pass;
     
     # --- 1. Prepare Gaze Data ---
@@ -195,6 +198,19 @@ def plot_gaze_chunks(
                 h2, = gaze_ax.plot(chunk_data[timestamp_col], chunk_data[y_col], label=f'{y_col} (Y)')
                 if not all_line_handles: 
                     all_line_handles = [h1, h2]
+                pass;
+
+            '''
+            if( len(baddata.index) > 0 ):
+                badchunk_data = baddata[ (baddata[timestamp_col] >= start_time) & 
+                                         (baddata[timestamp_col] < end_time)
+                                         ];
+                if not badchunk_data.empty:
+                    h1, = gaze_ax.plot(badchunk_data[timestamp_col], badchunk_data[x_col], color='grey');
+                    h2, = gaze_ax.plot(badchunk_data[timestamp_col], badchunk_data[y_col], color='grey');
+                    pass;
+                pass;
+            '''
             
             # --- 5d. Plot Events (Absolute) ---
             if event_args_provided and len(event_types_list) > 0:
@@ -290,3 +306,158 @@ def plot_gaze_chunks(
         pass;
     return; 
 
+
+
+
+
+
+
+
+def plot_gaze_chunks(
+    df, timestamp_col, x_col, y_col, chunk_size_sec=10,
+    pupil_col=None, eye_col=None, eyes_to_plot=None,
+    events_df=None, event_start_col=None, event_end_col=None, event_type_col=None,
+    stimulus_df=None, stim_start_col=None, stim_end_col=None, stim_name_col=None,
+    max_points_per_sec=None,
+    max_chunks_per_fig=10
+):
+    import pandas as pd
+    import numpy as np
+    import matplotlib.pyplot as plt
+    import matplotlib.gridspec as gridspec
+    import matplotlib.patches as mpatches
+
+    # --- 1. Data Prep ---
+    data = df.copy()
+    
+    # Identify groups to plot
+    if eye_col and eye_col in data.columns:
+        all_eyes = data[eye_col].unique().tolist()
+        plot_groups = eyes_to_plot if eyes_to_plot else all_eyes
+        data = data[data[eye_col].isin(plot_groups)]
+    else:
+        plot_groups = [None] 
+
+    # --- 1b. Downsampling (Absolute Time) ---
+    if max_points_per_sec is not None and max_points_per_sec > 0:
+        rule = f"{1000 / max_points_per_sec:.0f}ms"
+        
+        def resample_group(group_df):
+            t_min = group_df[timestamp_col].min()
+            group_df['_delta'] = pd.to_timedelta(group_df[timestamp_col] - t_min, unit='s')
+            resampled = group_df.set_index('_delta').resample(rule).mean().reset_index()
+            resampled[timestamp_col] = resampled['_delta'].dt.total_seconds() + t_min
+            return resampled.drop(columns=['_delta'])
+
+        if eye_col and eye_col in data.columns:
+            data = data.groupby(eye_col, group_keys=False).apply(resample_group).reset_index(drop=True)
+        else:
+            data = resample_group(data)
+
+    # --- 2. Setup Colors ---
+    # Gaze colors (tab10)
+    base_palette = plt.cm.tab10.colors
+    eye_colors = {eye: base_palette[i % len(base_palette)] for i, eye in enumerate(plot_groups)}
+
+    # --- NEW: Pupil shades (Gradient of greys) ---
+    # We create a list of grey levels from 0.3 (dark) to 0.7 (light)
+    grey_levels = np.linspace(0.3, 0.7, len(plot_groups))
+    pupil_shades = {eye: (g, g, g) for eye, g in zip(plot_groups, grey_levels)}
+
+    has_events = all([events_df is not None, event_start_col, event_end_col, event_type_col])
+    has_stim = all([stimulus_df is not None, stim_start_col, stim_end_col, stim_name_col])
+
+    event_types = sorted(events_df[event_type_col].unique()) if has_events else []
+    ev_colors = dict(zip(event_types, plt.cm.Set1(np.linspace(0, 1, len(event_types))))) if has_events else {}
+
+    # --- 3. Time Windows ---
+    global_start = data[timestamp_col].min()
+    global_end = data[timestamp_col].max()
+    total_chunks = int(np.ceil((global_end - global_start) / chunk_size_sec))
+    num_figs = int(np.ceil(total_chunks / max_chunks_per_fig))
+
+    # --- 4. Plotting Loop ---
+    for f_idx in range(num_figs):
+        c_start = f_idx * max_chunks_per_fig
+        c_end = min((f_idx + 1) * max_chunks_per_fig, total_chunks)
+        chunks_here = c_end - c_start
+        
+        fig = plt.figure(figsize=(16, max(4 * chunks_here, 8)), constrained_layout=True)
+        gs_outer = gridspec.GridSpec(chunks_here, 1, figure=fig, hspace=0.4)
+
+        for i in range(chunks_here):
+            chunk_idx = c_start + i
+            t0 = global_start + (chunk_idx * chunk_size_sec)
+            t1 = t0 + chunk_size_sec
+
+            gs_inner = gridspec.GridSpecFromSubplotSpec(2, 1, subplot_spec=gs_outer[i], 
+                                                        height_ratios=[3, 1], hspace=0.05)
+            ax = fig.add_subplot(gs_inner[0])
+            ev_ax = fig.add_subplot(gs_inner[1], sharex=ax)
+            p_ax = ax.twinx() if pupil_col else None
+
+            # --- Plot Gaze & Pupil Per Eye ---
+            for group_id in plot_groups:
+                if group_id is not None:
+                    chunk = data[(data[eye_col] == group_id) & (data[timestamp_col] >= t0) & (data[timestamp_col] < t1)]
+                    lbl = f"{group_id} "
+                    color = eye_colors[group_id]
+                    p_color = pupil_shades[group_id] # --- NEW: Use specific shade ---
+                else:
+                    chunk = data[(data[timestamp_col] >= t0) & (data[timestamp_col] < t1)]
+                    lbl = ""
+                    color = base_palette[0]
+                    p_color = (0.5, 0.5, 0.5)
+
+                if chunk.empty: continue
+                
+                # Plot Gaze
+                ax.plot(chunk[timestamp_col], chunk[x_col], color=color, label=f'{lbl}X')
+                ax.plot(chunk[timestamp_col], chunk[y_col], color=color, linestyle='--', label=f'{lbl}Y', alpha=0.7)
+                
+                # --- NEW: Plot Pupil with unique shade and label ---
+                if p_ax and pupil_col in chunk:
+                    p_ax.plot(chunk[timestamp_col], chunk[pupil_col], color=p_color, alpha=0.5, 
+                              linewidth=1.2, label=f'{lbl}Pupil')
+
+            # --- Plot Stimuli ---
+            if has_stim:
+                rel_stim = stimulus_df[(stimulus_df[stim_start_col] < t1) & (stimulus_df[stim_end_col] > t0)]
+                for _, s in rel_stim.iterrows():
+                    ss, se = max(s[stim_start_col], t0), min(s[stim_end_col], t1)
+                    ax.axvspan(ss, se, color='teal', alpha=0.08, zorder=0)
+                    ax.text((ss+se)/2, 0.96, s[stim_name_col], transform=ax.get_xaxis_transform(), 
+                            ha='center', va='top', fontweight='bold', alpha=0.4, color='teal', fontsize=9)
+
+            # --- Plot Events ---
+            if has_events:
+                rel_ev = events_df[(events_df[event_start_col] < t1) & (events_df[event_end_col] > t0)]
+                for idx, ev in rel_ev.iterrows():
+                    etype = ev[event_type_col]
+                    y_pos = event_types.index(etype)
+                    ec = ev_colors.get(etype, 'black')
+                    es, ee = max(ev[event_start_col], t0), min(ev[event_end_col], t1)
+                    ev_ax.hlines(y_pos, es, ee, color=ec, linewidth=10)
+                    ev_ax.text((es+ee)/2, y_pos, str(idx), color='white', ha='center', va='center', fontsize=8)
+                
+                ev_ax.set_yticks(range(len(event_types)))
+                ev_ax.set_yticklabels(event_types, fontsize=9)
+                ev_ax.set_ylim(-0.5, len(event_types)-0.5)
+            
+            # Formatting
+            ax.set_xlim(t0, t1)
+            ax.set_title(f"Time: {t0:.1f}s - {t1:.1f}s", loc='left', fontsize=10)
+            ax.grid(True, alpha=0.1)
+            plt.setp(ax.get_xticklabels(), visible=False)
+            if i == chunks_here - 1: ev_ax.set_xlabel("Time (s)")
+            if p_ax: 
+                p_ax.set_ylabel("Pupil Size", color=(0.4, 0.4, 0.4), fontsize=9)
+                p_ax.tick_params(axis='y', colors=(0.4, 0.4, 0.4), labelsize=8)
+
+        # Legend Cleanup (Deduplicate labels from Gaze and Pupil axes)
+        h1, l1 = ax.get_legend_handles_labels()
+        h2, l2 = p_ax.get_legend_handles_labels() if p_ax else ([], [])
+        unique = dict(zip(l1 + l2, h1 + h2))
+        fig.legend(unique.values(), unique.keys(), loc='upper right', bbox_to_anchor=(0.99, 0.99), fontsize=9)
+        fig.suptitle(f"Gaze Timeplot - Page {f_idx + 1}", fontsize=14)
+        yield fig;

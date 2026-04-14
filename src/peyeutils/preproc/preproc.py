@@ -677,10 +677,10 @@ def preproc_SHARED_label_blinks(df,
             pass;
         
         
-        neweyedf['badpupilPRE'] = dpupil_finiteblink_sdf; #combined EL/pupilarea (MAD)
-        neweyedf['badpupil'] = dpupil_sdf; #just pupil > thresh
-        neweyedf['badPRE'] = finiteblink_sdf; #just gaze target was NAN, or was blink in preblink
-        neweyedf['bad'] = noorphan_sdf; #combined, and expanded NANs, re-added orphans.
+        neweyedf[badcol+'pupilPRE'] = dpupil_finiteblink_sdf; #combined EL/pupilarea (MAD)
+        neweyedf[badcol+'pupil'] = dpupil_sdf; #just pupil > thresh
+        neweyedf[badcol+'PRE'] = finiteblink_sdf; #just gaze target was NAN, or was blink in preblink
+        neweyedf[badcol+''] = noorphan_sdf; #combined, and expanded NANs, re-added orphans.
         
         newdflist.append(neweyedf);
         
@@ -695,7 +695,7 @@ def preproc_SHARED_label_blinks(df,
 
 
 #REV: use time not indices? Bad? stidx, etc.
-def blink_df_from_samples(df,
+def blink_df_from_samples(indf,
                           badcol, #='bad',
                           tcol, #='Tsec',
                           dva_per_px,
@@ -706,78 +706,265 @@ def blink_df_from_samples(df,
                           xcol : str = '',
                           ycol : str = '',
                           use_index=True,
+                          eyecol='',
                           ):
-    if( badcol not in df.columns ):
-        raise Exception("No column {} in df".format(badcol));
 
-    if(len(df.index) < 2 ):
-        raise Exception("df has no data,  < 2 rows");
+    dfs = [indf];
+    if( eyecol ):
+        dfs = [ a[1] for a in indf.groupby(eyecol, as_index=False) ];
+        pass;
+        
+    evlist=list();
     
-    df = df.sort_values(by=tcol).reset_index(drop=True);
-    
-    if(use_index):
-        ev = pu.utils.cond_rle_df( df[badcol], val=True, t=df.index ); #REV: will ignore time.
-        ev[stidx] = ev['sidx'];
-        ev[enidx] = ev['eidx'];
+    for df in dfs:
+        
+        if( badcol not in df.columns ):
+            raise Exception("No column {} in df".format(badcol));
+        
+        if(len(df.index) < 2 ):
+            raise Exception("df has no data,  < 2 rows");
 
+        df = df.sort_values(by=tcol).reset_index(drop=True);
+
+        if(use_index):
+            ev = pu.utils.cond_rle_df( df[badcol], val=True, t=df.index ); #REV: will ignore time.
+            ev[stidx] = ev['sidx'];
+            ev[enidx] = ev['eidx'];
+
+            pass;
+        else:
+            ev = pu.utils.cond_rle_df( df[badcol], val=True, t=df[tcol] );
+            raise Exception("Must use index to ensure previous timepoint is used for X/Y");
+
+
+        ev = ev[ ev['v'] == True ].reset_index(drop=True);
+
+        ev[stidx] = ev['st'];
+        ev[enidx] = ev['et'];
+
+        #REV; shit, since it's a blink, there is by definition NAN at start/end time? So I need to do at least -1 and +1 to get "position"?
+        ev[stidx] -= 1; #REV: assume "time difference" (error) is very small...
+        ev[enidx] += 1;
+
+        ev.loc[ev[stidx]<0, stidx] = 0; #REV: make any that would be negative 0 so it doesnt read outside df
+        ev.loc[ev[enidx]>len(df.index), enidx] = len(df.index)-1; #REV: make any that would be negative 0 so it doesnt read outside df
+
+        print(ev);
+
+        if( xcol and ycol ):
+            print("Computing X/Y for blinks!");
+
+            tmpdf = df[[tcol, xcol, ycol ]];
+            tmpdf['index'] = tmpdf.index;
+            print(tmpdf);
+            stev = pd.merge( left=ev, right=tmpdf, left_on=stidx, right_on='index', how='left' );
+            print(stev);
+            ev['stx'] = stev[xcol];
+            ev['sty'] = stev[ycol];
+            ev[stcol] = stev[tcol];
+
+            enev = pd.merge( left=ev, right=tmpdf, left_on=enidx, right_on='index', how='left' );
+            ev['enx'] = enev[xcol];
+            ev['eny'] = enev[ycol];
+            ev[encol] = enev[tcol];
+
+            ev["dxdva"] = dva_per_px * (ev["enx"] - ev["stx"]);
+            ev["dydva"] = dva_per_px * (ev["eny"] - ev["sty"]);
+
+            import math;
+            ev["angle"] = np.rad2deg( np.atan2( ev["dydva"], ev["dxdva"] ) ); #REV: why is this x and y, shouldn't be Y/X?a
+            ev["ampldva"] = np.sqrt( (ev["dxdva"])**2 + (ev["dydva"])**2  ); #REV: assumes these are pitch/yaw angles.
+            pass;
+
+
+        ev['label'] = 'BLNK';
+        ev['dursec'] = ev[encol] - ev[stcol];
+
+        ev = ev[ [ c for c in ev if c in
+                   ['label', stcol, encol, stidx, enidx,
+                    'dursec', 'stx', 'sty', 'enx', 'eny',
+                    'dxdva', 'dydva', 'ampldva', 'angle' ]
+                  ]
+                ];
+        if( eyecol ):
+            myeye=df[eyecol].unique()[0];
+            ev[eyecol] = myeye;
+            pass;
+        evlist.append(ev);
         pass;
-    else:
-        ev = pu.utils.cond_rle_df( df[badcol], val=True, t=df[tcol] );
-        raise Exception("Must use index to ensure previous timepoint is used for X/Y");
-    
-        
-    ev = ev[ ev['v'] == True ].reset_index(drop=True);
-    
-    ev[stidx] = ev['st'];
-    ev[enidx] = ev['et'];
-        
-    #REV; shit, since it's a blink, there is by definition NAN at start/end time? So I need to do at least -1 and +1 to get "position"?
-    ev[stidx] -= 1; #REV: assume "time difference" (error) is very small...
-    ev[enidx] += 1;
-    
-    ev.loc[ev[stidx]<0, stidx] = 0; #REV: make any that would be negative 0 so it doesnt read outside df
-    ev.loc[ev[enidx]>len(df.index), enidx] = len(df.index)-1; #REV: make any that would be negative 0 so it doesnt read outside df
-    
-    print(ev);
-    
-    if( xcol and ycol ):
-        print("Computing X/Y for blinks!");
-        
-        tmpdf = df[[tcol, xcol, ycol ]];
-        tmpdf['index'] = tmpdf.index;
-        print(tmpdf);
-        stev = pd.merge( left=ev, right=tmpdf, left_on=stidx, right_on='index', how='left' );
-        print(stev);
-        ev['stx'] = stev[xcol];
-        ev['sty'] = stev[ycol];
-        ev[stcol] = stev[tcol];
-        
-        enev = pd.merge( left=ev, right=tmpdf, left_on=enidx, right_on='index', how='left' );
-        ev['enx'] = enev[xcol];
-        ev['eny'] = enev[ycol];
-        ev[encol] = enev[tcol];
-    
-        ev["dxdva"] = dva_per_px * (ev["enx"] - ev["stx"]);
-        ev["dydva"] = dva_per_px * (ev["eny"] - ev["sty"]);
-        
-        import math;
-        ev["angle"] = np.rad2deg( np.atan2( ev["dydva"], ev["dxdva"] ) ); #REV: why is this x and y, shouldn't be Y/X?a
-        ev["ampldva"] = np.sqrt( (ev["dxdva"])**2 + (ev["dydva"])**2  ); #REV: assumes these are pitch/yaw angles.
-        pass;
-    
-    
-    ev['label'] = 'BLNK';
-    ev['dursec'] = ev[encol] - ev[stcol];
-    
-    ev = ev[ [ c for c in ev if c in ['label', stcol, encol, stidx, enidx, 'dursec', 'stx', 'sty', 'enx', 'eny', 'dxdva', 'dydva', 'ampldva', 'angle' ] ] ];
-    
-    
-    
-        
-        
-        
-        
+    ev = pd.concat(evlist).sort_values(by=stcol).reset_index(drop=True);
     return ev;
 
+
+#REV: auto-separate e.g. LeftEye/RightEye params?
+#REV: how to "compress", and how to specify "binocular" columns?
+#REV: if contains "keywords", removes from it.
+
+#REV: this works for "regexes"...
+'''
+def separate_eyes( df : pd.DataFrame,
+                   #keywords : list,
+                   regexes: list,
+                   eyecol='eye',
+                   casesensitive=False,
+                   ):
+    #REV: lowercase everything? Exact?
+    columns = list(df.columns);
+    if( casesensitive ):
+        columns = [ c.lower() for c in columns ];
+        if( len(set(columns)) != len(columns) ):
+            raise Exception("lowercasing columns caused name collision: {}".format(columns));
+        keywords = [ k.lower() for k in keywords ];
+        if( len(set(keywords)) != len(keywords) ):
+            print(keywords);
+            raise Exception("lowercasing keywords caused name collision: {}".format(keywords));
+        pass;
+    
+    kcols = { k:list() for k in keywords };
+    for k in keywords:
+        marked = [ False for c in columns ];
+        for i, c in enumerate(columns):
+            
+            if( k in c ):
+                if( marked[i] ):
+                    raise Exception("Would double-mark column: {} for kw {}".format(c, k));
+                marked[i] = True;
+                kcols[k] += [c]; #REV: ghetto list append, SHOULD be equal to kcols[k].append(c);
+                pass;
+            pass;
+        pass;
+        
+    
+    
+    return df2;
+'''
+
+import pandas as pd
+import re
+
+def extract_regex_parts(text: str, pattern: str, casesensitive: bool = False):
+    flags = 0 if casesensitive else re.IGNORECASE
+    match = re.search(pattern, text, flags=flags)
+    
+    if not match or not match.groups():
+        return None, None
+        
+    spans = [match.span(i) for i in range(1, len(match.groups()) + 1) if match.span(i) != (-1, -1)]
+    
+    if not spans:
+        return None, None
+        
+    spans.sort(key=lambda x: x[0])
+    merged_spans = []
+    for start, end in spans:
+        if not merged_spans:
+            merged_spans.append([start, end])
+        else:
+            last_end = merged_spans[-1][1]
+            if start <= last_end:
+                merged_spans[-1][1] = max(last_end, end)
+            else:
+                merged_spans.append([start, end])
+                
+    uncaptured_parts = []
+    captured_parts = []
+    current_idx = match.start() 
+    
+    for start, end in merged_spans:
+        uncaptured_parts.append(text[current_idx:start])
+        captured_parts.append(text[start:end])
+        current_idx = end
+        
+    uncaptured_parts.append(text[current_idx:match.end()])
+    
+    uncap = "".join(uncaptured_parts)
+    cap = "".join(captured_parts)
+    
+    if not casesensitive:
+        uncap = uncap.lower()
+        cap = cap.lower()
+        
+    return uncap, cap
+
+
+def separate_eyes(df: pd.DataFrame, 
+                  regexes: list, 
+                  eyecol: str = 'eye', 
+                  casesensitive: bool = False,
+                  drop_words: list = None) -> pd.DataFrame:
+    
+    # --- NEW: Validate regexes have capture groups ---
+    for pattern in regexes:
+        compiled_regex = re.compile(pattern)
+        if compiled_regex.groups == 0:
+            raise ValueError(
+                f"Regex pattern '{pattern}' contains no capturing groups. "
+                f"You must use parentheses to specify what to capture, e.g., '({pattern})'."
+            )
+            
+    id_vars = []
+    value_cols_mapping = {}
+    seen_tuples = {}
+    
+    if drop_words is None:
+        drop_words = []
+    
+    for col in df.columns:
+        matched_patterns = []
+        last_uncap, last_cap = None, None
+        
+        for pattern in regexes:
+            uncap, cap = extract_regex_parts(col, pattern, casesensitive)
+            if uncap is not None:
+                matched_patterns.append(pattern)
+                
+                for word in drop_words:
+                    if not casesensitive:
+                        word = word.lower()
+                    uncap = uncap.replace(word, "")
+                    cap = cap.replace(word, "")
+                
+                uncap = uncap.strip("_- ")
+                cap = cap.strip("_- ")
+                
+                last_uncap, last_cap = uncap, cap
+                
+        if len(matched_patterns) > 1:
+            raise ValueError(f"Column '{col}' was matched by multiple regexes: {matched_patterns}")
+            
+        elif len(matched_patterns) == 1:
+            if last_uncap == "":
+                raise ValueError(f"Column '{col}' is entirely matched by regex '{matched_patterns[0]}' leaving no uncaptured variable name.")
+                
+            tuple_key = (last_uncap, last_cap)
+            
+            if tuple_key in seen_tuples:
+                colliding_col = seen_tuples[tuple_key]
+                raise ValueError(f"Data collision! Columns '{colliding_col}' and '{col}' both resolve to the same mapping: {tuple_key}")
+                
+            seen_tuples[tuple_key] = col
+            value_cols_mapping[col] = tuple_key
+            
+        else:
+            id_vars.append(col)
+            pass;
+        pass;
+    if not value_cols_mapping:
+        return df
+        
+    df_reshaped = df.set_index(id_vars)
+    
+    multi_tuples = [value_cols_mapping[col] for col in df_reshaped.columns]
+    df_reshaped.columns = pd.MultiIndex.from_tuples(multi_tuples, names=[None, eyecol])
+    
+    # --- NEW: Backward-compatible stack ---
+    try:
+        # For Pandas >= 2.1.0 (silences the warning)
+        df_reshaped = df_reshaped.stack(level=eyecol, future_stack=True).reset_index()
+    except TypeError:
+        # Fallback for Pandas < 2.1.0
+        df_reshaped = df_reshaped.stack(level=eyecol, dropna=False).reset_index()
+    
+    return df_reshaped
 
 

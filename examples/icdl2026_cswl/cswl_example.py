@@ -28,8 +28,8 @@ tname='time'
 input_tcol='RTTime';
 
 #REV: names of X and Y columns to use in this case.
-xcol='CursorX' #'XGazePosLeftEye'
-ycol='CursorY' #'YGazePosLeftEye
+inxcol='CursorX' #'XGazePosLeftEye'
+inycol='CursorY' #'YGazePosLeftEye
 
 input_tcol_units_hzsec=1e3;
 
@@ -62,9 +62,21 @@ df[tname] = df[input_tcol] * 1/input_tcol_units_hzsec;
 df = df.sort_values(by=tname).reset_index(drop=True);
 
 
+
+'''
+df['bad'] = False;
+
+df.loc[ (df['DiameterPupilRightEye'] <= 0), 'bad'] = True;
+df.loc[ (df['DiameterPupilLeftEye'] <= 0), 'bad'] = True;
+df.loc[ (df['CursorX'] <= -0.9), ['XGazePosLeftEye', 'YGazePosLeftEye', 'XGazePosRightEye', 'YGazePosRightEye', 'CursorX', 'CursorY', 'DiameterPupilLeftEye', 'bad'] ] = True;
+df.loc[ (df['ValidityLeftEye'] != 0), 'bad' ] = True; #np.nan; #REV: remove bad data, assume validity 0 is OK, nonzero is error.
+df.loc[ (df['ValidityRightEye'] != 0), 'bad'] = True; #REV: remove bad data, assume validity 0 is OK, nonzero is error.
+df.loc[ ((df['ValidityLeftEye'] != 0) & (df['ValidityRightEye'] != 0)), 'bad' ] = True;
+'''
+
 #REV: setting missing data to NAN (rather than negative numbers it seems to be)
-DROP_BAD_DATA=True;
-if(DROP_BAD_DATA):
+NAN_BAD_DATA=True;
+if(NAN_BAD_DATA):
     df.loc[ (df['DiameterPupilRightEye'] <= 0), 'DiameterPupilRightEye'] = np.nan;
     df.loc[ (df['DiameterPupilLeftEye'] <= 0), 'DiameterPupilLeftEye'] = np.nan;
     df.loc[ (df['CursorX'] <= -0.9), ['XGazePosLeftEye', 'YGazePosLeftEye', 'XGazePosRightEye', 'YGazePosRightEye', 'CursorX', 'CursorY', 'DiameterPupilLeftEye', 'DiameterPupilRightEye'] ] = np.nan;
@@ -82,15 +94,16 @@ print("COLS", df.columns);
 
 #REV: for simplicity, naming x and y
 # Note units are still unknown (probably pixels in some screen space).
-df['x'] = df[xcol];
-df['y'] = df[ycol];
+df['x'] = df[inxcol];
+df['y'] = df[inycol];
 
 
 
 
 #REV: dropping unnecessary columns...
 #REV: remove unneeded columns for now...just keep 'time'
-df = df[['x','y',tname, 'Subject', 'Session', 'ID', 'TETTime',
+
+df = df[['x','y', tname, 'Subject', 'Session', 'ID', 'TETTime',
          'RTTime', 'CursorX', 'CursorY', 'TimestampSec',
          'TimestampMicrosec', 'XGazePosLeftEye', 'YGazePosLeftEye',
          'XCameraPosLeftEye', 'YCameraPosLeftEye',
@@ -99,6 +112,7 @@ df = df[['x','y',tname, 'Subject', 'Session', 'ID', 'TETTime',
          'YCameraPosRightEye', 'DiameterPupilRightEye',
          'DistanceRightEye', 'ValidityRightEye', 'TrialId',
          'UserDefined_1']];
+
 
 #REV: some columns are strings which should not be imputed/interpolated!!!
 ## Even if they are "integer-like" (e.g. subject 100, 101)
@@ -117,9 +131,9 @@ df.loc[ (~df['ShowingSlide']), 'ShowingTrial' ] = '-1';
 df['ShowingSlide'] = df[c].astype(str);
 
 
-#REV: rename some data...
-df = df.rename(columns={'DiameterPupilLeftEye':'lpupil', 'DiameterPupilRightEye':'rpupil'});
-pupil = df[['time','lpupil','rpupil']].copy();
+
+pupil = df[['time','DiameterPupilLeftEye','DiameterPupilRightEye']].copy();
+pupil = pupil.rename(columns={'DiameterPupilLeftEye':'lpupil', 'DiameterPupilRightEye':'rpupil'});
 
 
 ##### Convert from "screen" pixel X/Y into degrees visual angle (DVA).
@@ -144,6 +158,8 @@ df['xcdva'] = (df.x - wpx/2)*dvappx; #REV: center and convert to dva...
 df['ycdva'] = (df.y - hpx/2)*dvappx;
 
 
+xcol='xcdva';
+ycol='ycdva';
 
 #REV: realistically, when passed into eyeutils, they should provide:
 
@@ -168,9 +184,15 @@ df['ycdva'] = (df.y - hpx/2)*dvappx;
 
 ## REV: remove "outside escreen" values ?
 #REV: set to NAN
-maxdva=20;
-df.loc[ ((df.xcdva < -maxdva) | (df.ycdva < -maxdva) | (df.xcdva > maxdva) | (df.ycdva > maxdva)) , ['xcdva', 'ycdva'] ] = np.nan;
+'''
+NAN_OUTSIDE=False;
+if( NAN_OUTSIDE ):
+    maxdva=20;
+    df.loc[ ((df.xcdva < -maxdva) | (df.ycdva < -maxdva) | (df.xcdva > maxdva) | (df.ycdva > maxdva)) , ['xcdva', 'ycdva'] ] = np.nan;
+    pass;
 
+df.loc[ ((df.xcdva < -maxdva) | (df.ycdva < -maxdva) | (df.xcdva > maxdva) | (df.ycdva > maxdva)) , 'bad'] = True;
+'''
 
 
 
@@ -198,6 +220,78 @@ df = df.groupby([tname], as_index=False).agg( saccr.safe_agg(df,'mean') ).reset_
 df = interpolate_df_to_samplerate(df, tname, targ_sr_hzsec, startsec=None, endsec=None,
                                   method=interptype, order=interporder, truesrs=truesrs, tcolunit_s=1,
                                   );
+
+baddatacol='mybaddata';
+df[baddatacol] = False;
+
+maxdva=20;
+df.loc[ ((df.xcdva < -maxdva) | (df.ycdva < -maxdva) | (df.xcdva > maxdva) | (df.ycdva > maxdva)) , baddatacol] = True;
+
+
+
+eyedf = pu.preproc.separate_eyes( df, regexes=['.*(Left).*', '.*(Right).*'],
+                                  eyecol='eye',
+                                  casesensitive=True,
+                                  drop_words=['Eye']);
+
+print("FINISHED SEP");
+print(eyedf);
+print(eyedf.columns);
+
+#REV: some preproc of pupilsize?
+eyedf = pu.preproc.preproc_SHARED_pupilsize(eyedf,
+                                            timecol=tname, #e.g. 'Tsec0'
+                                            pacol='DiameterPupil', #e.g. 'pa'
+                                            eyecol='eye', #e.g. 'eye'
+                                            characteristic_timescale_sec=0.010, #Rough characteristic timescale
+                                            ## of pupil size change
+                                            );
+
+#REV: plot pupil size too? On same graph?
+eyedf = pu.preproc.preproc_SHARED_label_blinks(eyedf,
+                                                 sr_hzsec=targ_sr_hzsec, 
+                                                 tsecname=tname,
+                                                 eyecol='eye',
+                                                 valcol='XGazePos', #REV: is pupil area NAN when no eye tracking?
+                                                 badcol='ppbad',
+                                                 pacol='DiameterPupil',
+                                                 #patdiffcol='pa_abs_tdiff',
+                                                 preblinkcols=[] );
+
+
+pblinks = pu.preproc.blink_df_from_samples(eyedf,
+                                           badcol='ppbad',
+                                           tcol=tname,
+                                           stcol='stsec',
+                                           encol='ensec',
+                                           stidx='stidx',
+                                           enidx='enidx',
+                                           xcol='XGazePos',
+                                           ycol='YGazePos',
+                                           dva_per_px=xyunits_dva,
+                                           eyecol='eye',
+                                           
+                                           );
+
+pblinks = pblinks[pblinks['eye']=='Left'];
+pblinks['label'] = 'PBLNK';
+
+
+baddata = df[ (df[baddatacol]==True) ].copy();
+
+
+
+#REV: remove here?
+NAN_OUTSIDE=True;
+if( NAN_OUTSIDE ):
+    maxdva=20;
+    df.loc[ ((df.xcdva < -maxdva) | (df.ycdva < -maxdva) | (df.xcdva > maxdva) | (df.ycdva > maxdva)) , ['xcdva', 'ycdva'] ] = np.nan;
+    pass;
+
+
+
+
+
 
 
 
@@ -242,6 +336,9 @@ if(REMOVEBLINK):
     pass;
 
 
+
+#REV: this does NAN dilation etc.... it removes data, not just setting "bad" column or something? I'd rather mask...so I know
+## old values for comparison.
 sdf = rv.remodnav_preprocess_eyetrace2d(eyesamps=df, params=params);
     
 
@@ -257,69 +354,129 @@ sdf, ev = saccr.saccadr_sacc(sdf, sparams, tsecname=tname);
 print(ev);
 print(ev.columns);
 
+saccs = ev[ (ev['label'] == 'SACC') ];
+nonsaccs = ev[ ~(ev['label'] == 'SACC') ];
+print("NON-SACCS", nonsaccs['label']);
 
 
-
-sixteen_val=60;
-zero_val=20;
-
-zero_over_err=40;
-sixteen_over_err=270;
-
-zero_under_err=10;
-sixteen_under_err=30;
-
-sixteen=16;
-zero=0;
-
-rise=sixteen_val-zero_val;
-run=sixteen-zero;
-
-over_err_slope = (sixteen_over_err-zero_over_err)/run;
-under_err_slope = (sixteen_under_err-zero_under_err)/run;
-
-def is_mainseq(myampl_dva,
-               mydur_s,
-               intercept_ms=20,
-               slope=rise/run,
-               over_err_inter=zero_over_err,
-               over_err_slope=over_err_slope,
-               under_err_inter=zero_under_err,
-               under_err_slope=under_err_slope ):
-    
-    mydurms = mydur_s * 1e3;
-    #expected_dur = intercept_ms + myampl_dva * slope; #NOT USED
-    
-    over_err_at_ampl = over_err_inter + (myampl_dva * over_err_slope);
-    over = over_err_at_ampl;
-    
-    under_err_at_ampl = under_err_inter + (myampl_dva * under_err_slope);
-    under= under_err_at_ampl;
-    
-    return (mydurms <= over) & (mydurms >= under);
-
-
-
-ev = ev[ ev['ampldva'] > min_sacc_dva ];
-
-ev['ismain'] = is_mainseq( ev['ampldva'], ev['dursec'] );
+saccs = saccs[ saccs['ampldva'] > min_sacc_dva ];
 
 
 PLOT=True;
+
 if(PLOT):
+    mainseq, mygraphics = pu.eyemovements.mainseq.mainseq_ampldur_linear_95pctl_human_chen2021_wplot( saccs['ampldva'],
+                                                                                                      saccs['dursec'],
+                                                                                                      error_gain=1.5,
+                                                                                                     );
     xmin=0;
     xmax=25;
-    
-    g = sns.relplot(data=ev, x='ampldva', y='dursec', hue='ismain', kind='scatter' );
-    g.ax.axhline(0);
-    g.ax.set_ylim([0, 0.3]);
-    g.ax.set_xlim([xmin, xmax]);
-    g.ax.plot([xmin, xmax], [1e-3*zero_under_err, 1e-3*(zero_under_err+(under_err_slope*xmax))]);
-    g.ax.plot([xmin, xmax], [1e-3*zero_over_err, 1e-3*(zero_over_err+(over_err_slope*xmax))]);
-    g.fig.tight_layout();
-    g.fig.savefig('mainseq.pdf');
+    mygraphics.ax.set_xlim([xmin, xmax]);
+    mygraphics.savefig('mainseq.pdf');
+    plt.show();
+    pass;
+else:
+    mainseq = pu.eyemovements.mainseq.mainseq_ampldur_linear_95pctl_human_chen2021_wplot( saccs['ampldva'],
+                                                                                          saccs['dursec'],
+                                                                                          error_gain=1.5,
+                                                                                         );
+    pass;
+
+saccs['ismain'] = mainseq; #Any way to always just make it give me first?
+saccs = saccs[ (saccs.ismain==True) ].reset_index(drop=True);
+
+
+blinks = pu.eyemovements.blink.compute_blinks_from_sampcol( sdf,
+                                                            dva_per_px=params['dva_per_px'],
+                                                            badcol=params['blinkcol'],
+                                                            tcol=tname,
+                                                            xcol=xcol,
+                                                            ycol=ycol )
+
+#REV: should I remove blinks in which eye did not move much (< 0.5 deg ?). I.e. fixation with intermediate lbink?
+# Vision is not happening during that time and physiologically it is equivalent...and then ISI is?
+
+print(pblinks.columns);
+print(saccs.columns);
+
+ev = pd.concat( [saccs, blinks, nonsaccs, pblinks] ).reset_index(drop=True);
+
+ISIevents=['SACC', 'BLNK']; #REV: i.e. use blinks as saccades (gaze shifts often happen during blinks...)
+isis = pu.eyemovements.isi.compute_ISIs_from_events( ev,
+                                                     zerotime=sdf[tname].iloc[0], #REV: or .min()
+                                                     eventstouse=ISIevents,
+                                                     #stname='stsec', enname='ensec', durname='dursec', label='ISI' #defaults
+                                                    );
+
+isis = isis[ isis['dursec'] > min_isi_sec ];
+
+ev = pd.concat([ev, isis]);
+ev = ev.sort_values(by='stsec').reset_index(drop=True);
+
+
+#REV: how am I plotting double labels?
+isis = ev[ (ev['label']=='ISI') ];
+
+saccblnks = ev[ (ev.label=='SACC') | (ev.label=='BLNK') ];
+#saccblnks = pd.concat( [ saccs, blinks] );
+#saccblnks = saccblnks.sort_values(by='stsec').reset_index(drop=True);
+
+
+
+
+if(PLOT):
+    sns.histplot(data=saccblnks, x='ampldva',
+                 multiple='stack',
+                 #saccblnks['ampldva'],
+                 binwidth=0.5, binrange=(0, 30), hue='label' );
+    plt.xlabel('Sacc Ampl (deg)');
+    plt.tight_layout();
+    plt.savefig('amplhist.pdf');
     plt.show();
     
+    sns.histplot(isis['dursec'], binwidth=0.050, binrange=(0, 2) );
+    plt.xlabel('ISI (sec)');
+    plt.tight_layout();
+    plt.savefig('isihist.pdf');
+    plt.show();
+    
+    plt.close();
+    
+        
+    print("PRINTING COLS");
+    print(isis.columns);
+    sns.relplot( data=isis, x='stx', y='sty', kind='scatter', size='dursec' );
+    plt.title("Gaze during ISI (blinks/saccades removed)");
+    plt.tight_layout();
+    plt.savefig('isiXYlocs.pdf');
+    plt.show();
+    plt.close();
+    
+    
+    fig = plt.figure();
+    for i, row in saccblnks.iterrows():
+        plt.plot( [row['stx'], row['enx']], [row['sty'], row['eny'] ] );
+        pass;
+    plt.xlabel("X (dva)");
+    plt.ylabel("Y (dva)");
+    plt.tight_layout();
+    plt.savefig('saccades.pdf');
+    plt.show();
+    
+    
+    for i,fig in enumerate(
+            pu.plotting.plot_gaze_chunks2( df=sdf, timestamp_col=tname, x_col=xcol, y_col=ycol, chunk_size_sec=10,
+                                          events_df=ev, event_start_col='stsec', event_end_col='ensec',
+                                          event_type_col='label', max_chunks_per_fig=4,
+                                          pupil_col='DiameterPupilRightEye',
+                                          )
+    ):
+        fig.tight_layout();
+        fig.savefig('testfig_{:04d}.pdf'.format(i));
+        pass;
     pass;
+
+
+
 
 exit(0);

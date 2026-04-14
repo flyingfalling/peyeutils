@@ -24,9 +24,17 @@ def load_gaze_session( fn,
                        ycol='CursorY', #'YGazePosLeftEye'
                        PLOT=True, #False,
                       ):
-
-    print("Processing for FN {}".format(fn));
     
+    print("Processing for FN {}".format(fn));
+
+    if( os.path.basename(fn) == '22-1_nonTC1_100-1.gazedata'):
+        print("DOING FOR {}".format('22-1_nonTC1_100-1.gazedata'));
+        pass;
+    else:
+        print("SKIPPING");
+        return;
+    
+        
     ### HARD-CODED CONSTANTS #####
     whratio = 4/3;
     wpx = 1024;

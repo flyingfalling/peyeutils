@@ -1025,7 +1025,7 @@ def remodnav_preprocess_eyetrace2d(eyesamps : pd.DataFrame,
     finalvels = [];
     for vel in eyesamps.vel:
         if( vel  >  params['maxveldegsec'] ):
-            print("REV: Detected too-high velocity {}? Maybe bad filter params?".format(vel));
+            print("REV: Detected SAMPLE too-high velocity {}? Maybe bad filter params?".format(vel));
             #vel = finalvels[-1]; #REV: just replace it with the previous velocity? Fine with high sample rates...
             pass;
         finalvels.append(vel);
