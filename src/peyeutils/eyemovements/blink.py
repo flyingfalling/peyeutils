@@ -10,14 +10,15 @@ def compute_blinks_from_sampcol( samps,
                                  tcol,
                                  xcol,
                                  ycol,
-                                 ):
-                                 
+                                ):
+    
     blinkev = pu.preproc.blink_df_from_samples(samps,
                                                dva_per_px=dva_per_px,
                                                badcol=badcol,
                                                tcol=tcol,
                                                xcol=xcol,
-                                               ycol=ycol);
+                                               ycol=ycol,
+                                               );
     return blinkev;
 
 

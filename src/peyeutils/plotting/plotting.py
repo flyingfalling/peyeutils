@@ -326,7 +326,7 @@ def plot_gaze_chunks(
     import matplotlib.pyplot as plt
     import matplotlib.gridspec as gridspec
     import matplotlib.patches as mpatches
-
+    
     # --- 1. Data Prep ---
     data = df.copy()
     

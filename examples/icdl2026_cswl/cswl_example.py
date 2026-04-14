@@ -229,52 +229,63 @@ df.loc[ ((df.xcdva < -maxdva) | (df.ycdva < -maxdva) | (df.xcdva > maxdva) | (df
 
 
 
-eyedf = pu.preproc.separate_eyes( df, regexes=['.*(Left).*', '.*(Right).*'],
-                                  eyecol='eye',
-                                  casesensitive=True,
-                                  drop_words=['Eye']);
+PUPILSIZE_BLINKS=False;
+if(PUPILSIZE_BLINKS):
 
-print("FINISHED SEP");
-print(eyedf);
-print(eyedf.columns);
+    #REV: separate data into left/right eye samples in "long" format.
+    eyedf = pu.preproc.separate_eyes( df, regexes=['.*(Left).*', '.*(Right).*'],
+                                      eyecol='eye',
+                                      casesensitive=True,
+                                      drop_words=['Eye']);
+    
+    print("FINISHED SEP");
+    print(eyedf);
+    print(eyedf.columns);
 
-#REV: some preproc of pupilsize?
-eyedf = pu.preproc.preproc_SHARED_pupilsize(eyedf,
-                                            timecol=tname, #e.g. 'Tsec0'
-                                            pacol='DiameterPupil', #e.g. 'pa'
-                                            eyecol='eye', #e.g. 'eye'
-                                            characteristic_timescale_sec=0.010, #Rough characteristic timescale
-                                            ## of pupil size change
-                                            );
+    #REV: compute MAD etc. of pupil size and perform some smoothing.
+    eyedf = pu.preproc.preproc_SHARED_pupilsize(eyedf,
+                                                timecol=tname, #e.g. 'Tsec0'
+                                                pacol='DiameterPupil', #e.g. 'pa'
+                                                eyecol='eye', #e.g. 'eye'
+                                                characteristic_timescale_sec=0.010, #Rough characteristic timescale
+                                                ## of pupil size change
+                                                );
 
-#REV: plot pupil size too? On same graph?
-eyedf = pu.preproc.preproc_SHARED_label_blinks(eyedf,
-                                                 sr_hzsec=targ_sr_hzsec, 
-                                                 tsecname=tname,
-                                                 eyecol='eye',
-                                                 valcol='XGazePos', #REV: is pupil area NAN when no eye tracking?
-                                                 badcol='ppbad',
-                                                 pacol='DiameterPupil',
-                                                 #patdiffcol='pa_abs_tdiff',
-                                                 preblinkcols=[] );
+    #REV: label eye blinks in using the pupilsize information (based on velocity/acceleration deviation from surrounding noise,
+    ## sudden changes in pupilsize indicate blinks (or saccades) in VOG video oculography eye tracking.
+    #REV: plot pupil size too? On same graph?
+    eyedf = pu.preproc.preproc_SHARED_label_blinks(eyedf,
+                                                   sr_hzsec=targ_sr_hzsec, 
+                                                   tsecname=tname,
+                                                   eyecol='eye',
+                                                   valcol='XGazePos', #REV: is pupil area NAN when no eye tracking?
+                                                   badcol='ppbad',
+                                                   pacol='DiameterPupil',
+                                                   #patdiffcol='pa_abs_tdiff',
+                                                   preblinkcols=[] );
+    
+    #REV: convert to an "events" dataframe (start/end of each blink etc.)
+    pblinks = pu.preproc.blink_df_from_samples(eyedf,
+                                               badcol='ppbad',
+                                               tcol=tname,
+                                               stcol='stsec',
+                                               encol='ensec',
+                                               stidx='stidx',
+                                               enidx='enidx',
+                                               xcol='XGazePos',
+                                               ycol='YGazePos',
+                                               dva_per_px=xyunits_dva,
+                                               eyecol='eye',
+                                               
+                                               );
 
+    #REV: label them
+    pblinks['label'] = 'PBLNK';
 
-pblinks = pu.preproc.blink_df_from_samples(eyedf,
-                                           badcol='ppbad',
-                                           tcol=tname,
-                                           stcol='stsec',
-                                           encol='ensec',
-                                           stidx='stidx',
-                                           enidx='enidx',
-                                           xcol='XGazePos',
-                                           ycol='YGazePos',
-                                           dva_per_px=xyunits_dva,
-                                           eyecol='eye',
-                                           
-                                           );
+    #REV: just take left as example?
+    pblinks = pblinks[pblinks['eye']=='Left'];
+    pass;
 
-pblinks = pblinks[pblinks['eye']=='Left'];
-pblinks['label'] = 'PBLNK';
 
 
 baddata = df[ (df[baddatacol]==True) ].copy();
@@ -352,7 +363,7 @@ sparams['ek_vel_thresh_lambda'] = 6;
 sdf, ev = saccr.saccadr_sacc(sdf, sparams, tsecname=tname);
 
 print(ev);
-print(ev.columns);
+print("FIRST EVENT COLUMNS: ", ev.columns);
 
 saccs = ev[ (ev['label'] == 'SACC') ];
 nonsaccs = ev[ ~(ev['label'] == 'SACC') ];
@@ -386,6 +397,11 @@ saccs['ismain'] = mainseq; #Any way to always just make it give me first?
 saccs = saccs[ (saccs.ismain==True) ].reset_index(drop=True);
 
 
+if( 'eye' in ev.columns ):
+    print("In EV 0");
+    pass;
+
+
 blinks = pu.eyemovements.blink.compute_blinks_from_sampcol( sdf,
                                                             dva_per_px=params['dva_per_px'],
                                                             badcol=params['blinkcol'],
@@ -396,10 +412,22 @@ blinks = pu.eyemovements.blink.compute_blinks_from_sampcol( sdf,
 #REV: should I remove blinks in which eye did not move much (< 0.5 deg ?). I.e. fixation with intermediate lbink?
 # Vision is not happening during that time and physiologically it is equivalent...and then ISI is?
 
-print(pblinks.columns);
 print(saccs.columns);
 
-ev = pd.concat( [saccs, blinks, nonsaccs, pblinks] ).reset_index(drop=True);
+ev = pd.concat( [saccs,
+                 blinks,
+                 #nonsaccs, #REV: this is currently just PISI (original ISI from saccade detection...). In other cases
+                 # there may also be e.g. drifts/smooth pursuits, etc.?
+                 ] ).reset_index(drop=True);
+
+if( 'eye' in ev.columns ):
+    print("In EV 1");
+    pass;
+
+if( PUPILSIZE_BLINKS ):
+    ev = pd.concat( [ev, pblinks] ).reset_index(drop=True);
+    pass;
+
 
 ISIevents=['SACC', 'BLNK']; #REV: i.e. use blinks as saccades (gaze shifts often happen during blinks...)
 isis = pu.eyemovements.isi.compute_ISIs_from_events( ev,
@@ -408,13 +436,19 @@ isis = pu.eyemovements.isi.compute_ISIs_from_events( ev,
                                                      #stname='stsec', enname='ensec', durname='dursec', label='ISI' #defaults
                                                     );
 
-isis = isis[ isis['dursec'] > min_isi_sec ];
+
+#isis = isis[ isis['dursec'] > min_isi_sec ];
 
 ev = pd.concat([ev, isis]);
 ev = ev.sort_values(by='stsec').reset_index(drop=True);
 
-
 #REV: how am I plotting double labels?
+
+
+print(ev['eye']);
+ev = pu.eyemovements.isi.generalized_eye_event_merge( ev, );
+
+
 isis = ev[ (ev['label']=='ISI') ];
 
 saccblnks = ev[ (ev.label=='SACC') | (ev.label=='BLNK') ];
@@ -476,7 +510,8 @@ if(PLOT):
         pass;
     pass;
 
-
+ev.to_csv('events.csv', index=False);
+print(ev);
 
 
 exit(0);
