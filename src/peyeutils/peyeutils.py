@@ -55,11 +55,16 @@ def preproc_and_compute_events(df,
                                ycol,
                                sr_hzsec,
                                badcol='',
-                               blinkcol='',
+                               nablinks=True,
+                               blinkcol='blink',
                                eyecol='eye',
                                PLOT=False,
                                DEBUG=False,
                                ):
+
+    import pandas as pd;
+    import numpy as np;
+    
     min_sacc_dva = 0.33;
     min_isi_sec = 0.040;
     blinksacc_merge_envelop_sec=0.040;
@@ -73,7 +78,7 @@ def preproc_and_compute_events(df,
         raise Exception("Samplerate not good, expected {}, got {}".format(sr_hzsec, sr));
 
     ########### PREPROCESSING (smooth/savgol filter/median filter/dilate NANs  ################
-    params1 = rv.make_default_preproc_params(samplerate_hzsec=sr_hzsec,
+    params1 = pu.eyemovements.remodnav.make_default_preproc_params(samplerate_hzsec=sr_hzsec,
                                              timeunitsec=1,
                                              dva_per_px=xyunits_dva,
                                              xname=xcol,
@@ -81,7 +86,7 @@ def preproc_and_compute_events(df,
                                              tname=tcol);
     
     #REV: default other params for remodnav (will be ignored if not needed).
-    params2 = rv.make_default_params(samplerate_hzsec=sr_hzsec);
+    params2 = pu.eyemovements.remodnav.make_default_params(samplerate_hzsec=sr_hzsec);
 
     #REV: combine this into single large params dict. These do not affect results very much
     params = params1 | params2;
@@ -94,22 +99,23 @@ def preproc_and_compute_events(df,
     params['startvel'] = 100;
 
     #REV: this recomputes "hidden" params which are per-sample (based on per-sec params passed by user).
-    params = rv.recompute_params(params);
+    params = pu.eyemovements.remodnav.recompute_params(params);
     
     #REV; sets 'blink' to True for NAN gaze samples, false otherwise.
-    if(blinkcol):
-        params['blinkcol'] = blinkcol;
-        df[ params[blinkcol] ] = df[xcol].isna();
+    
+    params['blinkcol'] = blinkcol;
+    if( nablinks ):
+        df[ params['blinkcol'] ] = df[xcol].isna();
         pass;
 
     #REV: this does NAN dilation etc.... it removes data, not just setting "bad" column or something? 
-    sdf = rv.remodnav_preprocess_eyetrace2d(eyesamps=df, params=params);
+    sdf = pu.eyemovements.remodnav.remodnav_preprocess_eyetrace2d(eyesamps=df, params=params);
 
 
 
     ################ SACCADE DETECTION #######################
     
-    sparams = saccr.default_saccadr_params();
+    sparams = pu.eyemovements.saccadr.default_saccadr_params();
     sparams['samplerate'] = sr_hzsec;
     sparams['noiseconst'] = 4; #REV: 4 works.
     sparams['ek_vel_thresh_lambda'] = 6; # 6 works
@@ -119,8 +125,8 @@ def preproc_and_compute_events(df,
     sparams['om_vel_peak_detect_shift_sec']=0.0075;
     sparams['om_usepca']=False;
     
-    sdf, sev = saccr.saccadr_detect_saccades(sdf, sparams, tsecname=tcol);
-    rdf, rev = rv.remodnav_classify_events(sdf, params);
+    sdf, sev = pu.eyemovements.saccadr.saccadr_detect_saccades(sdf, sparams, tsecname=tcol);
+    rdf, rev = pu.eyemovements.remodnav.remodnav_classify_events(sdf, params);
     
     ev=rev;
     
@@ -133,6 +139,9 @@ def preproc_and_compute_events(df,
     saccs = allsaccs.reset_index(drop=True);
     
     if(PLOT):
+        import matplotlib.pyplot as plt;
+        import seaborn as sns;
+        
         mainseq, mygraphics = pu.eyemovements.mainseq.mainseq_ampldur_linear_95pctl_human_chen2021_wplot( saccs['ampldva'],
                                                                                                           saccs['dursec'],
                                                                                                           error_gain=1.5,
@@ -206,7 +215,7 @@ def preproc_and_compute_events(df,
     saccblnks = ev[ (ev.label=='SACC') | (ev.label=='BLNK') | (ev.label=='SACCBLNK')];
     
     if(PLOT):
-        plt.close();
+        
         sns.histplot(data=saccblnks,
                      x='ampldva',
                      multiple='stack',
@@ -215,14 +224,13 @@ def preproc_and_compute_events(df,
         plt.tight_layout();
         plt.savefig('amplhist.pdf');
         plt.show();
-        plt.close();
         
         sns.histplot(isis['dursec'], binwidth=0.050, binrange=(0, 2) );
         plt.xlabel('ISI (sec)');
         plt.tight_layout();
         plt.savefig('isihist.pdf');
         plt.show();
-        plt.close();
+        
         
         
         sns.relplot( data=isis, x='stx', y='sty', kind='scatter', size='dursec' );
@@ -230,9 +238,7 @@ def preproc_and_compute_events(df,
         plt.tight_layout();
         plt.savefig('isiXYlocs.pdf');
         plt.show();
-        plt.close();
-
-
+        
         
         fig = plt.figure();
         for i, row in saccblnks.iterrows():
@@ -243,10 +249,9 @@ def preproc_and_compute_events(df,
         plt.tight_layout();
         plt.savefig('saccades.pdf');
         plt.show();
-        plt.close();
-        
+                
         for i,fig in enumerate(
-                pu.plotting.plot_gaze_chunks_wpupil( df=sdf, timestamp_col=tname, x_col=xcol, y_col=ycol, chunk_size_sec=10,
+                pu.plotting.plot_gaze_chunks_wpupil( df=sdf, timestamp_col=tcol, x_col=xcol, y_col=ycol, chunk_size_sec=10,
                                               events_df=ev, event_start_col='stsec', event_end_col='ensec',
                                               event_type_col='label', max_chunks_per_fig=4,
                                               pupil_col='DiameterPupilRightEye',
@@ -254,7 +259,7 @@ def preproc_and_compute_events(df,
         ):
             fig.savefig('testfig_{:04d}.pdf'.format(i));
             pass;
-        plt.close();
+        
         pass;
         
     return sdf, ev;

@@ -7,7 +7,7 @@ from scipy import ndimage;
 from pandas.api.types import is_numeric_dtype
 from pandas.api.types import is_string_dtype
 
-def select_legal_timepoints4(ts, vals, maxdt):
+def select_legal_timepoints4(ts, vals, maxdt, DEBUG=False):
     """
 
     Parameters
@@ -63,7 +63,9 @@ def select_legal_timepoints4(ts, vals, maxdt):
         keeps = diffs <= maxdt;
         passed = badt[np.where(keeps)];
         passed = np.unique(passed);
-        print('Kept {} passed badt out of orig {}'.format(len(passed), len(badt)));
+        if(DEBUG):
+            print('Kept {} passed badt out of orig {}'.format(len(passed), len(badt)));
+            pass;
         return goodt, passed;
     
     else:
@@ -71,7 +73,7 @@ def select_legal_timepoints4(ts, vals, maxdt):
         return list(), list();
     return;
 
-def strsafe_interpolate(df, tcol, method='linear', order=1):
+def strsafe_interpolate(df, tcol, method='linear', order=1,DEBUG=False):
     df = df.sort_values(by=tcol).reset_index(drop=True);
     
     interpcolumns = [ colname  for colname in df.columns if (True==is_numeric_dtype(df[colname])) ]
@@ -80,11 +82,15 @@ def strsafe_interpolate(df, tcol, method='linear', order=1):
     
     strdf = df[ notinterpcolumns ];
     strdf = strdf.ffill();
-    
-    print("WILL NOT INTERP", notinterpcolumns, strdf.dtypes);
+
+    if(DEBUG):
+        print("WILL NOT INTERP", notinterpcolumns, strdf.dtypes);
+        pass;
     
     tmpdf = df[ interpcolumns ];
-    print("WILL INTERP", interpcolumns, tmpdf.dtypes);
+    if(DEBUG):
+        print("WILL INTERP", interpcolumns, tmpdf.dtypes);
+        pass;
     
     tmpdf = tmpdf.set_index( tmpdf[tcol] );
     tmpdf = tmpdf.interpolate(method=method, order=order);
@@ -108,12 +114,14 @@ def refill_interpolate_NANs( df, maskdf, nontcol ):
         
     return df;
 
+
 def interpolate_df_to_samplerate(df, tcol, targ_srhzsec, tcolunit_s, truesrs=dict(),
                                  maxtdelta_s=None, maxtdeltas_s=dict(),
                                  startsec=None, endsec=None,
                                  method='polynomial', order=2,
                                  tsecname='Tsec', tsec0name='Tsec0',
                                  zeroTsec=None,
+                                 DEBUG=False,
                                  ):
     """
 
@@ -213,8 +221,10 @@ def interpolate_df_to_samplerate(df, tcol, targ_srhzsec, tcolunit_s, truesrs=dic
     if( endsec is not None ):
         en = ensec;
         pass;
-    
-    print("MAX T DELTAS of column [{}] (now in timeunit={} sec units) -- WILL LIN STEP ({}-{} @ {})".format(tcol, tcolunit_s, st, en, dt))
+
+    if(DEBUG):
+        print("MAX T DELTAS of column [{}] (now in timeunit={} sec units) -- WILL LIN STEP ({}-{} @ {})".format(tcol, tcolunit_s, st, en, dt))
+        pass;
     
     if( ((en-st)/dt) > 1e9 ):
         raise Exception("you are attempting to create more than 1 billion time points at once...probably you will run out of memory");
@@ -286,8 +296,10 @@ def interpolate_df_to_samplerate(df, tcol, targ_srhzsec, tcolunit_s, truesrs=dic
     for c in unaccounted:
         finalgrps.append([c]);
         pass;
-    
-    print("Groups of similar columns: ", finalgrps);
+
+    if(DEBUG):
+        print("Groups of similar columns: ", finalgrps);
+        pass;
         
     for g in finalgrps:
         dtgrps = [maxtdeltas_s[c] for c in g];
@@ -303,8 +315,12 @@ def interpolate_df_to_samplerate(df, tcol, targ_srhzsec, tcolunit_s, truesrs=dic
             c = mydtgrp[0];
             if( c == tcol ):
                 raise Exception("WTF, c is the tcol even though it should not be?");
-            print("For [{}] maxdt is [{}]".format(c, maxdt));
-            good, bad = select_legal_timepoints4(mdf[tcol], mdf[c], maxdt);
+
+            if(DEBUG):
+                print("For [{}] maxdt is [{}]".format(c, maxdt));
+                pass;
+            
+            good, bad = select_legal_timepoints4(mdf[tcol], mdf[c], maxdt, DEBUG=DEBUG);
             goodbad = np.concatenate([good, bad]);
             maskdf[c] = False;
             for c in mydtgrp:
@@ -326,7 +342,7 @@ def interpolate_df_to_samplerate(df, tcol, targ_srhzsec, tcolunit_s, truesrs=dic
         raise Exception("Tcol is not unique (you need to have unique times, suggest groupby(tcol).mean() for example)!");
     
     ## REV: handle string columns existing...?
-    mdf = strsafe_interpolate( mdf, tcol=tcol, method=method, order=order );
+    mdf = strsafe_interpolate( mdf, tcol=tcol, method=method, order=order, DEBUG=DEBUG );
 
     #REV: and replace NAN in locations of missing data (interpolate
     ## will have filled all holes, no matter how far from "good" data)
@@ -348,7 +364,9 @@ def interpolate_df_to_samplerate(df, tcol, targ_srhzsec, tcolunit_s, truesrs=dic
         tsec0=tsec - tsec.min();
         pass;
     else:
-        print("Setting Tsec0 zero time to Tsec={} (to e.g. align with other sensor source such as video)".format(zeroTsec));
+        if(DEBUG):
+            print("Setting Tsec0 zero time to Tsec={} (to e.g. align with other sensor source such as video)".format(zeroTsec));
+            pass;
         tsec0=tsec - zeroTsec;
         pass;
 
