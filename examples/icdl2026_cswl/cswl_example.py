@@ -39,7 +39,7 @@ targ_sr_hzsec=1000;
 interptype='polynomial';
 interporder=1;
 
-min_sacc_dva = 0.50;
+min_sacc_dva = 0.33;
 min_isi_sec = 0.040;
 ##############################
 
@@ -334,8 +334,8 @@ params = params1 | params2;
 
 params['noiseconst'] = 8;
 params['dilate_nan_win_sec'] = 0.010;
-params['min_sac_dur_sec'] = 0.010;
-params['min_intersac_dur_sec'] = 0.020;
+params['min_sac_dur_sec'] = 0.014;
+params['min_intersac_dur_sec'] = 0.100;
 params['minblinksec'] = 0.030;
 params['startvel'] = 100;
 
@@ -374,22 +374,22 @@ sparams['om_vel_peak_detect_shift_sec']=0.0075;
 sparams['om_usepca']=False;
 
 print("Doing SACCR");
-#sdf, sev = saccr.saccadr_detect_saccades(sdf, sparams, tsecname=tname);
+sdf, sev = saccr.saccadr_detect_saccades(sdf, sparams, tsecname=tname);
 
 
 #REV: OK, ek is a problem...it detects "long" saccades...(if vel moves)
 #sdf1, sev1 = saccr.saccadr_detect_saccades(sdf, sparams, tsecname=tname, namedmethods=('ek',));
 #sdf2, sev2 = saccr.saccadr_detect_saccades(sdf, sparams, tsecname=tname, namedmethods=('om',));
-sdf3, sev3 = saccr.saccadr_detect_saccades(sdf, sparams, tsecname=tname, namedmethods=('nh',));
+#sdf3, sev3 = saccr.saccadr_detect_saccades(sdf, sparams, tsecname=tname, namedmethods=('nh',));
 
 
 #REV: make it select "most strict" among overlapping saccades.
 #REV: filter 
 
-sev = pd.concat( [#sev1,
-                  #sev2,
-                  sev3,
-                  ] );
+#sev = pd.concat( [#sev1,
+#                  sev2,
+                  #sev3,
+#                  ] );
 
 print("Doing REMODNAV");
 rdf, rev = rv.remodnav_classify_events(sdf, params);
@@ -399,9 +399,9 @@ rdf, rev = rv.remodnav_classify_events(sdf, params);
 #allsaccs = sev[ sev.label=='SACC'];
 
 #ev=sev;
-ev=rev;
+ev=sev;
 
-allsaccs = pd.concat( [ #sev[sev['label']=='SACC' ],
+allsaccs = pd.concat( [ sev[sev['label']=='SACC' ],
                         rev[rev['label']=='SACC' ],
                        ]
                       );
@@ -433,12 +433,13 @@ else:
     pass;
 
 saccs['ismain'] = mainseq; #Any way to always just make it give me first?
-#saccs = saccs[ (saccs.ismain==True) ].reset_index(drop=True);
+saccs = saccs[ (saccs.ismain==True) ].reset_index(drop=True); #REV: main seq, very small ones would be bad too?
 
+saccs = saccs[ saccs['ampldva'] > min_sacc_dva ];
 
 
 #REV: remove "impossible" ones before that.
-saccs2 = pu.eyemovements.combine.consolidate_saccades( saccs,
+saccs2 = pu.eyemovements.combine.intersection_saccades( saccs,
                                                        isi_threshold=0
                                                       );
 saccs['label'] = 'OSACC';
@@ -456,7 +457,7 @@ nonsaccs = rev[ ~(rev['label'] == 'SACC') ];
 print("NON-SACCS", nonsaccs['label']);
 
 
-#saccs = saccs[ saccs['ampldva'] > min_sacc_dva ];
+
 
 
 
@@ -496,32 +497,33 @@ if( PUPILSIZE_BLINKS ):
     pass;
 
 
-ISIevents=['SACC', 'BLNK']; #REV: i.e. use blinks as saccades (gaze shifts often happen during blinks...)
-isis = pu.eyemovements.isi.compute_ISIs_from_events( ev,
-                                                     zerotime=sdf[tname].iloc[0], #REV: or .min()
-                                                     eventstouse=ISIevents,
-                                                     #stname='stsec', enname='ensec', durname='dursec', label='ISI' #defaults
-                                                    );
 
 
-#isis = isis[ isis['dursec'] > min_isi_sec ];
 
-ev = pd.concat([ev, isis]);
 ev = ev.sort_values(by='stsec').reset_index(drop=True);
 
 #REV: how am I plotting double labels?
 
 
 #print(ev['eye']);
-DOMERGE = False;
+DOMERGE = True;
 if(DOMERGE):
     ev = pu.eyemovements.isi.eye_event_merge( ev,
                                               eyecol='eye',
-                                              min_blink_dur=0.030,
-                                              max_blink_amp=0.5,
-                                              min_isi_dur=min_isi_sec,
+                                              min_isi_dur=0.060, #min_isi_sec,
                                              );
     pass;
+
+ISIevents=['SACC', 'BLNK']; #REV: i.e. use blinks as saccades (gaze shifts often happen during blinks...)
+isis = pu.eyemovements.isi.compute_ISIs_from_events( ev,
+                                                     zerotime=sdf[tname].iloc[0], #REV: or .min()
+                                                     eventstouse=ISIevents,
+                                                     #stname='stsec', enname='ensec', durname='dursec', label='ISI' #defaults
+                                                    );
+ev = pd.concat([ev, isis]);
+ev = ev.sort_values(by='stsec').reset_index(drop=True);
+#isis = isis[ isis['dursec'] > min_isi_sec ];
+
 
 
 isis = ev[ (ev['label']=='ISI') ];

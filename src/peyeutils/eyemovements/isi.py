@@ -69,8 +69,8 @@ def add_ISIs_to_events( ev,
 
 
 
-import pandas as pd
-import numpy as np
+
+
 
 
 
@@ -78,8 +78,6 @@ import numpy as np
 
 
 def eye_event_merge( df,
-                     min_blink_dur=0.060,
-                     max_blink_amp=0.33,
                      min_isi_dur=0.020,
                      eyecol='eye',
                      ):
@@ -90,17 +88,108 @@ def eye_event_merge( df,
 
     evlist=list();
     for eye, eyedf in df.groupby(eyecol, as_index=False):
-        ev2 = _eye_event_merge_final(eyedf,
-                                    min_blink_dur=min_blink_dur,
-                                    max_blink_amp=max_blink_amp,
-                                    min_isi_dur=min_isi_dur,
-                                    );
-        
+        #ev2 = _eye_event_merge_final(eyedf,
+        #                            min_blink_dur=min_blink_dur,
+        #                            max_blink_amp=max_blink_amp,
+        #                            min_isi_dur=min_isi_dur,
+        #                            );
+        ev2 = absorb_blink_artifacts(eyedf, margin_sec=min_isi_dur)
         ev2[eyecol] = eye;
         evlist.append(ev2);
         pass;
     ev = pd.concat(evlist).reset_index(drop=True);
     return ev;
+
+
+
+
+
+
+
+import pandas as pd
+import numpy as np
+
+def absorb_blink_artifacts(df, margin_sec=0.050):
+    """
+    Absorbs artifactual saccades surrounding a blink by creating a 'Blink Envelope'.
+    Preserves all metadata using the First-Row Copy pattern.
+    """
+    if df.empty: return df
+
+    # 1. Isolate the relevant events
+    # We ignore ISIs/Fixations so they don't accidentally get swallowed
+    mask = df['label'].str.upper().isin(['BLNK', 'SACC', 'SACBLNK'])
+    work_df = df[mask].copy()
+    others = df[~mask].copy()
+    
+    if work_df.empty: return df
+    work_df = work_df.sort_values('stsec').reset_index(drop=True)
+
+    # 2. Build the Envelope (Expand Blinks, keep Saccades normal)
+    work_df['match_start'] = np.where(
+        work_df['label'].str.upper() == 'BLNK', 
+        work_df['stsec'] - margin_sec, 
+        work_df['stsec']
+    )
+    
+    work_df['match_end'] = np.where(
+        work_df['label'].str.upper() == 'BLNK', 
+        work_df['ensec'] + margin_sec, 
+        work_df['ensec']
+    )
+
+    # 3. Grouping by Envelope Intersection
+    run_max = work_df['match_end'].cummax().shift(1)
+    work_df['group_id'] = ((run_max.isna()) | (work_df['match_start'] > run_max)).cumsum()
+
+    merged_list = []
+    
+    # 4. The Metadata-Safe Aggregator
+    for _, group in work_df.groupby('group_id'):
+        res = group.iloc[0].copy()
+        
+        if len(group) > 1:
+            # We ONLY update if a blink actually swallowed something
+            # Use actual times, not the artificial match envelope times
+            res['stsec'] = group['stsec'].min()
+            res['ensec'] = group['ensec'].max()
+            res['dursec'] = res['ensec'] - res['stsec']
+            
+            if 'stidx' in group.columns: res['stidx'] = group['stidx'].min()
+            if 'enidx' in group.columns: res['enidx'] = group['enidx'].max()
+            if 'idx' in group.columns: res['idx'] = group['stidx'].min()
+            
+            # Spatial Coordinates
+            stx, sty = group['stx'].iloc[0], group['sty'].iloc[0]
+            enx, eny = group['enx'].iloc[-1], group['eny'].iloc[-1]
+            res['stx'], res['sty'], res['enx'], res['eny'] = stx, sty, enx, eny
+            
+            # Geometry
+            res['dxdva'] = enx - stx
+            res['dydva'] = eny - sty
+            res['ampldva'] = np.sqrt(res['dxdva']**2 + res['dydva']**2)
+            res['angle'] = np.degrees(np.arctan2(res['dydva'], res['dxdva']))
+            
+            # Kinematics
+            res['pvel'] = group['pvel'].max()
+            res['avgvel'] = group['avgvel'].mean()
+            if 'medvel' in group.columns: res['medvel'] = group['medvel'].mean()
+
+            # Override: If this group swallowed anything, the whole thing is a Blink.
+            res['label'] = 'BLNK'
+
+        # Clean up temp columns
+        for col in ['group_id', 'match_start', 'match_end']:
+            if col in res.index: 
+                res = res.drop(col)
+            
+        merged_list.append(res)
+
+    # 5. Recombine
+    merged_df = pd.DataFrame(merged_list)
+    final_df = pd.concat([merged_df, others], ignore_index=True, join='outer')
+    
+    return final_df.sort_values('stsec').reset_index(drop=True)
 
 
 

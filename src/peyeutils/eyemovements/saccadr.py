@@ -794,13 +794,13 @@ def default_saccadr_params():
              om_usepca=True,
              #om_pca_var_thresh_degsec=0.05, #not used (currently)
              ek_vel_thresh_lambda=10, #6
-             ek_min_dur_sec=0.010,
+             ek_min_dur_sec=0.014,
              #ek_min_sep_sec=0.012, #REV: not currently used
              ek_vel_window_sec=0.024, #REV: 24 msec in original paper
              dilate_nan_win_sec=0, #0.015,
              min_blink_sec=0.010, #REV: only dilate nans longer
-             saccadr_min_sep_sec=0.040, #0.012,
-             saccadr_min_dur_sec=0.012,
+             saccadr_min_sep_sec=0.070, #0.012,
+             saccadr_min_dur_sec=0.014,
              blink_vel_thresh_degsec=2e3,
              noiseconst=6,
              );

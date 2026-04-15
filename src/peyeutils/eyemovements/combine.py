@@ -26,6 +26,36 @@ def consolidate_saccades(df,
     ev = pd.concat(eyelist).reset_index(drop=True);
     return ev;
     
+def intersection_saccades(df,
+                         eyecol='eye',
+                         isi_threshold=0.010,):
+    if( len((df['label'].unique() )) != 1 ):
+        raise Exception("consolidate_saccades, got more than 1 unique labels (should only have SACC) : {}".format(df['label'].unique()));
+    if( df['label'].unique()[0] != 'SACC' ):
+        raise Exception("Consolidate saccades, label is not SACC (should only have SACC) : {}".format(df['label'].unique()));
+    
+    if eyecol not in df.columns:
+        df[eyecol] = '';
+        print("consolidate saccades, adding eyecol {} to df as empty string".format(eyecol));
+        pass;
+    eyelist=list();
+    for eye, eyedf in df.groupby(eyecol, as_index=False):
+        #myev=_consolidate_saccades_slow(df=df, isi_threshold=isi_threshold);
+        myev= consolidate_saccades_strict(df=df);
+        myev[eyecol] = eye;
+        eyelist.append(myev);
+        pass;
+    
+    import pandas as pd;
+    ev = pd.concat(eyelist).reset_index(drop=True);
+    return ev;
+
+
+
+
+
+
+
 
 
 
@@ -153,6 +183,126 @@ def _consolidate_saccades_slow(df,
     final_df = pd.concat([merged_saccs, others], ignore_index=True)
     
     return final_df.sort_values('stsec').reset_index(drop=True)
+
+
+
+
+
+
+
+
+
+
+
+
+
+def consolidate_saccades_strict(df):
+    """
+    Consolidates overlapping saccades using Strict Consensus (Intersection).
+    If a large master saccade envelopes disjoint smaller ones, the master 
+    is dropped and the smaller disjoint saccades are preserved.
+    """
+    if df.empty: return df
+
+    # 1. Filter and Sort
+    is_sacc_mask = df['label'].str.upper().str.startswith('SACC').fillna(False)
+    sacc_df = df[is_sacc_mask].copy()
+    others = df[~is_sacc_mask].copy()
+    
+    if sacc_df.empty: return df
+    sacc_df = sacc_df.sort_values('stsec').reset_index(drop=True)
+
+    # 2. Strict Overlap Grouping (Must physically overlap)
+    running_max_end = sacc_df['ensec'].cummax().shift(1)
+    sacc_df['group_id'] = ((running_max_end.isna()) | (sacc_df['stsec'] >= running_max_end)).cumsum()
+
+    # --- 3. Recursive Resolution Logic ---
+    def resolve_overlap_group(sub_group):
+        # Base Case: Isolated saccade
+        if len(sub_group) == 1:
+            res = sub_group.iloc[0].copy()
+            return [res]
+
+        new_stsec = sub_group['stsec'].max() # Latest start
+        new_ensec = sub_group['ensec'].min() # Earliest end
+
+        # SUCCESS: All detections mutually overlap
+        if new_ensec > new_stsec:
+            res = sub_group.iloc[0].copy()
+            res['stsec'] = new_stsec
+            res['ensec'] = new_ensec
+            res['dursec'] = new_ensec - new_stsec
+            
+            # Bind Spatial Coordinates to the winning timestamps
+            row_max_st = sub_group.loc[sub_group['stsec'].idxmax()]
+            row_min_en = sub_group.loc[sub_group['ensec'].idxmin()]
+            
+            res['stx'], res['sty'] = row_max_st['stx'], row_max_st['sty']
+            res['enx'], res['eny'] = row_min_en['enx'], row_min_en['eny']
+            
+            if 'stidx' in sub_group.columns: res['stidx'] = row_max_st['stidx']
+            if 'enidx' in sub_group.columns: res['enidx'] = row_min_en['enidx']
+            
+            # Re-Compute Geometry
+            res['dxdva'] = res['enx'] - res['stx']
+            res['dydva'] = res['eny'] - res['sty']
+            res['ampldva'] = np.sqrt(res['dxdva']**2 + res['dydva']**2)
+            res['angle'] = np.degrees(np.arctan2(res['dydva'], res['dxdva']))
+            
+            # Kinematics
+            res['pvel'] = sub_group['pvel'].max()
+            res['avgvel'] = sub_group['avgvel'].mean()
+            if 'medvel' in sub_group.columns: res['medvel'] = sub_group['medvel'].mean()
+            
+            return [res]
+            
+        # CONFLICT: Empty Intersection (e.g., Master enveloping disjoint shorts)
+        else:
+            # Identify the longest saccade ("master") and drop it
+            idx_to_drop = (sub_group['ensec'] - sub_group['stsec']).idxmax()
+            remaining = sub_group.drop(index=idx_to_drop).copy()
+            remaining = remaining.sort_values('stsec').reset_index(drop=True)
+            
+            # Re-evaluate the remaining saccades to see if they form new disjoint groups
+            run_max = remaining['ensec'].cummax().shift(1)
+            remaining['sub_g'] = ((run_max.isna()) | (remaining['stsec'] >= run_max)).cumsum()
+            
+            # Recursively resolve the newly split groups
+            results = []
+            for _, sg in remaining.groupby('sub_g'):
+                results.extend(resolve_overlap_group(sg))
+            return results
+
+    # 4. Execute Resolution
+    merged_list = []
+    for _, group in sacc_df.groupby('group_id'):
+        resolved_rows = resolve_overlap_group(group)
+        for row in resolved_rows:
+            # Clean up temp identifiers
+            if 'group_id' in row.index: row = row.drop('group_id')
+            if 'sub_g' in row.index: row = row.drop('sub_g')
+            merged_list.append(row)
+
+    # 5. Recombine
+    merged_df = pd.DataFrame(merged_list)
+    final_df = pd.concat([merged_df, others], ignore_index=True, join='outer')
+    return final_df.sort_values('stsec').reset_index(drop=True)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 '''
 
