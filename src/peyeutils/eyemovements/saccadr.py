@@ -177,6 +177,8 @@ def sd_via_median_estimator(x):
 
 # Engbert and Kliegl (2003) \doi{10.1016/S0042-6989(03)00084-1}
 #REV: original method uses milliseconds (and degrees?)
+#REV: this is SIMPLE AND STUPID, just points over vel threshold, but
+# uses a normalized velocity based on stddev of vel.
 def method_ek(df, params, eyepfix=''):
     sr = params['samplerate'];
     
@@ -666,18 +668,24 @@ def method_nh(df, params, eyepfix):
 
 
     #REV: iterate
+    #REV: while newPT - pt > 1, i.e. we want error between mu (mean of points below thresh) + stdev(points below) * const
+    # and previous value.  Each time, we reduce the number of points (pt is getting larger?), we are iterating until error is
+    ## <= 1. It is mean of points below threshold (threshold is mean of points below + const*std of points below).
+    ## We mark as saccade any points that are good and have vel > threshold. So, we can make this thresh "lower" by reducing
+    # noise const?
     newPT = init_vel_thresh_degsec;
     pt = newPT*2;
+    noiseconst = params['noiseconst'];
     while( abs(newPT - pt) > 1 ):
         pt = newPT;
         ibelow = isgood & (vel<pt);
         mu = np.nanmean(vel[ibelow]);
         sig = np.nanstd(vel[ibelow]);
-        noiseconst = params['noiseconst'];
         newPT = mu + noiseconst * sig; #REV: noise
+        
         pass;
     
-    onset_thresh = mu + 3*sig;
+    onset_thresh = mu + 3*sig; #REV: only used later...
     
     issacc = isgood & (vel > pt);
     peaks = np.where(True == issacc)[0];
@@ -823,15 +831,33 @@ def filter_nans_beforeafter( votes, x ):
 #REV: sampdf is modified "in place"?
 
 #REV: this DOES modify the sample df...adding columns.
+#REV: hm, let user pass actual functions?
 def saccadr_detect_saccades( sampdf,
                              params,
                              tsecname, #='Tsec',
-                             methods=(method_ek, method_om, method_nh),
+                             namedmethods=('ek', 'om', 'nh'), #method_ek, method_om, method_nh),
+                             extramethods=list(),
                              velocity_function=diff_ek,
                              xname='xcdva',
                              yname='ycdva',
                              eyecol='eye',
                             ):
+
+    mymethods=list();
+    if('ek' in namedmethods):
+        mymethods.append(method_ek);
+        pass;
+    if('om' in namedmethods):
+        mymethods.append(method_om);
+        pass;
+    if('nh' in namedmethods):
+        mymethods.append(method_nh);
+        pass;
+
+    methods = mymethods + extramethods;
+    if( len(methods) < 1 ):
+        raise Exception("saccadr requires at least one method");
+    
     if eyecol not in sampdf.columns:
         print("Adding missing eyecol {} to samples df (all values empty string)...".format(eyecol));
         sampdf[eyecol]='';

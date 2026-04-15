@@ -334,7 +334,7 @@ params = params1 | params2;
 
 params['noiseconst'] = 8;
 params['dilate_nan_win_sec'] = 0.010;
-params['min_sac_dur_sec'] = 0.010;
+params['min_sac_dur_sec'] = 0.014;
 params['min_intersac_dur_sec'] = 0.020;
 params['minblinksec'] = 0.030;
 params['startvel'] = 100;
@@ -365,15 +365,28 @@ sdf = rv.remodnav_preprocess_eyetrace2d(eyesamps=df, params=params);
 
 sparams = saccr.default_saccadr_params();
 sparams['samplerate'] = 1000;
-sparams['noiseconst'] = 4; #REV: 4 works.
+sparams['noiseconst'] = 5; #REV: 4 works.
 sparams['ek_vel_thresh_lambda'] = 6; # 6 works
+sparams['nh_init_vel_thresh_degsec'] = 100;
 
 print("Doing SACCR");
-sdf, sev = saccr.saccadr_detect_saccades(sdf, sparams, tsecname=tname);
+#sdf, sev1 = saccr.saccadr_detect_saccades(sdf, sparams, tsecname=tname);
+
+sdf, sev1 = saccr.saccadr_detect_saccades(sdf, sparams, tsecname=tname, namedmethods=('ek',));
+
+#print("Doing SACCR");
+sdf2, sev2 = saccr.saccadr_detect_saccades(sdf, sparams, tsecname=tname, namedmethods='om,');
+
+print("Doing SACCR");
+sdf3, sev3 = saccr.saccadr_detect_saccades(sdf, sparams, tsecname=tname, namedmethods=('nh',));
 
 print("Doing REMODNAV");
 rdf, rev = rv.remodnav_classify_events(sdf, params);
 
+
+sev = pd.concat( [sev1,
+                  #sev2,
+                  sev3] );
 
 allsaccs = pd.concat( [ sev[sev['label']=='SACC' ],
                         rev[rev['label']=='SACC' ], ]
@@ -381,9 +394,13 @@ allsaccs = pd.concat( [ sev[sev['label']=='SACC' ],
 
 ev=rev;
 saccs = allsaccs.reset_index(drop=True);
-saccs = pu.eyemovements.combine.consolidate_saccades( saccs,
-                                                      isi_threshold=0
-                                                     );
+
+saccs2 = pu.eyemovements.combine.consolidate_saccades( saccs,
+                                                       isi_threshold=0
+                                                      );
+saccs2['label'] = 'CSACC';
+
+saccs = pd.concat([saccs, saccs2]).reset_index(drop=True);
 
 
 
@@ -418,8 +435,9 @@ else:
                                                                                          );
     pass;
 
+
 saccs['ismain'] = mainseq; #Any way to always just make it give me first?
-saccs = saccs[ (saccs.ismain==True) ].reset_index(drop=True);
+#saccs = saccs[ (saccs.ismain==True) ].reset_index(drop=True);
 
 
 if( 'eye' in ev.columns ):
