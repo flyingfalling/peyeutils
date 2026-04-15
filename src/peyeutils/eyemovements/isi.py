@@ -78,7 +78,7 @@ def add_ISIs_to_events( ev,
 
 
 def eye_event_merge( df,
-                     min_isi_dur=0.020,
+                     min_isi_dur=0.040,
                      eyecol='eye',
                      ):
     if( eyecol not in df.columns ):
@@ -93,7 +93,7 @@ def eye_event_merge( df,
         #                            max_blink_amp=max_blink_amp,
         #                            min_isi_dur=min_isi_dur,
         #                            );
-        ev2 = absorb_blink_artifacts(eyedf, margin_sec=min_isi_dur)
+        ev2 = absorb_blink_artifacts(eyedf, margin_sec=min_isi_dur); #REV: this could have been done by just expanding (dilating) nn
         ev2[eyecol] = eye;
         evlist.append(ev2);
         pass;

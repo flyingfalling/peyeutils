@@ -967,6 +967,81 @@ def dilate_xy_nans( df, params ):
     return df;
 
 
+def check_samplerate(df,
+                     tcol,
+                     ):
+    import pandas as pd;
+    import numpy as np;
+    
+    df = df.sort_values(by=tcol).reset_index(drop=True);
+    
+    sr = get_sample_rate(df[tcol]);
+    
+    return sr;
+    
+    
+
+def get_sample_rate(time_array, tolerance=1e-3):
+    """
+    Checks if a time array (in seconds) is sampled at a regular rate 
+    and returns the sample rate in Hz.
+
+    Args:
+        time_array (array-like): Time values in seconds (e.g., list, numpy array, pandas Series).
+        tolerance (float): The relative tolerance for floating-point precision differences. 
+                           Default is 1e-3 (0.1% deviation allowed).
+
+    Returns:
+        float: The regular sample rate in Hz.
+
+    Raises:
+        ValueError: If the array is irregular, not increasing, or too short.
+    """
+
+    import numpy as np
+    # Convert input to a numpy array for efficient vectorized operations
+    t = np.asarray(time_array)
+    
+    if len(t) < 2:
+        raise ValueError("Time array must contain at least two data points.")
+        
+    # Calculate the differences (delta t) between consecutive timestamps
+    dt_array = np.diff(t)
+    
+    # Use the median difference to establish the expected interval. 
+    # Median is used over mean to prevent a single missing sample from skewing the expected value.
+    expected_dt = np.median(dt_array)
+    
+    if expected_dt <= 0:
+        raise ValueError("Time array must be strictly increasing.")
+        
+    # Verify all differences are close to the expected difference
+    # atol (absolute tolerance) is set to 1 microsecond to handle very high sample rates
+    is_regular = np.all(np.isclose(dt_array, expected_dt, rtol=tolerance, atol=1e-6))
+    
+    if not is_regular:
+        raise ValueError("Time column is not sampled at a regular rate (contains missing samples or jitter).")
+        
+    # Calculate the sample rate
+    sample_rate = 1.0 / expected_dt
+    
+    # Return the rate, rounded to 2 decimal places to clean up floating point artifacts
+    return round(sample_rate, 2)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 #Assume aligned at beginning.
 def pearson_gaze_CC(x1, x2):
     n=len(x1);

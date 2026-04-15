@@ -14,6 +14,258 @@ import os;
 import pandas as pd;
 import numpy as np;
 
+
+#REV: remove 'weird' oscillations from data (e.g. 50 Hz etc. from fRMRI?). Do fourier, and filter out? However, what about 'direction'...?
+
+#REV: remove "unrealistic" periods of zero eye movements (i.e. nostril detected as pupil?).
+
+
+
+def prepare_data( df,
+                  tcol,
+                  targ_sr_hzsec,
+                  truesrs : dict, #REV: true samplerates of each sensor (column cluster).
+                  method='polynomial',
+                  order=2,
+                  tcolunit_s=1,
+                  startsec=None,
+                  endsec=None,
+                  ):
+    
+    
+    return;
+                  
+#REV: user must:
+
+## Rescale all time to seconds (and pass name of seconds time column)
+## Rescale all X/Y to dva (and pass name of columns, xname and yname?). Center irrelevant, but we want to keep correspondence...
+## Separate eyes (if they want) and pass "eye" column separately.
+## Specify pupil-size? Column... (and normalize to mean etc.).
+
+## Pass other params
+## badcol represents unreliable/missing data points (xcol, ycol should be set to NAN?)
+## blinkcol represents locations of known blinks?
+
+## REV: user must "upsample" their data first, and ensure "level" (label/id) columns are stored as "string" to avoid
+## imputation.
+
+def preproc_and_compute_events(df,
+                               tcol,
+                               xcol,
+                               ycol,
+                               sr_hzsec,
+                               badcol='',
+                               blinkcol='',
+                               eyecol='eye',
+                               PLOT=False,
+                               DEBUG=False,
+                               ):
+    min_sacc_dva = 0.33;
+    min_isi_sec = 0.040;
+    blinksacc_merge_envelop_sec=0.040;
+    
+    ##############################
+    xyunits_dva=1;
+
+    sr = pu.utils.tsutils.check_samplerate(df, tcol=tcol );
+
+    if( not np.isclose( sr, sr_hzsec ) ):
+        raise Exception("Samplerate not good, expected {}, got {}".format(sr_hzsec, sr));
+
+    ########### PREPROCESSING (smooth/savgol filter/median filter/dilate NANs  ################
+    params1 = rv.make_default_preproc_params(samplerate_hzsec=sr_hzsec,
+                                             timeunitsec=1,
+                                             dva_per_px=xyunits_dva,
+                                             xname=xcol,
+                                             yname=ycol,
+                                             tname=tcol);
+    
+    #REV: default other params for remodnav (will be ignored if not needed).
+    params2 = rv.make_default_params(samplerate_hzsec=sr_hzsec);
+
+    #REV: combine this into single large params dict. These do not affect results very much
+    params = params1 | params2;
+    
+    params['noiseconst'] = 8;
+    params['dilate_nan_win_sec'] = 0.010;
+    params['min_sac_dur_sec'] = 0.014;
+    params['min_intersac_dur_sec'] = 0.100;
+    params['minblinksec'] = 0.030;
+    params['startvel'] = 100;
+
+    #REV: this recomputes "hidden" params which are per-sample (based on per-sec params passed by user).
+    params = rv.recompute_params(params);
+    
+    #REV; sets 'blink' to True for NAN gaze samples, false otherwise.
+    if(blinkcol):
+        params['blinkcol'] = blinkcol;
+        df[ params[blinkcol] ] = df[xcol].isna();
+        pass;
+
+    #REV: this does NAN dilation etc.... it removes data, not just setting "bad" column or something? 
+    sdf = rv.remodnav_preprocess_eyetrace2d(eyesamps=df, params=params);
+
+
+
+    ################ SACCADE DETECTION #######################
+    
+    sparams = saccr.default_saccadr_params();
+    sparams['samplerate'] = sr_hzsec;
+    sparams['noiseconst'] = 4; #REV: 4 works.
+    sparams['ek_vel_thresh_lambda'] = 6; # 6 works
+    sparams['nh_init_vel_thresh_degsec'] = 100;
+    sparams['om_max_peaks_per_sec']=10;
+    sparams['om_vel_thresh_degsec']=25; #REV: was 3 or 5 wtf? #REV: won't work for saccade -> pursuit? REV: relative to "surround"?
+    sparams['om_vel_peak_detect_shift_sec']=0.0075;
+    sparams['om_usepca']=False;
+    
+    sdf, sev = saccr.saccadr_detect_saccades(sdf, sparams, tsecname=tcol);
+    rdf, rev = rv.remodnav_classify_events(sdf, params);
+    
+    ev=rev;
+    
+    allsaccs = pd.concat( [ sev[sev['label']=='SACC' ],
+                            rev[rev['label']=='SACC' ],
+                           ]
+                          );
+    
+    
+    saccs = allsaccs.reset_index(drop=True);
+    
+    if(PLOT):
+        mainseq, mygraphics = pu.eyemovements.mainseq.mainseq_ampldur_linear_95pctl_human_chen2021_wplot( saccs['ampldva'],
+                                                                                                          saccs['dursec'],
+                                                                                                          error_gain=1.5,
+                                                                                                         );
+        xmin=0;
+        xmax=25;
+        mygraphics.ax.set_xlim([xmin, xmax]);
+        mygraphics.savefig('mainseq.pdf');
+        plt.show();
+        pass;
+    else:
+        mainseq = pu.eyemovements.mainseq.mainseq_ampldur_linear_95pctl_human_chen2021_wplot( saccs['ampldva'],
+                                                                                              saccs['dursec'],
+                                                                                              error_gain=1.5,
+                                                                                             );
+        pass;
+
+    
+    saccs['ismain'] = mainseq; #Any way to always just make it give me first?
+    saccs = saccs[ (saccs.ismain==True) ].reset_index(drop=True); #REV: main seq, very small ones would be bad too?
+
+    saccs = saccs[ saccs['ampldva'] > min_sacc_dva ];
+
+
+    #REV: remove "impossible" ones before that.
+    saccs = pu.eyemovements.combine.intersection_saccades( saccs,
+                                                           isi_threshold=0
+                                                          );
+    if(DEBUG):
+        saccs['label'] = 'OSACC';
+        saccs2['label'] = 'SACC';
+        saccs = pd.concat([saccs, saccs2]).reset_index(drop=True);
+        pass;
+    
+    nonsaccs = rev[ ~(rev['label'] == 'SACC') ];
+    
+    blinks = pu.eyemovements.blink.compute_blinks_from_sampcol( sdf,
+                                                                dva_per_px=params['dva_per_px'],
+                                                                badcol=params['blinkcol'],
+                                                                tcol=tcol,
+                                                                xcol=xcol,
+                                                                ycol=ycol )
+    
+    #REV: should I remove blinks in which eye did not move much (< 0.5 deg ?). I.e. fixation with intermediate lbink?
+    # Vision is not happening during that time and physiologically it is equivalent...and then ISI is?
+    
+    ev = pd.concat( [saccs,
+                     blinks,
+                     nonsaccs, #REV: this is currently just PISI (original ISI from saccade detection...). In other cases
+                     # there may also be e.g. drifts/smooth pursuits, etc.?
+                     ] ).reset_index(drop=True);
+
+    ev = ev.sort_values(by='stsec').reset_index(drop=True);
+    
+    ev = pu.eyemovements.isi.eye_event_merge( ev,
+                                              eyecol=eyecol,
+                                              min_isi_dur=blinksacc_merge_envelop_sec,
+                                             );
+    
+    ISIevents=['SACC', 'BLNK']; #REV: i.e. use blinks as saccades (gaze shifts often happen during blinks...)
+    isis = pu.eyemovements.isi.compute_ISIs_from_events( ev,
+                                                         zerotime=sdf[tcol].iloc[0], #REV: or .min()
+                                                         eventstouse=ISIevents,
+                                                        );
+    ev = pd.concat([ev, isis]);
+    ev = ev.sort_values(by='stsec').reset_index(drop=True);
+    #isis = isis[ isis['dursec'] > min_isi_sec ];
+    
+    isis = ev[ (ev['label']=='ISI') ];
+    
+    saccblnks = ev[ (ev.label=='SACC') | (ev.label=='BLNK') | (ev.label=='SACCBLNK')];
+    
+    if(PLOT):
+        plt.close();
+        sns.histplot(data=saccblnks,
+                     x='ampldva',
+                     multiple='stack',
+                     binwidth=0.5, binrange=(0, 30), hue='label' );
+        plt.xlabel('Sacc Ampl (deg)');
+        plt.tight_layout();
+        plt.savefig('amplhist.pdf');
+        plt.show();
+        plt.close();
+        
+        sns.histplot(isis['dursec'], binwidth=0.050, binrange=(0, 2) );
+        plt.xlabel('ISI (sec)');
+        plt.tight_layout();
+        plt.savefig('isihist.pdf');
+        plt.show();
+        plt.close();
+        
+        
+        sns.relplot( data=isis, x='stx', y='sty', kind='scatter', size='dursec' );
+        plt.title("Gaze during ISI (blinks/saccades removed)");
+        plt.tight_layout();
+        plt.savefig('isiXYlocs.pdf');
+        plt.show();
+        plt.close();
+
+
+        
+        fig = plt.figure();
+        for i, row in saccblnks.iterrows():
+            plt.plot( [row['stx'], row['enx']], [row['sty'], row['eny'] ] );
+            pass;
+        plt.xlabel("X (dva)");
+        plt.ylabel("Y (dva)");
+        plt.tight_layout();
+        plt.savefig('saccades.pdf');
+        plt.show();
+        plt.close();
+        
+        for i,fig in enumerate(
+                pu.plotting.plot_gaze_chunks_wpupil( df=sdf, timestamp_col=tname, x_col=xcol, y_col=ycol, chunk_size_sec=10,
+                                              events_df=ev, event_start_col='stsec', event_end_col='ensec',
+                                              event_type_col='label', max_chunks_per_fig=4,
+                                              pupil_col='DiameterPupilRightEye',
+                                              )
+        ):
+            fig.savefig('testfig_{:04d}.pdf'.format(i));
+            pass;
+        plt.close();
+        pass;
+        
+    return sdf, ev;
+
+
+
+
+
+
+
+
 def preproc_peyefv_edf( in_edf_path : str,
                         out_csv_path : str = None,
                        ):

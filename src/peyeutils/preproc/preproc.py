@@ -887,6 +887,10 @@ def extract_regex_parts(text: str, pattern: str, casesensitive: bool = False):
     return uncap, cap
 
 
+
+
+
+
 def separate_eyes(df: pd.DataFrame, 
                   regexes: list, 
                   eyecol: str = 'eye', 

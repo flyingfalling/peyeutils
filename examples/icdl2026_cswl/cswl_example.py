@@ -15,6 +15,8 @@ from pandas.api.types import is_numeric_dtype
 from pandas.api.types import is_string_dtype
 
 
+DEBUG=False;
+
 ## REV: fixed parameters (provided by user, about e.g. physical
 ## dimensions of setup in this case).
 whratio = 4/3;
@@ -37,7 +39,7 @@ tobiisr=50; #REV; estimated?
 targ_sr_hzsec=1000;
 
 interptype='polynomial';
-interporder=1;
+interporder=2;
 
 min_sacc_dva = 0.33;
 min_isi_sec = 0.040;
@@ -229,7 +231,7 @@ df.loc[ ((df.xcdva < -maxdva) | (df.ycdva < -maxdva) | (df.xcdva > maxdva) | (df
 
 
 
-PUPILSIZE_BLINKS=True;
+PUPILSIZE_BLINKS=False;
 if(PUPILSIZE_BLINKS):
 
     #REV: separate data into left/right eye samples in "long" format.
@@ -287,7 +289,7 @@ if(PUPILSIZE_BLINKS):
 
     #REV: label them
     pblinks['label'] = 'PBLNK';
-
+    
     #REV: just take left as example?
     pblinks = pblinks[pblinks['eye']=='Left'];
     pass;
@@ -306,9 +308,14 @@ if( NAN_OUTSIDE ):
     pass;
 
 
-
-
-
+sdf, ev = pu.peyeutils.preproc_and_compute_events( df=df,
+                                                   tcol=tname,
+                                                   xcol=xcol,
+                                                   ycol=ycol,
+                                                   sr_hzsec=targ_sr_hzsec,
+                                                   PLOT=True,
+                                                  );
+'''
 
 
 
@@ -399,7 +406,7 @@ rdf, rev = rv.remodnav_classify_events(sdf, params);
 #allsaccs = sev[ sev.label=='SACC'];
 
 #ev=sev;
-ev=sev;
+ev=rev;
 
 allsaccs = pd.concat( [ sev[sev['label']=='SACC' ],
                         rev[rev['label']=='SACC' ],
@@ -439,14 +446,14 @@ saccs = saccs[ saccs['ampldva'] > min_sacc_dva ];
 
 
 #REV: remove "impossible" ones before that.
-saccs2 = pu.eyemovements.combine.intersection_saccades( saccs,
+saccs = pu.eyemovements.combine.intersection_saccades( saccs,
                                                        isi_threshold=0
                                                       );
-saccs['label'] = 'OSACC';
-saccs2['label'] = 'SACC';
-
-saccs = pd.concat([saccs, saccs2]).reset_index(drop=True);
-
+if(DEBUG):
+    saccs['label'] = 'OSACC';
+    saccs2['label'] = 'SACC';
+    saccs = pd.concat([saccs, saccs2]).reset_index(drop=True);
+    pass;
 
 
 print(ev);
@@ -487,7 +494,7 @@ print(saccs.columns);
 
 ev = pd.concat( [saccs,
                  blinks,
-                 #nonsaccs, #REV: this is currently just PISI (original ISI from saccade detection...). In other cases
+                 nonsaccs, #REV: this is currently just PISI (original ISI from saccade detection...). In other cases
                  # there may also be e.g. drifts/smooth pursuits, etc.?
                  ] ).reset_index(drop=True);
 
@@ -510,7 +517,7 @@ DOMERGE = True;
 if(DOMERGE):
     ev = pu.eyemovements.isi.eye_event_merge( ev,
                                               eyecol='eye',
-                                              min_isi_dur=0.060, #min_isi_sec,
+                                              min_isi_dur=0.040, #min_isi_sec,
                                              );
     pass;
 
@@ -586,9 +593,23 @@ if(PLOT):
         fig.savefig('testfig_{:04d}.pdf'.format(i));
         pass;
     pass;
+'''
+
+
 
 ev.to_csv('events.csv', index=False);
 print(ev);
+
+
+#REV: TODO:
+
+## 1) impute missing values after removing due to e.g. impossibly high accelerations/velocities?
+## 2) use "other" blink detection algorithm, e.g. pupil size, but need to separate out "true blinks" from "saccades".
+##    -> Note, "true blink" will always result in total loss of pupil?!?!
+
+## Fuck, label PSO (post-saccadic oscillatoin...)
+
+## REV: note they used 'within 2deg' for blincade...
 
 
 exit(0);

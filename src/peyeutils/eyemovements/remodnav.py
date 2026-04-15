@@ -133,7 +133,7 @@ def find_psoend( velocities, sac_velthresh, sac_peak_velthresh ):
     #REV: this is finding very high peaks of saccades
     pso_peaks = find_peaks(velocities, sac_peak_velthresh)
 
-    ## "high" peak saccade onsets?
+    ## "high" peak saccade onsets?, REV: post-saccadic oscillation?
     if pso_peaks:
         pso_label = 'HPSO';
         pass;
