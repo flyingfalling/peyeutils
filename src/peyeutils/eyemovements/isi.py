@@ -74,6 +74,9 @@ import numpy as np
 
 
 
+
+
+
 def eye_event_merge( df,
                      min_blink_dur=0.060,
                      max_blink_amp=0.33,

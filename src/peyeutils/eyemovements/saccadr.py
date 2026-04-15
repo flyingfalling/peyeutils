@@ -169,9 +169,7 @@ def sd_via_median_estimator(x):
         sd = np.sqrt( np.nanmean(x**2) - np.nanmean(x)**2 );
         pass;
     if( sd < SMALL_EPSIL ):
-        print("ERROR, median too small...");
-        exit(1);
-        pass;
+        raise Exception("ERROR, median too small...");
     
     return sd;
 
@@ -181,7 +179,6 @@ def sd_via_median_estimator(x):
 # uses a normalized velocity based on stddev of vel.
 def method_ek(df, params, eyepfix=''):
     sr = params['samplerate'];
-    
     #velth_degsec = params['ek_vel_thresh_degsec']; 
         
     #REV: they use "6". Then, they multiply vel_thresh times sigma_xy
@@ -209,7 +206,7 @@ def method_ek(df, params, eyepfix=''):
     
     xvel = df[eyepfix+'xvel'];
     yvel = df[eyepfix+'yvel'];
-
+    
     sd_x = sd_funct( xvel );
     sd_y = sd_funct( yvel );
     
@@ -250,11 +247,14 @@ def method_om_adaptive(df, params, eyepfix):
 
 
 def method_om(df, params, eyepfix,
-              tsecname='Tsec'):
+              tsecname='Tsec',
+              ):
     min_inter_peak_sec = params['om_min_inter_peak_sec'];
     max_peaks_per_sec = params['om_max_peaks_per_sec'];
     vel_thresh_degsec = params['om_vel_thresh_degsec']; #REV: slow microsaccs with noisy system (zuber 1965)
     peak_detect_shift_sec = params['om_vel_peak_detect_shift_sec'];
+    usepca=params['om_usepca'];
+    
     sr = params['samplerate'];
     peak_detect_shift_samp = int( peak_detect_shift_sec * sr );
     #pca_var_thresh_degsec = params['om_pca_var_thresh_degsec']; #REV: not used now (would normally only used PCA components > this thresh of
@@ -561,9 +561,15 @@ def method_om(df, params, eyepfix,
     bestgrp = sdf.groupby(['grpidx'], as_index=False).agg(safe_agg(sdf,'mean')).reset_index(drop=True).sort_values(by='zlogpvel', ascending=False).iloc[0].grpidx;
     
     #REV: drop saccades outside of that group (only keep saccades/peaks which were classified in that group during clustering).
-    sdf = sdf[ sdf.grpidx==bestgrp ];
-    after=len(sdf.index);
-    print("Dropped {}->{} saccades".format(before,after));
+    if(usepca):
+        sdf = sdf[ sdf.grpidx==bestgrp ];
+        after=len(sdf.index);
+        print("Dropped {}->{} saccades based on PCA zlogpvel".format(before,after));
+        pass;
+    else:
+        pass;
+    
+    
 
     print(sdf);
     
@@ -782,12 +788,13 @@ def default_saccadr_params():
              nh_savgol_order=0, #2, #not used unless diff_nh
              nh_savgol_window_sec=0, #0.019, # not used unless diff_nh
              om_min_inter_peak_sec=0.030,
-             om_max_peaks_per_sec=5,
-             om_vel_thresh_degsec=5, #REV: was 3 wtf?
+             om_max_peaks_per_sec=10,
+             om_vel_thresh_degsec=20, #REV: was 3 or 5 wtf?
              om_vel_peak_detect_shift_sec=0.0075,
+             om_usepca=True,
              #om_pca_var_thresh_degsec=0.05, #not used (currently)
-             ek_vel_thresh_lambda=6, #6
-             ek_min_dur_sec=0.012,
+             ek_vel_thresh_lambda=10, #6
+             ek_min_dur_sec=0.010,
              #ek_min_sep_sec=0.012, #REV: not currently used
              ek_vel_window_sec=0.024, #REV: 24 msec in original paper
              dilate_nan_win_sec=0, #0.015,
@@ -835,7 +842,7 @@ def filter_nans_beforeafter( votes, x ):
 def saccadr_detect_saccades( sampdf,
                              params,
                              tsecname, #='Tsec',
-                             namedmethods=('ek', 'om', 'nh'), #method_ek, method_om, method_nh),
+                             namedmethods=('ek', 'om', 'nh'), #method_ek, method_om, method_nh), #REV: method_om is too forgiving?
                              extramethods=list(),
                              velocity_function=diff_ek,
                              xname='xcdva',

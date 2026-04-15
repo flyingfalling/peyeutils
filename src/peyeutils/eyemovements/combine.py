@@ -5,13 +5,19 @@ import numpy as np
 def consolidate_saccades(df,
                          eyecol='eye',
                          isi_threshold=0.010,):
+    if( len((df['label'].unique() )) != 1 ):
+        raise Exception("consolidate_saccades, got more than 1 unique labels (should only have SACC) : {}".format(df['label'].unique()));
+    if( df['label'].unique()[0] != 'SACC' ):
+        raise Exception("Consolidate saccades, label is not SACC (should only have SACC) : {}".format(df['label'].unique()));
+    
     if eyecol not in df.columns:
         df[eyecol] = '';
         print("consolidate saccades, adding eyecol {} to df as empty string".format(eyecol));
         pass;
     eyelist=list();
     for eye, eyedf in df.groupby(eyecol, as_index=False):
-        myev=_consolidate_saccades_slow(df=df, isi_threshold=isi_threshold);
+        #myev=_consolidate_saccades_slow(df=df, isi_threshold=isi_threshold);
+        myev= consolidate_consensus_saccades(df=df, isi_threshold=isi_threshold);
         myev[eyecol] = eye;
         eyelist.append(myev);
         pass;
@@ -20,6 +26,82 @@ def consolidate_saccades(df,
     ev = pd.concat(eyelist).reset_index(drop=True);
     return ev;
     
+
+
+
+
+def consolidate_consensus_saccades(df, isi_threshold=0.0, group_cols=None):
+    """
+    Consolidates saccades into a single consensus envelope.
+    Explicitly handles gaps and overlapping detections.
+    """
+    if df.empty:
+        return df
+
+    # 1. Sort by Group and Time
+    sort_order = (group_cols if group_cols else []) + ['stsec']
+    df = df.sort_values(sort_order).reset_index(drop=True)
+
+    def process_group(group):
+        if len(group) == 0:
+            return pd.DataFrame()
+        
+        # Sort internal to group just in case
+        group = group.sort_values('stsec')
+        
+        merged = []
+        # Initialize current consensus with the first row
+        curr = group.iloc[0].to_dict()
+        
+        for i in range(1, len(group)):
+            nxt = group.iloc[i]
+            
+            # CONSENSUS LOGIC: Does the next detection overlap with 
+            # our current consensus (plus the allowed gap)?
+            if nxt['stsec'] <= (curr['ensec'] + isi_threshold):
+                # We merge: Expand the end time to the maximum seen so far
+                if nxt['ensec'] > curr['ensec']:
+                    curr['ensec'] = nxt['ensec']
+                    curr['enx'] = nxt['enx'] # Update end coords to latest
+                    curr['eny'] = nxt['eny']
+                
+                # Take the highest peak velocity recorded in this window
+                if 'pvel' in nxt:
+                    curr['pvel'] = max(curr.get('pvel', 0), nxt['pvel'])
+            else:
+                # We hit a gap: Push the consensus and start a new one
+                merged.append(curr)
+                curr = nxt.to_dict()
+        
+        # Don't forget the last one (prevents dropping the final saccade!)
+        merged.append(curr)
+        return pd.DataFrame(merged)
+
+    # 2. Apply the greedy logic per eye/trial
+    if group_cols:
+        consensus = df.groupby(group_cols, group_keys=False).apply(process_group).reset_index(drop=True)
+    else:
+        consensus = process_group(df)
+
+    # 3. RECALCULATION STEP
+    # This fixes the "frankensaccade" metrics using the new consensus timestamps/coords
+    consensus['dursec'] = consensus['ensec'] - consensus['stsec']
+    
+    # Calculate Amplitude (Euclidean distance)
+    # $$Amplitude = \sqrt{(enx - stx)^2 + (eny - sty)^2}$$
+    dx = consensus['enx'] - consensus['stx']
+    dy = consensus['eny'] - consensus['sty']
+    consensus['ampldva'] = np.sqrt(dx**2 + dy**2)
+    
+    # Calculate Average Velocity
+    # $$AvgVel = \frac{Amplitude}{Duration}$$
+    consensus['avgvel'] = np.where(
+        consensus['dursec'] > 0, 
+        consensus['ampldva'] / consensus['dursec'], 
+        0
+    )
+
+    return consensus
 
 
 
@@ -71,8 +153,6 @@ def _consolidate_saccades_slow(df,
     final_df = pd.concat([merged_saccs, others], ignore_index=True)
     
     return final_df.sort_values('stsec').reset_index(drop=True)
-
-
 
 '''
 
