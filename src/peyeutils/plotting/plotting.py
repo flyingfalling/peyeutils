@@ -313,13 +313,14 @@ def plot_gaze_chunks(
 
 
 
-def plot_gaze_chunks(
+def plot_gaze_chunks_wpupil(
     df, timestamp_col, x_col, y_col, chunk_size_sec=10,
     pupil_col=None, eye_col=None, eyes_to_plot=None,
     events_df=None, event_start_col=None, event_end_col=None, event_type_col=None,
     stimulus_df=None, stim_start_col=None, stim_end_col=None, stim_name_col=None,
     max_points_per_sec=None,
-    max_chunks_per_fig=10
+    max_chunks_per_fig=10,
+    highlight_saccs=True,
 ):
     import pandas as pd
     import numpy as np
@@ -433,10 +434,16 @@ def plot_gaze_chunks(
             if has_events:
                 rel_ev = events_df[(events_df[event_start_col] < t1) & (events_df[event_end_col] > t0)]
                 for idx, ev in rel_ev.iterrows():
+                    
                     etype = ev[event_type_col]
                     y_pos = event_types.index(etype)
                     ec = ev_colors.get(etype, 'black')
                     es, ee = max(ev[event_start_col], t0), min(ev[event_end_col], t1)
+                    
+                    if( highlight_saccs and ev['label']=='SACC' ):
+                        ax.axvspan(es, ee, color='grey', alpha=0.1, zorder=0); #REV: sacc
+                        pass;
+                    
                     ev_ax.hlines(y_pos, es, ee, color=ec, linewidth=10)
                     ev_ax.text((es+ee)/2, y_pos, str(idx), color='white', ha='center', va='center', fontsize=8)
                 

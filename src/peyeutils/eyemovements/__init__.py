@@ -4,3 +4,4 @@ import peyeutils.eyemovements.saccadr;
 import peyeutils.eyemovements.mainseq;
 import peyeutils.eyemovements.blink;
 import peyeutils.eyemovements.isi;
+import peyeutils.eyemovements.combine;

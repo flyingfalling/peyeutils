@@ -39,8 +39,8 @@ targ_sr_hzsec=1000;
 interptype='polynomial';
 interporder=1;
 
-min_sacc_dva = 0.33;
-min_isi_sec = 0.060;
+min_sacc_dva = 0.50;
+min_isi_sec = 0.040;
 ##############################
 
 
@@ -229,7 +229,7 @@ df.loc[ ((df.xcdva < -maxdva) | (df.ycdva < -maxdva) | (df.xcdva > maxdva) | (df
 
 
 
-PUPILSIZE_BLINKS=False;
+PUPILSIZE_BLINKS=True;
 if(PUPILSIZE_BLINKS):
 
     #REV: separate data into left/right eye samples in "long" format.
@@ -261,6 +261,12 @@ if(PUPILSIZE_BLINKS):
                                                    valcol='XGazePos', #REV: is pupil area NAN when no eye tracking?
                                                    badcol='ppbad',
                                                    pacol='DiameterPupil',
+                                                   blinkremoval_MAD_mult=8,
+                                                   blinkremoval_med_mult=1,
+                                                   blinkremoval_dilate_win_sec=0.030,
+                                                   blinkremoval_orphan_upperlimit_sec=0.020,
+                                                   blinkremoval_orphan_bracket_min_sec=0.040,
+                                                   blinkremoval_shortblink_minsize=0.070,
                                                    #patdiffcol='pa_abs_tdiff',
                                                    preblinkcols=[] );
     
@@ -328,10 +334,10 @@ params = params1 | params2;
 
 params['noiseconst'] = 8;
 params['dilate_nan_win_sec'] = 0.010;
-params['min_sac_dur_sec'] = 0.012;
+params['min_sac_dur_sec'] = 0.010;
 params['min_intersac_dur_sec'] = 0.020;
 params['minblinksec'] = 0.030;
-params['startvel'] = 120;
+params['startvel'] = 100;
 
 #REV: this recomputes "hidden" params which are per-sample (based on per-sec params passed by user).
 params = rv.recompute_params(params);
@@ -354,23 +360,42 @@ sdf = rv.remodnav_preprocess_eyetrace2d(eyesamps=df, params=params);
     
 
 
-#REV: params for saccadr. Also does not affect number of saccades etc. THAT much..
+
+#METHOD='saccadr'; #'remodnav';
+
 sparams = saccr.default_saccadr_params();
 sparams['samplerate'] = 1000;
 sparams['noiseconst'] = 4; #REV: 4 works.
-sparams['ek_vel_thresh_lambda'] = 6;
+sparams['ek_vel_thresh_lambda'] = 6; # 6 works
 
-sdf, ev = saccr.saccadr_sacc(sdf, sparams, tsecname=tname);
+print("Doing SACCR");
+sdf, sev = saccr.saccadr_detect_saccades(sdf, sparams, tsecname=tname);
+
+print("Doing REMODNAV");
+rdf, rev = rv.remodnav_classify_events(sdf, params);
+
+
+allsaccs = pd.concat( [ sev[sev['label']=='SACC' ],
+                        rev[rev['label']=='SACC' ], ]
+                      );
+
+ev=rev;
+saccs = allsaccs.reset_index(drop=True);
+saccs = pu.eyemovements.combine.consolidate_saccades( saccs,
+                                                      isi_threshold=0
+                                                     );
+
+
 
 print(ev);
-print("FIRST EVENT COLUMNS: ", ev.columns);
+print("FIRST EVENT COLUMNS: ", ev.columns); #REV: NOT HERE.
 
-saccs = ev[ (ev['label'] == 'SACC') ];
-nonsaccs = ev[ ~(ev['label'] == 'SACC') ];
+#saccs = ev[ (ev['label'] == 'SACC') ];
+nonsaccs = rev[ ~(rev['label'] == 'SACC') ];
 print("NON-SACCS", nonsaccs['label']);
 
 
-saccs = saccs[ saccs['ampldva'] > min_sacc_dva ];
+#saccs = saccs[ saccs['ampldva'] > min_sacc_dva ];
 
 
 PLOT=True;
@@ -414,15 +439,17 @@ blinks = pu.eyemovements.blink.compute_blinks_from_sampcol( sdf,
 
 print(saccs.columns);
 
+#REV: ugh, either all computations must take into account "eye" column, or they must ignore it.
+#REV: Easiest: error out if eye column is detected? Force user to do it themselves (do pipeline for each eye?).
+
+#REV: problem we may want to "merge" at some point...
+
 ev = pd.concat( [saccs,
                  blinks,
                  #nonsaccs, #REV: this is currently just PISI (original ISI from saccade detection...). In other cases
                  # there may also be e.g. drifts/smooth pursuits, etc.?
                  ] ).reset_index(drop=True);
 
-if( 'eye' in ev.columns ):
-    print("In EV 1");
-    pass;
 
 if( PUPILSIZE_BLINKS ):
     ev = pd.concat( [ev, pblinks] ).reset_index(drop=True);
@@ -445,13 +472,21 @@ ev = ev.sort_values(by='stsec').reset_index(drop=True);
 #REV: how am I plotting double labels?
 
 
-print(ev['eye']);
-ev = pu.eyemovements.isi.generalized_eye_event_merge( ev, );
+#print(ev['eye']);
+DOMERGE=True;
+if(DOMERGE):
+    ev = pu.eyemovements.isi.eye_event_merge( ev,
+                                              eyecol='eye',
+                                              min_blink_dur=0.030,
+                                              max_blink_amp=0.5,
+                                              min_isi_dur=min_isi_sec,
+                                             );
+    pass;
 
 
 isis = ev[ (ev['label']=='ISI') ];
 
-saccblnks = ev[ (ev.label=='SACC') | (ev.label=='BLNK') ];
+saccblnks = ev[ (ev.label=='SACC') | (ev.label=='BLNK') | (ev.label=='SACCBLNK')];
 #saccblnks = pd.concat( [ saccs, blinks] );
 #saccblnks = saccblnks.sort_values(by='stsec').reset_index(drop=True);
 
@@ -499,7 +534,7 @@ if(PLOT):
     
     
     for i,fig in enumerate(
-            pu.plotting.plot_gaze_chunks2( df=sdf, timestamp_col=tname, x_col=xcol, y_col=ycol, chunk_size_sec=10,
+            pu.plotting.plot_gaze_chunks_wpupil( df=sdf, timestamp_col=tname, x_col=xcol, y_col=ycol, chunk_size_sec=10,
                                           events_df=ev, event_start_col='stsec', event_end_col='ensec',
                                           event_type_col='label', max_chunks_per_fig=4,
                                           pupil_col='DiameterPupilRightEye',

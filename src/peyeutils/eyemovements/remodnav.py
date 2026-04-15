@@ -615,13 +615,31 @@ def classify_intersaccade_periods(  eyesamps,
 
 
 
+def remodnav_classify_events(eyesamps,
+                             params,
+                             eyecol='eye' ):
+    if eyecol not in eyesamps.columns:
+        print("REMODNAV, adding eyecol {} to columns of samples (empty string)".format(eyecol));
+        eyesamps[eyecol] = '';
+        pass;
 
+    evlist=list();
+    for eye, eyedf in eyesamps.groupby(eyecol, as_index=False):
+        myev = _remodnav_classify_events(eyesamps=eyedf,
+                                         params=params);
+        myev[eyecol] = eye;
+        evlist.append(myev);
+        pass;
+    import pandas as pd;
+    ev = pd.concat(evlist).reset_index(drop=True);
+    return eyesamps, ev;
 
 #REV: R package based on old algo (huh??? This is not remodnav):
 # https://github.com/tmalsburg/saccades
 
 #REV: classify events using remodnav
-def remodnav_classify_events(eyesamps, params): #sac_window_sec=1.0):
+def _remodnav_classify_events(eyesamps,
+                              params):
     samplerate=params['samplerate_hzsec'];
     
     # find threshold velocities
@@ -1025,7 +1043,7 @@ def remodnav_preprocess_eyetrace2d(eyesamps : pd.DataFrame,
     finalvels = [];
     for vel in eyesamps.vel:
         if( vel  >  params['maxveldegsec'] ):
-            print("REV: Detected SAMPLE too-high velocity {}? Maybe bad filter params?".format(vel));
+            print("REV: Detected SAMPLE too-high velocity {:5.2f} > maxvel deg/sec {}? Maybe bad filter params?".format(vel,params['maxveldegsec'] ));
             #vel = finalvels[-1]; #REV: just replace it with the previous velocity? Fine with high sample rates...
             pass;
         finalvels.append(vel);

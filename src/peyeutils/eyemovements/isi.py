@@ -9,21 +9,35 @@ def compute_ISIs_from_events( ev,
                               stname='stsec',
                               enname='ensec',
                               durname='dursec',
+                              eyecol='eye',
                               ):
-    saccblnks = ev[ ev.label.isin(eventstouse) ];
-    saccblnks = saccblnks.sort_values(by=stname).reset_index(drop=True);
-    
-    isis = saccblnks.copy();
-    
-    isis[stname] = saccblnks.shift(1)[enname].copy();    #start of ISI is the "end" of the PREVIOUS one (will be null for first)
-    print(isis);
-    if( len(isis.index) > 0 ):
-        isis.loc[ isis.index[0], stname ] = zerotime;
+
+    if eyecol not in ev:
+        print("Adding eyecol {} to ev".format(eyecol));
+        ev[eyecol]='';
         pass;
 
-    isis[enname] = saccblnks[stname];
-    isis[durname] = isis[enname] - isis[stname];
-    isis['label'] = label;
+    isilist = list();
+    for eye, eyedf in ev.groupby(eyecol, as_index=False):
+        saccblnks = eyedf[ eyedf.label.isin(eventstouse) ];
+        saccblnks = saccblnks.sort_values(by=stname).reset_index(drop=True);
+        
+        isis = saccblnks.copy();
+        
+        isis[stname] = saccblnks.shift(1)[enname].copy();    #start of ISI is the "end" of the PREVIOUS one (will be null for first)
+        print(isis);
+        if( len(isis.index) > 0 ):
+            isis.loc[ isis.index[0], stname ] = zerotime;
+            pass;
+        
+        isis[enname] = saccblnks[stname];
+        isis[durname] = isis[enname] - isis[stname];
+        isis['label'] = label;
+
+        isilist.append(isis);
+        pass;
+
+    isis = pd.concat(isilist).reset_index(drop=True);
     
     return isis;
 
@@ -36,6 +50,7 @@ def add_ISIs_to_events( ev,
                         stname='stsec',
                         enname='ensec',
                         durname='dursec',
+                        eyecol='eye',
                        ):
     
     isis = compute_ISIs_from_events( ev,
@@ -45,6 +60,7 @@ def add_ISIs_to_events( ev,
                                      stname=stname,
                                      enname=enname,
                                      durname=dursec,
+                                     eyecol=eyecol,
                                     );
 
     ev = pd.concat( [ev, isis] ).reset_index(drop=True);
@@ -57,12 +73,46 @@ import pandas as pd
 import numpy as np
 
 
-def generalized_eye_event_merge(df, min_blink_dur=0.060, max_blink_amp=2.0, min_isi_dur=0.020):
+
+def eye_event_merge( df,
+                     min_blink_dur=0.060,
+                     max_blink_amp=0.33,
+                     min_isi_dur=0.020,
+                     eyecol='eye',
+                     ):
+    if( eyecol not in df.columns ):
+        print("Adding missing eyecol {} to df with empty string geneye event merge".format(eyecol));
+        df[eyecol]='';
+        pass;
+
+    evlist=list();
+    for eye, eyedf in df.groupby(eyecol, as_index=False):
+        ev2 = _eye_event_merge_final(eyedf,
+                                    min_blink_dur=min_blink_dur,
+                                    max_blink_amp=max_blink_amp,
+                                    min_isi_dur=min_isi_dur,
+                                    );
+        
+        ev2[eyecol] = eye;
+        evlist.append(ev2);
+        pass;
+    ev = pd.concat(evlist).reset_index(drop=True);
+    return ev;
+
+
+
+'''
+def _eye_event_merge(df,
+                     min_blink_dur=0.060,
+                     max_blink_amp=2.0,
+                     min_isi_dur=0.020
+                     ):
     # Ensure chronological order and valid indices
     df = df.sort_values('stsec').reset_index(drop=True)
-
-    if( 'eye' in df.columns and len(df['eye'].unique()) != 1 ):
-        raise Exception("More than one eye level in df for merge_eye_events... {}".format(df['eye'].unique()));
+    
+    
+    #if( 'eye' in df.columns and len(df['eye'].unique()) != 1 ):
+    #    raise Exception("More than one eye level in df for merge_eye_events... {}".format(df['eye'].unique()));
     
     # --- 1. Noise Imputation ---
     # Convert "glitch" blinks into ISIs so they can be merged into surrounding events
@@ -88,12 +138,12 @@ def generalized_eye_event_merge(df, min_blink_dur=0.060, max_blink_amp=2.0, min_
         unique_labels = set(group['label'].unique())
         
         # Priority Logic for the new label:
-        # 1. If it has a Saccade AND a Blink -> SACBLNK
+        # 1. If it has a Saccade AND a Blink -> SACCBLNK
         # 2. If it has any 'real' event, keep that label (SACC, PURSUIT, DRIFT)
         # 3. Default to the most frequent non-ISI label, or ISI if all are ISI
         
         if 'BLNK' in unique_labels and 'SACC' in unique_labels:
-            final_label = 'SACBLNK'
+            final_label = 'SACCBLNK'
         elif 'BLNK' in unique_labels:
             final_label = 'BLNK'
         elif 'SACC' in unique_labels:
@@ -122,90 +172,312 @@ def generalized_eye_event_merge(df, min_blink_dur=0.060, max_blink_amp=2.0, min_
             'ampldva': dist,
             'pvel': group['pvel'].max(),
             'dursec': group['ensec'].max() - group['stsec'].min(),
-            'eye': group['eye'].iloc[0]
         })
 
     return df.groupby('group_id').apply(aggregate_group).reset_index(drop=True)
+'''
 
 
 
-def merge_eye_events(df, min_blink_dur=0.060, max_blink_amp=2.0, min_isi_dur=0.020):
+
+
+def _eye_event_merge(df,
+                     min_blink_dur,
+                     max_blink_amp,
+                     min_isi_dur,):
     """
-    Cleans and merges eye events for a single eye's dataframe.
+    Generalized eye event merger (Blinks, Saccades, ISIs).
+    Fixes FutureWarnings for Pandas 3.0 compatibility.
     """
-
-    if( 'eye' in df.columns and len(df['eye'].unique()) != 1 ):
-        raise Exception("More than one eye level in df for merge_eye_events... {}".format(df['eye'].unique()));
-    # Ensure chronological order within the eye
+    # Ensure chronological order
     df = df.sort_values('stsec').reset_index(drop=True)
 
-    # --- 1. Impute noise blinks as ISI ---
+    # 1. Noise Imputation
     noise_mask = (df['label'] == 'BLNK') & \
                  (df['dursec'] < min_blink_dur) & \
                  (df['ampldva'] < max_blink_amp)
     df.loc[noise_mask, 'label'] = 'ISI'
 
-    # --- 2. Identify merge candidates ---
-    # An event should merge if it IS a short ISI or if the PREVIOUS event was a short ISI
-    is_short_isi = (df['label'] == 'ISI') & (df['dursec'] < min_isi_dur)
+    # 2. Bridge Identification (using shift with fill_value to avoid downcasting warning)
+    is_bridge = (df['label'] == 'ISI') & (df['dursec'] < min_isi_dur)
     
-    # This mask marks every row that is part of a "merge cluster"
-    merge_mask = is_short_isi | is_short_isi.shift(1).fillna(False) | is_short_isi.shift(-1).fillna(False)
+    # FIX: shift(..., fill_value=False) prevents boolean promotion to object/float
+    merge_mask = (
+        is_bridge | 
+        is_bridge.shift(1, fill_value=False) | 
+        is_bridge.shift(-1, fill_value=False)
+    )
 
-    # --- 3. Create Group IDs ---
-    # We want a new ID every time we hit a row that is NOT part of a merge sequence
-    # or the start of a new merge sequence.
-    df['new_group'] = ~(merge_mask & merge_mask.shift(1).fillna(False))
-    df['group_id'] = df['new_group'].cumsum()
+    # 3. Grouping Logic
+    # FIX: Again, shift(fill_value=False) used here to avoid warnings
+    df['group_id'] = (~(merge_mask & merge_mask.shift(1, fill_value=False))).cumsum()
 
-    # --- 4. Define Aggregation ---
+    # 4. Aggregation
     def aggregate_group(group):
-        labels = group['label'].unique()
+        labels = set(group['label'].unique())
         
-        # Determine the new label
+        # Priority Logic: Saccade + Blink = SACCBLNK
         if 'BLNK' in labels and 'SACC' in labels:
-            final_label = 'SACBLNK'
+            final_label = 'SACCBLNK'
         elif 'BLNK' in labels:
             final_label = 'BLNK'
         elif 'SACC' in labels:
             final_label = 'SACC'
+        elif len(labels - {'ISI'}) > 0:
+            final_label = list(labels - {'ISI'})[0]
         else:
             final_label = 'ISI'
 
-        # Calculate spatial displacement
+        # Spatial calculations
         stx, sty = group['stx'].iloc[0], group['sty'].iloc[0]
         enx, eny = group['enx'].iloc[-1], group['eny'].iloc[-1]
         
-        # Assuming ampldva is Euclidean distance in DVA
-        # If your data is in pixels, you'd apply your px->dva conversion here
+        # Euclidean distance in DVA
         dist = np.sqrt((enx - stx)**2 + (eny - sty)**2)
 
         return pd.Series({
             'stsec': group['stsec'].min(),
             'ensec': group['ensec'].max(),
-            'stx': stx,
-            'sty': sty,
-            'enx': enx,
-            'eny': eny,
+            'stx': stx, 'sty': sty,
+            'enx': enx, 'eny': eny,
             'label': final_label,
             'ampldva': dist,
-            'pvel': group['pvel'].max(), # Peak velocity in the cluster
-            'dursec': group['ensec'].max() - group['stsec'].min(),
-            'eye': group['eye'].iloc[0]
+            'pvel': group['pvel'].max(),
+            'dursec': group['ensec'].max() - group['stsec'].min()
         })
 
-    return df.groupby('group_id').apply(aggregate_group).reset_index(drop=True)
-
-'''
-# --- EXECUTION ON MULTI-EYE DF ---
-# This isolates the logic per eye level
-processed_df = df.groupby('eye', group_keys=False).apply(
-    lambda x: merge_eye_events(x, min_blink_dur=0.060, min_isi_dur=0.020)
-)
-'''
+    # FIX: include_groups=False silences the grouping column warning
+    return (
+        df.groupby('group_id')
+        .apply(aggregate_group, include_groups=False)
+        .sort_values(by='stsec')
+        .reset_index(drop=True)
+    )
 
 
-#REV: combines samples/event, to compute: #samples in ISI available (as pct total possible?)
-## Also, mean X/Y, stdev X/Y, mean (abs) velocity, etc..
-def compute_isi_params(ev, samps, ):
-    return ev;
+
+
+
+def _eye_event_merge_slow_old(df,
+                           min_blink_dur,
+                           max_blink_amp,
+                           min_isi_dur,):
+    """
+    Robustly merges events (Blinks, Saccades, ISIs) using the manual-loop pattern
+    to prevent silent data loss.
+    """
+    if df.empty:
+        return df
+
+    # 1. Noise Imputation (Small Blinks -> ISI)
+    # We use a copy to ensure we aren't working on a slice
+    df = df.copy()
+    noise_mask = (df['label'].str.upper() == 'BLNK') & \
+                 (df['dursec'] < min_blink_dur) & \
+                 (df['ampldva'] < max_blink_amp)
+    df.loc[noise_mask, 'label'] = 'ISI'
+
+    # 2. Identify Bridge Groups (using short ISIs)
+    is_bridge = (df['label'].str.upper() == 'ISI') & (df['dursec'] < min_isi_dur)
+    
+    # Logic: If a row is a bridge, or next to a bridge, it belongs in a group
+    merge_mask = (
+        is_bridge | 
+        is_bridge.shift(1, fill_value=False) | 
+        is_bridge.shift(-1, fill_value=False)
+    )
+
+    # Every continuous sequence of 'True' merges; every 'False' stays isolated
+    df['group_id'] = (~(merge_mask & merge_mask.shift(1, fill_value=False))).cumsum()
+
+    merged_list = []
+    # 3. Manual Loop - This is the "Safety Rail"
+    for _, group in df.groupby('group_id'):
+        # ALWAYS start with a full copy of the first row's metadata
+        res = group.iloc[0].copy()
+        
+        if len(group) > 1:
+            # Metadata update
+            res['stsec'] = group['stsec'].min()
+            res['ensec'] = group['ensec'].max()
+            res['dursec'] = res['ensec'] - res['stsec']
+            
+            # Spatial update: First valid Start -> Last valid End
+            stx, sty = group['stx'].iloc[0], group['sty'].iloc[0]
+            enx, eny = group['enx'].iloc[-1], group['eny'].iloc[-1]
+            res['stx'], res['sty'], res['enx'], res['eny'] = stx, sty, enx, eny
+            
+            res['ampldva'] = np.sqrt((enx - stx)**2 + (eny - sty)**2)
+            res['pvel'] = group['pvel'].max()
+            
+            # Label Priority
+            labels = set(group['label'].str.upper())
+            if 'BLNK' in labels and 'SACC' in labels:
+                res['label'] = 'SACBLNK'
+            elif 'BLNK' in labels:
+                res['label'] = 'BLNK'
+            elif 'SACC' in labels:
+                res['label'] = 'SACC'
+            elif len(labels - {'ISI'}) > 0:
+                res['label'] = list(labels - {'ISI'})[0]
+            else:
+                res['label'] = 'ISI'
+
+        # Clean up the temp ID and add to our safe list
+        if 'group_id' in res.index:
+            res = res.drop('group_id')
+        merged_list.append(res)
+
+    # 4. Final Reconstruction
+    final_df = pd.DataFrame(merged_list)
+    return final_df.sort_values('stsec').reset_index(drop=True)
+
+
+
+
+
+def _eye_event_merge_slow2(df, min_blink_dur=0.060, max_blink_amp=2.0, min_isi_dur=0.020):
+    if df.empty: return df
+
+    # 1. Noise Imputation (Small Blinks -> ISI)
+    df = df.copy()
+    noise_mask = (df['label'].str.upper() == 'BLNK') & \
+                 (df['dursec'] < min_blink_dur) & \
+                 (df['ampldva'] < max_blink_amp)
+    df.loc[noise_mask, 'label'] = 'ISI'
+
+    # 2. Identify Bridge Groups
+    is_bridge = (df['label'].str.upper() == 'ISI') & (df['dursec'] < min_isi_dur)
+    merge_mask = (is_bridge | is_bridge.shift(1, fill_value=False) | 
+                  is_bridge.shift(-1, fill_value=False))
+    
+    # Generate Group IDs
+    df['group_id'] = (~(merge_mask & merge_mask.shift(1, fill_value=False))).cumsum()
+
+    merged_list = []
+    for _, group in df.groupby('group_id'):
+        # START WITH A COPY (Preserves: angle, eye, ismain, avgvel, etc.)
+        res = group.iloc[0].copy()
+        
+        if len(group) > 1:
+            # --- Update Timestamps & Indices ---
+            res['stsec'] = group['stsec'].min()
+            res['ensec'] = group['ensec'].max()
+            res['dursec'] = res['ensec'] - res['stsec']
+            
+            # Preserve pointers to raw data array
+            if 'stidx' in group.columns: res['stidx'] = group['stidx'].min()
+            if 'enidx' in group.columns: res['enidx'] = group['enidx'].max()
+            
+            # --- Update Spatial Coordinates ---
+            stx, sty = group['stx'].iloc[0], group['sty'].iloc[0]
+            enx, eny = group['enx'].iloc[-1], group['eny'].iloc[-1]
+            res['stx'], res['sty'], res['enx'], res['eny'] = stx, sty, enx, eny
+            
+            # --- Recalculate Vector Components ---
+            # These must be updated to match the new displacement
+            res['dxdva'] = enx - stx
+            res['dydva'] = eny - sty
+            res['ampldva'] = np.sqrt(res['dxdva']**2 + res['dydva']**2)
+            res['angle'] = np.degrees(np.arctan2(res['dydva'], res['dxdva']))
+            
+            # --- Update Velocity ---
+            res['pvel'] = group['pvel'].max()
+            # Note: avgvel is harder to recalculate perfectly without raw data,
+            # but max() or mean() of the components is a better proxy than just the first row.
+            res['avgvel'] = group['avgvel'].mean() 
+            
+            # --- Resolve Label ---
+            labels = set(group['label'].str.upper())
+            if 'BLNK' in labels and 'SACC' in labels:
+                res['label'] = 'SACCBLNK'
+            elif 'BLNK' in labels:
+                res['label'] = 'BLNK'
+            elif 'SACC' in labels:
+                res['label'] = 'SACC'
+
+        # Clean up and append
+        if 'group_id' in res.index: res = res.drop('group_id')
+        merged_list.append(res)
+
+    return pd.DataFrame(merged_list).sort_values('stsec').reset_index(drop=True)
+
+
+
+
+
+def _eye_event_merge_final(df,
+                           min_blink_dur,
+                           max_blink_amp,
+                           min_isi_dur,
+                           ):
+    
+    if df.empty: return df
+
+    # 1. Noise Imputation (Small Blinks -> ISI)
+    df = df.copy()
+    noise_mask = (df['label'].str.upper() == 'BLNK') & \
+                 (df['dursec'] < min_blink_dur) & \
+                 (df['ampldva'] < max_blink_amp)
+    df.loc[noise_mask, 'label'] = 'ISI'
+
+    # 2. Identify Bridge Groups (ISIs smaller than threshold)
+    is_bridge = (df['label'].str.upper() == 'ISI') & (df['dursec'] < min_isi_dur)
+    merge_mask = (is_bridge | is_bridge.shift(1, fill_value=False) | 
+                  is_bridge.shift(-1, fill_value=False))
+    
+    # Generate Group IDs
+    df['group_id'] = (~(merge_mask & merge_mask.shift(1, fill_value=False))).cumsum()
+
+    merged_list = []
+    for _, group in df.groupby('group_id'):
+        # 3. START WITH A COPY (Preserves eye, ismain, etc.)
+        res = group.iloc[0].copy()
+        
+        if len(group) > 1:
+            # --- Update Timestamps & Indices ---
+            res['stsec'] = group['stsec'].min()
+            res['ensec'] = group['ensec'].max()
+            res['dursec'] = res['ensec'] - res['stsec']
+            
+            if 'stidx' in group.columns: res['stidx'] = group['stidx'].min()
+            if 'enidx' in group.columns: res['enidx'] = group['enidx'].max()
+            if 'idx' in group.columns: res['idx'] = group['stidx'].min() 
+
+            # --- Update Spatial Coordinates ---
+            stx, sty = group['stx'].iloc[0], group['sty'].iloc[0]
+            enx, eny = group['enx'].iloc[-1], group['eny'].iloc[-1]
+            res['stx'], res['sty'], res['enx'], res['eny'] = stx, sty, enx, eny
+            
+            # --- Recalculate Vector Components ---
+            res['dxdva'] = enx - stx
+            res['dydva'] = eny - sty
+            res['ampldva'] = np.sqrt(res['dxdva']**2 + res['dydva']**2)
+            res['angle'] = np.degrees(np.arctan2(res['dydva'], res['dxdva']))
+            
+            # --- Update Velocity ---
+            res['pvel'] = group['pvel'].max()
+            res['avgvel'] = group['avgvel'].mean() 
+            if 'medvel' in group.columns:
+                res['medvel'] = group['medvel'].mean()
+            
+            # --- Resolve Label ---
+            labels = set(group['label'].str.upper())
+            if 'BLNK' in labels and 'SACC' in labels:
+                res['label'] = 'SACCBLNK'
+            elif 'BLNK' in labels:
+                res['label'] = 'BLNK'
+            elif 'SACC' in labels:
+                res['label'] = 'SACC'
+            elif len(labels - {'ISI'}) > 0:
+                # Keep other events like PURSUIT if they exist
+                res['label'] = list(labels - {'ISI'})[0]
+            else:
+                res['label'] = 'ISI'
+
+        # Clean up and append
+        if 'group_id' in res.index: res = res.drop('group_id')
+        merged_list.append(res)
+        pass;
+
+    return pd.DataFrame(merged_list).sort_values('stsec').reset_index(drop=True)

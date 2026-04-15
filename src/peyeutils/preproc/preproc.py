@@ -754,7 +754,7 @@ def blink_df_from_samples(indf,
         if( xcol and ycol ):
             print("Computing X/Y for blinks!");
 
-            tmpdf = df[[tcol, xcol, ycol ]];
+            tmpdf = df[[tcol, xcol, ycol ]].copy();
             tmpdf['index'] = tmpdf.index;
             print(tmpdf);
             stev = pd.merge( left=ev, right=tmpdf, left_on=stidx, right_on='index', how='left' );

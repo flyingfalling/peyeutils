@@ -815,15 +815,6 @@ def filter_nans_beforeafter( votes, x ):
     return votes;
 
 
-def saccadr_detect_saccs( df,
-                          methods=(method_ek, method_om, method_nh),
-                          velocity_function=diff_ek,
-                          binocular="merge",
-                          tcol='Tsec',
-                         ):
-    
-
-    return df, evdf;
 
 
 
@@ -832,20 +823,54 @@ def saccadr_detect_saccs( df,
 #REV: sampdf is modified "in place"?
 
 #REV: this DOES modify the sample df...adding columns.
+def saccadr_detect_saccades( sampdf,
+                             params,
+                             tsecname, #='Tsec',
+                             methods=(method_ek, method_om, method_nh),
+                             velocity_function=diff_ek,
+                             xname='xcdva',
+                             yname='ycdva',
+                             eyecol='eye',
+                            ):
+    if eyecol not in sampdf.columns:
+        print("Adding missing eyecol {} to samples df (all values empty string)...".format(eyecol));
+        sampdf[eyecol]='';
+        pass;
+
+    sdflist=list();
+    edflist=list();
+    for eye, eyedf in sampdf.groupby(eyecol, as_index=False):
+        sdf, edf = _saccadr_sacc( sampdf=eyedf,
+                                  params=params,
+                                  tsecname=tsecname,
+                                  methods=methods,
+                                  velocity_function=velocity_function,
+                                  xname=xname,
+                                  yname=yname,
+                                 );
+        
+        edf[eyecol] = eye;
+        
+        sdflist.append(sdf);
+        edflist.append(edf);
+        pass;
+    
+    sampdf = pd.concat(sdflist).reset_index(drop=True);
+    evdf = pd.concat(edflist).reset_index(drop=True);
+    return sampdf, evdf;
+    
+
 
 #REV: this is hackish, it uses prefix (l, r) for eyes to determine how to handle data...
-def saccadr_sacc( sampdf,
-                  params,
-                  tsecname, #='Tsec',
-                  methods=(method_ek, method_om, method_nh),
-                  velocity_function=diff_ek,
-                  binocular="DONOTHING",
-                  xname='xcdva',
-                  yname='ycdva',
-                  eyecol='eye',
-                 ):
-    
-    #sampdf = sampdf.copy();
+def _saccadr_sacc( sampdf,
+                   params,
+                   tsecname, #='Tsec',
+                   methods=(method_ek, method_om, method_nh),
+                   velocity_function=diff_ek,
+                   xname='xcdva',
+                   yname='ycdva',
+                   eyecol='eye',
+                  ):
     
     #REV: sort by time point (note assumes it must be resampled at regular rate, check that and that diff roughly matches
     #     parameter 1/samplerate);
@@ -862,29 +887,11 @@ def saccadr_sacc( sampdf,
     
     sampdf = sampdf.sort_values(by=tsecname).reset_index(drop=True);
     
-    isbinoc=False;
-    
     if( eyecol in sampdf.columns and
         len(sampdf[eyecol].unique()) > 1 ):
         eyes=sampdf[eyecol].unique();
-        #raise Exception("saccadr_sacc, you are passing samples with more than one eyecolumn value defined, but it should be run with only a single timeseries: {}".format(sampdf[eyecol].unique()))
-        isbinoc=True;
-        pass;
-    else:
-        eyes=('',);
-        sampdf[eyecol]=eyes[0];
-        pass;
+        raise Exception("WARNING: _saccadr_sacc, you are passing samples with more than one eyecolumn value defined, but it should be run with only a single timeseries: {}".format(sampdf[eyecol].unique()))
     
-        
-    #REV: basically take mean of both eyes.
-    if( isbinoc and binocular == "cyclopean" ):
-        print("CYCLOPEAN!")
-        sampdf = sampdf.groupby( tsecname, as_index=False ).mean(numeric_only=True).reset_index(drop=True);
-        
-        #sampdf[xname] = np.nanmean( [sampdf.lxcdva, sampdf.rxcdva], axis=0 );
-        #sampdf[yname] = np.nanmean( [sampdf.lycdva, sampdf.rycdva], axis=0 );
-        eyes=('',);
-        pass;
     
     #REV: now I will make a vote for each location.
     #REV: note velocity is always DEG/SEC
@@ -899,151 +906,124 @@ def saccadr_sacc( sampdf,
     min_dur_samples=math.ceil(min_duration_sec * sr);
 
     
-    evdfs=list();
-    eyedfs=list();
-    for eye, eyedf in sampdf.groupby(by=eyecol, as_index=False):
-        print("Doing for eye: [{}] (empty=no eyes specified)".format(eye));
-        votecols=[];
-        
-        xvel, yvel, vel =  velocity_function( eyedf[xname],
-                                              eyedf[yname],
-                                              params
-                                             );
-
-        #REV: optionally, remove biologically unrealistic values and re-dilate?
+    
+    votecols=[];
+    
+    xvel, yvel, vel =  velocity_function( sampdf[xname],
+                                          sampdf[yname],
+                                          params
+                                         );
+    
+    #REV: optionally, remove biologically unrealistic values and re-dilate?
         #REV: removing those over some maximum velocity (likely blinks or biologically unrealistic data...)
-        vel[ vel > blink_vel_thresh_degsec ] = np.nan;
+    vel[ vel > blink_vel_thresh_degsec ] = np.nan;
 
-        eyedf['xvel'] = xvel;
-        eyedf['yvel'] = yvel;
-        eyedf['vel'] = vel;
-        
-        cols = [xname, yname, 'vel', 'xvel', 'yvel'];
-        cols = [s for s in cols];
-        
-        eyedf = dilate_nans(eyedf, cols, params);
-                
-        #REV: could run median filter if I want...
-        eyedf['medvel'] = vel;
-        
-        
-        xacc, yacc, acc = velocity_function( eyedf['xvel'],
-                                             eyedf['yvel'],
-                                             params
-                                            );
-        eyedf['xacc'] = xacc;
-        eyedf['yacc'] = yacc;
-        eyedf['acc'] = acc;
-        
-        
-        for i, m in enumerate(methods):
-            
-            #################################
-            ####### WORK IS HERE!! ##########
-            #################################
-            
-            #REV: note this just returns VOTES!!! No info about
-            #REV: velocity etc... I have to go re-extract it.
-            methodvotecol = 'vote_'+str(i)+"_{}".format(m.__name__);
-            votecols.append(methodvotecol);
-            sampvotes = methods[i]( eyedf, params, eyepfix='' );
-            sampvotes = filter_nans_beforeafter( sampvotes, eyedf['vel'] );
-            eyedf[methodvotecol] = sampvotes;
-            
-            pass;
-        
-        
-        
-        #REV: average by-row (between merged);
-        normvotecol='normvotes';
-        eyedf[normvotecol] = np.nanmean( eyedf[ votecols ], axis=1 );
-        
-        print( eyedf[ eyedf[normvotecol] > 0 ][ votecols + [normvotecol] ] );
-        
-            
+    sampdf['xvel'] = xvel;
+    sampdf['yvel'] = yvel;
+    sampdf['vel'] = vel;
 
-    
-        vals, starts, lens = rle( eyedf['normvotes'] > vote_thresh );
-        #REV: only doe for where vals==True for saccs
-        
-        #REV: first, need to check...
-        # if true, or (false but surrounded by true on both sides and with length < min_separation between saccades in samples)
-        #REV: then, keep it as a "saccade"?
-        vals = (vals == True) | (  (vals == False)
-                                   & (shift_elements(vals, 1, False)==True)
-                                   & (shift_elements(vals, -1, False)==True)
-                                   & (lens < min_sep_samples)
-                                 );
-        
-        remarked_samps = inverse_rle(vals, starts, lens);
-        vals, starts, lens = rle(remarked_samps);
-        vals = (vals==True) & (lens >= min_dur_samples);
+    cols = [xname, yname, 'vel', 'xvel', 'yvel'];
+    cols = [s for s in cols];
 
-        #REV: include both saccs and ISI...
-        #vals = np.where( True==vals )[0];
-        #starts = starts[vals];
-        #lens = lens[vals];
-                
-        if( len(vals) == 1 and vals[0] == False ):
-            print("SACCADR: No saccades detected by votes!");
-            pass;
-        
-        dictlist=[];
-        #REV: assume sroted by TSEC
-        for v, s, l in zip(vals, starts, lens):
-            if( l == 1 ):
-                #REV: huh...should never be of length L lol
-                continue;
-            e=s+l-1; #REV: oh shit do I have an off-by-one error here?
-            #print("Event: s={}  e={}  (l={})   {}".format(s, e, l, v));
-            #REV: aligning names with removdnav
-            ev = dict(stsec=eyedf[tsecname][s],
-                      ensec=eyedf[tsecname][e],
-                      eye=eye,
-                      stx=eyedf[xname][s],
-                      sty=eyedf[yname][s],
-                      enx=eyedf[xname][e],
-                      eny=eyedf[yname][e],
-                      pvel=np.nanmax(eyedf[ (eyedf[tsecname]>=eyedf[tsecname][s]) & (eyedf[tsecname]<eyedf[tsecname][e]) ]['vel'] ),
-                      medvel=np.nanmedian(eyedf[ (eyedf[tsecname]>=eyedf[tsecname][s]) & (eyedf[tsecname]<eyedf[tsecname][e]) ]['vel'] ),
-                      avgvel=np.nanmean(eyedf[ (eyedf[tsecname]>=eyedf[tsecname][s]) & (eyedf[tsecname]<eyedf[tsecname][e]) ]['vel'] ),
-                      label='SACC' if (True==v) else 'SISI',
-                      );
+    sampdf = dilate_nans(sampdf, cols, params);
 
-            dictlist.append(ev);
-            pass;
+    #REV: could run median filter if I want...
+    sampdf['medvel'] = vel;
 
-        if( len(dictlist) > 0 ):
-            evdfs.append( pd.DataFrame(dictlist) );
-            pass;
-        
+
+    xacc, yacc, acc = velocity_function( sampdf['xvel'],
+                                         sampdf['yvel'],
+                                         params
+                                        );
+    sampdf['xacc'] = xacc;
+    sampdf['yacc'] = yacc;
+    sampdf['acc'] = acc;
+
+
+    for i, m in enumerate(methods):
+
+        #################################
+        ####### WORK IS HERE!! ##########
+        #################################
+
+        #REV: note this just returns VOTES!!! No info about
+        #REV: velocity etc... I have to go re-extract it.
+        methodvotecol = 'vote_'+str(i)+"_{}".format(m.__name__);
+        votecols.append(methodvotecol);
+        sampvotes = methods[i]( sampdf, params, eyepfix='' );
+        sampvotes = filter_nans_beforeafter( sampvotes, sampdf['vel'] );
+        sampdf[methodvotecol] = sampvotes;
+
+        pass;
+
+
+
+    #REV: average by-row (between merged);
+    normvotecol='normvotes';
+    sampdf[normvotecol] = np.nanmean( sampdf[ votecols ], axis=1 );
+
+    print( sampdf[ sampdf[normvotecol] > 0 ][ votecols + [normvotecol] ] );
+
+
+
+
+    vals, starts, lens = rle( sampdf['normvotes'] > vote_thresh );
+    #REV: only doe for where vals==True for saccs
+
+    #REV: first, need to check...
+    # if true, or (false but surrounded by true on both sides and with length < min_separation between saccades in samples)
+    #REV: then, keep it as a "saccade"?
+    vals = (vals == True) | (  (vals == False)
+                               & (shift_elements(vals, 1, False)==True)
+                               & (shift_elements(vals, -1, False)==True)
+                               & (lens < min_sep_samples)
+                             );
+
+    remarked_samps = inverse_rle(vals, starts, lens);
+    vals, starts, lens = rle(remarked_samps);
+    vals = (vals==True) & (lens >= min_dur_samples);
+
+    #REV: include both saccs and ISI...
+    #vals = np.where( True==vals )[0];
+    #starts = starts[vals];
+    #lens = lens[vals];
+
+    if( len(vals) == 1 and vals[0] == False ):
+        print("SACCADR: No saccades detected by votes!");
+        pass;
+
+    dictlist=list();
+    #REV: assume sroted by TSEC
+    for v, s, l in zip(vals, starts, lens):
+        if( l == 1 ):
+            #REV: huh...should never be of length L lol
+            continue;
+        e=s+l-1; #REV: oh shit do I have an off-by-one error here?
+        #print("Event: s={}  e={}  (l={})   {}".format(s, e, l, v));
+        #REV: aligning names with removdnav
+        ev = dict(stsec=sampdf[tsecname][s],
+                  ensec=sampdf[tsecname][e],
+                  stx=sampdf[xname][s],
+                  sty=sampdf[yname][s],
+                  enx=sampdf[xname][e],
+                  eny=sampdf[yname][e],
+                  pvel=np.nanmax(sampdf[ (sampdf[tsecname]>=sampdf[tsecname][s]) & (sampdf[tsecname]<sampdf[tsecname][e]) ]['vel'] ),
+                  medvel=np.nanmedian(sampdf[ (sampdf[tsecname]>=sampdf[tsecname][s]) & (sampdf[tsecname]<sampdf[tsecname][e]) ]['vel'] ),
+                  avgvel=np.nanmean(sampdf[ (sampdf[tsecname]>=sampdf[tsecname][s]) & (sampdf[tsecname]<sampdf[tsecname][e]) ]['vel'] ),
+                  label='SACC' if (True==v) else 'SISI',
+                  );
+
+        dictlist.append(ev);
         pass;
     
-    eyedfs.append(eyedf);
     
-    if( len(evdfs)>0):
-        evdf = pd.concat( evdfs );
+    evdf = pd.DataFrame(dictlist);
+    
+    #REV: compute other parameters...
+    evdf['dydva'] = evdf.eny - evdf.sty;
+    evdf['dxdva'] = evdf.enx - evdf.stx;
+    evdf['dursec'] = evdf.ensec - evdf.stsec;
+    evdf['angle'] = np.arctan2( evdf.dydva, evdf.dxdva );
+    evdf['ampldva'] = np.sqrt( evdf.dydva**2 + evdf.dxdva**2 );
         
-        #REV: compute other parameters...
-        evdf['dydva'] = evdf.eny - evdf.sty;
-        evdf['dxdva'] = evdf.enx - evdf.stx;
-        evdf['dursec'] = evdf.ensec - evdf.stsec;
-        evdf['angle'] = np.arctan2( evdf.dydva, evdf.dxdva );
-        evdf['ampldva'] = np.sqrt( evdf.dydva**2 + evdf.dxdva**2 );
-        
-        pass;
-    else:
-        evdf = pd.DataFrame();
-        pass;
-    
-    sampdf = pd.concat(eyedfs).sort_values(by=[eyecol, tsecname]).reset_index(drop=True);
-    
-    #REV: DONE, but first I need to check parameters etc. because it is probably all fucked up.
-    #REV: also, remove blinks
-    #REV: also, combine this stuff into left/right eye.
-    
-    #REV: compute "final" with sacc info, e.g. accel, start/end, times.
-    
-    #REV: note I want to also return "votes" for start/end of saccades for each separate method. Just do methods one at a time I guess...
-    
     return sampdf, evdf; #REV: has velocities of L/R eye etc.

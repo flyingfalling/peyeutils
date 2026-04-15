@@ -10,15 +10,28 @@ def compute_blinks_from_sampcol( samps,
                                  tcol,
                                  xcol,
                                  ycol,
+                                 eyecol='eye',
                                 ):
+    if eyecol not in samps.columns:
+        print("Compute blinks, adding eyecol {} to samps, setting to empty string".format(eyecol));
+        samps['eye']='';
+        pass;
     
-    blinkev = pu.preproc.blink_df_from_samples(samps,
-                                               dva_per_px=dva_per_px,
-                                               badcol=badcol,
-                                               tcol=tcol,
-                                               xcol=xcol,
-                                               ycol=ycol,
-                                               );
+    blinkevs=list();
+    for eye, eyedf in samps.groupby(eyecol, as_index=False):
+        blinkev = pu.preproc.blink_df_from_samples(samps,
+                                                   dva_per_px=dva_per_px,
+                                                   badcol=badcol,
+                                                   tcol=tcol,
+                                                   xcol=xcol,
+                                                   ycol=ycol,
+                                                   );
+        blinkev[eyecol] = eye;
+        blinkevs.append(blinkev);
+        pass;
+
+    import pandas as pd;
+    blinkev = pd.concat(blinkevs).reset_index(drop=True);
     return blinkev;
 
 
@@ -30,6 +43,7 @@ def add_blinks_to_events_from_sampcol( ev, samps,
                                        tcol,
                                        xcol,
                                        ycol,
+                                       eyecol='eye',
                                       ):
     
     blinkev = compute_blinks_from_sampcol( samps,
@@ -37,11 +51,13 @@ def add_blinks_to_events_from_sampcol( ev, samps,
                                            badcol=badcol,
                                            tcol=tcol,
                                            xcol=xcol,
-                                           ycol=ycol
+                                           ycol=ycol,
+                                           eyecol=eyecol,
                                           );
         
     #REV: should I remove blinks in which eye did not move much (< 0.5 deg ?). I.e. fixation with intermediate lbink?
     # Vision is not happening during that time and physiologically it is equivalent...and then ISI is?
+    import pandas as pd;
     ev = pd.concat([ev, blinkev]);
     ev = ev.sort_values(by='stsec').reset_index(drop=True);
     return ev;
