@@ -65,17 +65,6 @@ df = df.sort_values(by=tname).reset_index(drop=True);
 
 
 
-'''
-df['bad'] = False;
-
-df.loc[ (df['DiameterPupilRightEye'] <= 0), 'bad'] = True;
-df.loc[ (df['DiameterPupilLeftEye'] <= 0), 'bad'] = True;
-df.loc[ (df['CursorX'] <= -0.9), ['XGazePosLeftEye', 'YGazePosLeftEye', 'XGazePosRightEye', 'YGazePosRightEye', 'CursorX', 'CursorY', 'DiameterPupilLeftEye', 'bad'] ] = True;
-df.loc[ (df['ValidityLeftEye'] != 0), 'bad' ] = True; #np.nan; #REV: remove bad data, assume validity 0 is OK, nonzero is error.
-df.loc[ (df['ValidityRightEye'] != 0), 'bad'] = True; #REV: remove bad data, assume validity 0 is OK, nonzero is error.
-df.loc[ ((df['ValidityLeftEye'] != 0) & (df['ValidityRightEye'] != 0)), 'bad' ] = True;
-'''
-
 #REV: setting missing data to NAN (rather than negative numbers it seems to be)
 NAN_BAD_DATA=True;
 if(NAN_BAD_DATA):
@@ -91,8 +80,6 @@ if(NAN_BAD_DATA):
 
 #REV: dropping duplicate times. Could use "mean" first, but expect no dupl.
 df = df.drop_duplicates(subset=[tname], keep='first');
-
-print("COLS", df.columns);
 
 #REV: for simplicity, naming x and y
 # Note units are still unknown (probably pixels in some screen space).
@@ -183,18 +170,6 @@ ycol='ycdva';
 
 ## Converting from these to projection on sphere (i.e. just x and y "rotation")
 ##  may be confusing for some users...
-
-## REV: remove "outside escreen" values ?
-#REV: set to NAN
-'''
-NAN_OUTSIDE=False;
-if( NAN_OUTSIDE ):
-    maxdva=20;
-    df.loc[ ((df.xcdva < -maxdva) | (df.ycdva < -maxdva) | (df.xcdva > maxdva) | (df.ycdva > maxdva)) , ['xcdva', 'ycdva'] ] = np.nan;
-    pass;
-
-df.loc[ ((df.xcdva < -maxdva) | (df.ycdva < -maxdva) | (df.xcdva > maxdva) | (df.ycdva > maxdva)) , 'bad'] = True;
-'''
 
 
 
@@ -315,6 +290,12 @@ sdf, ev = pu.peyeutils.preproc_and_compute_events( df=df,
                                                    sr_hzsec=targ_sr_hzsec,
                                                    PLOT=True,
                                                   );
+
+print("FINISHED");
+print(ev);
+exit(0);
+
+
 '''
 
 
@@ -597,8 +578,8 @@ if(PLOT):
 
 
 
-ev.to_csv('events.csv', index=False);
-print(ev);
+#ev.to_csv('events.csv', index=False);
+#print(ev);
 
 
 #REV: TODO:

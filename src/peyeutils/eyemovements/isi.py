@@ -25,7 +25,7 @@ def compute_ISIs_from_events( ev,
         isis = saccblnks.copy();
         
         isis[stname] = saccblnks.shift(1)[enname].copy();    #start of ISI is the "end" of the PREVIOUS one (will be null for first)
-        print(isis);
+        
         if( len(isis.index) > 0 ):
             isis.loc[ isis.index[0], stname ] = zerotime;
             pass;

@@ -937,7 +937,7 @@ def remodnav_preprocess_eyetrace2d(eyesamps : pd.DataFrame,
     
     if( 'blinkcol' in params ):
         bcol=params['blinkcol'];
-        print("1st) Re-NANing x/y based on blinkcolumn [{}] (in case smoothing added?)".format(bcol));
+        #print("1st) Re-NANing x/y based on blinkcolumn [{}] (in case smoothing added?)".format(bcol));
         eyesamps.loc[ (eyesamps[bcol]==True), [xname, yname] ] = np.nan;
         eyesamps.loc[ (eyesamps[xname].isna()), bcol ] = True;
         pass;
@@ -970,7 +970,7 @@ def remodnav_preprocess_eyetrace2d(eyesamps : pd.DataFrame,
     
     cols = [xname, yname, 'vel', 'acc']; #REV: remove actual samples too I guess lol...
     es2 = eyesamps[ (eyesamps.acc >= blink_acc_thresh_degsecsec) | (eyesamps.vel >= blink_vel_thresh_degsec) ]; #[cols] = np.nan;
-    print("Detected {} timepoints outside of velocity or acceleration allowance.".format(len(es2.index)));
+    print("REMODNAV (preproc): Detected {} timepoints outside of velocity or acceleration allowance.".format(len(es2.index)));
     
     eyesamps.loc[ ((eyesamps.acc >= blink_acc_thresh_degsecsec) | (eyesamps.vel >= blink_vel_thresh_degsec)), cols ] = np.nan;
     
@@ -992,7 +992,7 @@ def remodnav_preprocess_eyetrace2d(eyesamps : pd.DataFrame,
     
     if( 'blinkcol' in params ):
         bcol=params['blinkcol'];
-        print("2nd) Re-NANing x/y based on blinkcolumn [{}]".format(bcol));
+        #print("2nd) Re-NANing x/y based on blinkcolumn [{}]".format(bcol));
         eyesamps.loc[ (eyesamps[bcol]==True), [xname, yname] ] = np.nan;
         eyesamps.loc[ (eyesamps[xname].isna()), bcol ] = True;
         pass;
@@ -1032,7 +1032,7 @@ def remodnav_preprocess_eyetrace2d(eyesamps : pd.DataFrame,
     
     if( 'blinkcol' in params ):
         bcol=params['blinkcol'];
-        print("3rd) Re-NANing x/y based on blinkcolumn [{}]".format(bcol));
+        #print("3rd) Re-NANing x/y based on blinkcolumn [{}]".format(bcol));
         eyesamps.loc[ (eyesamps[bcol]==True), [xname, yname] ] = np.nan;
         eyesamps.loc[ (eyesamps[xname].isna()), bcol ] = True;
         pass;

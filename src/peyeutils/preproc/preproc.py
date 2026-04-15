@@ -1,4 +1,3 @@
-
 import pandas as pd;
 import numpy as np;
 import math;
@@ -707,13 +706,14 @@ def blink_df_from_samples(indf,
                           ycol : str = '',
                           use_index=True,
                           eyecol='',
+                          DEBUG=False,
                           ):
-
+    
     dfs = [indf];
     if( eyecol ):
         dfs = [ a[1] for a in indf.groupby(eyecol, as_index=False) ];
         pass;
-        
+    
     evlist=list();
     
     for df in dfs:
@@ -749,34 +749,46 @@ def blink_df_from_samples(indf,
         ev.loc[ev[stidx]<0, stidx] = 0; #REV: make any that would be negative 0 so it doesnt read outside df
         ev.loc[ev[enidx]>len(df.index), enidx] = len(df.index)-1; #REV: make any that would be negative 0 so it doesnt read outside df
 
-        print(ev);
-
+        if(DEBUG):
+            print(ev);
+            pass;
+        
         if( xcol and ycol ):
-            print("Computing X/Y for blinks!");
-
+            if(DEBUG):
+                print("Computing X/Y for blinks!");
+                pass;
+            
             tmpdf = df[[tcol, xcol, ycol ]].copy();
             tmpdf['index'] = tmpdf.index;
-            print(tmpdf);
+            
+            if(DEBUG):
+                print(tmpdf);
+                pass;
+            
             stev = pd.merge( left=ev, right=tmpdf, left_on=stidx, right_on='index', how='left' );
-            print(stev);
+            
+            if(DEBUG):
+                print(stev);
+                pass;
+            
             ev['stx'] = stev[xcol];
             ev['sty'] = stev[ycol];
             ev[stcol] = stev[tcol];
-
+            
             enev = pd.merge( left=ev, right=tmpdf, left_on=enidx, right_on='index', how='left' );
             ev['enx'] = enev[xcol];
             ev['eny'] = enev[ycol];
             ev[encol] = enev[tcol];
-
+            
             ev["dxdva"] = dva_per_px * (ev["enx"] - ev["stx"]);
             ev["dydva"] = dva_per_px * (ev["eny"] - ev["sty"]);
-
+            
             import math;
             ev["angle"] = np.rad2deg( np.atan2( ev["dydva"], ev["dxdva"] ) ); #REV: why is this x and y, shouldn't be Y/X?a
             ev["ampldva"] = np.sqrt( (ev["dxdva"])**2 + (ev["dydva"])**2  ); #REV: assumes these are pitch/yaw angles.
             pass;
-
-
+        
+        
         ev['label'] = 'BLNK';
         ev['dursec'] = ev[encol] - ev[stcol];
 

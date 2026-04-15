@@ -269,10 +269,8 @@ def method_om(df, params, eyepfix,
     #BIGNUM=1e10;
     #REV: just fill with repeat...
     if( len(vel) < 1 ):
-        print("Vel 0 len");
-        exit(1);
-        pass;
-    
+        raise Exception("Vel 0 len");
+        
     
     #REV: fine, because guarantee large amounts between peaks...
     #REV: but, too large and all points in sacc will be a peak...
@@ -571,9 +569,7 @@ def method_om(df, params, eyepfix,
     
     
 
-    print(sdf);
-    
-    
+        
     
     for idx, row in sdf.iterrows():
         saccresult[ row.stidx:row.enidx ] = True; #REV: the +1 because it only selects for each...
@@ -809,9 +805,8 @@ def default_saccadr_params():
 def filter_nans_beforeafter( votes, x ):
     #REV: must be bool array.
     if( votes.dtype != bool ):
-        print("WTF votes filter nans beforeafter not boolean...");
-        exit(1);
-        pass;
+        raise Exception("WTF votes filter nans beforeafter not boolean...");
+    
     
     vals, sts, lens = rle(votes);
     for v, s, l in zip(vals, sts, lens):
@@ -903,6 +898,7 @@ def _saccadr_sacc( sampdf,
                    xname='xcdva',
                    yname='ycdva',
                    eyecol='eye',
+                   DEBUG=False,
                   ):
     
     #REV: sort by time point (note assumes it must be resampled at regular rate, check that and that diff roughly matches
@@ -995,7 +991,9 @@ def _saccadr_sacc( sampdf,
     normvotecol='normvotes';
     sampdf[normvotecol] = np.nanmean( sampdf[ votecols ], axis=1 );
 
-    print( sampdf[ sampdf[normvotecol] > 0 ][ votecols + [normvotecol] ] );
+    if(DEBUG):
+        print( sampdf[ sampdf[normvotecol] > 0 ][ votecols + [normvotecol] ] );
+        pass;
 
 
 
