@@ -8,10 +8,27 @@ import pandas as pd
 import sys
 import os
 
-#REV
-df = pd.read_csv( sys.argv[1] );
+wajd_idx = sys.argv[1];
+wajdmuscimol_idx = sys.argv[2];
 
-df = df[ df.yesOpto == False ];
+
+df = pd.read_csv( wajd_idx );
+mdf = pd.read_csv( wajdmuscimol_idx );
+
+df['date'] = pd.to_datetime(df.date);
+mdf['date'] = pd.to_datetime(mdf.date);
+#print(df.date.dtype);
+
+print(df.columns);
+print(mdf.columns);
+
+df = pd.merge(left=df, left_on=['date', 'trialcsv', 'subj'], right=mdf, right_on=['date', 'trialcsv', 'subj'], how='outer' ); #REV: both outer, inner, and left should be same
+#print(df);
+print(df.columns);
+
+
+
+df = df[ (df.yesOpto == False) & (df.muscimol==False) ];
 df['vid'] = df.vid.str[:-4];
 print(df.vid);
 result = df.groupby(['subj', 'vid']).size();

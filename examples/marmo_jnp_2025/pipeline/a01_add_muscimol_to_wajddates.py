@@ -4,6 +4,8 @@ import pandas as pd;
 from openpyxl.styles import PatternFill
 
 xlsx_file=sys.argv[1];
+wajd_idx=sys.argv[2];
+
 
 wb = openpyxl.load_workbook(xlsx_file);
 ws = wb.active
@@ -47,5 +49,16 @@ print(df[df.muscimol==True]);
 print(df);
 df.to_csv('wajd_muscimol_labelled.csv', index=False);
 
+wdf = pd.read_csv(wajd_idx);
 
+nomusc_fn=wajd_idx + '.muscimol.csv';
+
+wdf = pd.merge(left=wdf, left_on=['date','subj','trialcsv'],
+               right=df, right_on=['date','subj','trialcsv'],
+               how='outer' );
+
+print(wdf);
+print(wdf.columns);
+
+wdf.to_csv(nomusc_fn, index=False);
 

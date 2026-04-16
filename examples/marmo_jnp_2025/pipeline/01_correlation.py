@@ -13,9 +13,16 @@ def main():
     wajd_gaze=sys.argv[2];
     orig_idx=sys.argv[3];
     orig_gaze=sys.argv[4];
-
-
+    
+    
+    
     widxdf=pd.read_csv(wajd_idx);
+    
+    #REV: remove wajd trials with muscimol or opto stim...
+    widxdf = widxdf[ (widxdf['yesOpto'] == False) &
+                     (widxdf['muscimol'] == False)
+                     ];
+        
     widxdf['wotype']='w';
     widxdf['trialidx'] = widxdf['trialidx'].astype(str) + 'w'
     widxdf['vid'] = widxdf['vid'].str[:-4];
@@ -26,6 +33,20 @@ def main():
     oidxdf=pd.read_csv(orig_idx);
     oidxdf['wotype']='o';
     oidxdf['trialidx'] = oidxdf['trialidx'].astype(str) + 'o'
+
+    '''
+    print("WAJD");
+    print(widxdf.iloc[0]);
+    
+    print("CHEN");
+    print(oidxdf.iloc[0]);
+
+    #REV: should rename...
+    exit(0);
+    '''
+    
+    
+    
     print(oidxdf.vid.unique());
     print(oidxdf.species.unique());
     
@@ -37,8 +58,10 @@ def main():
     ogazedf['wotype']='o';
     ogazedf['trialidx']= ogazedf['trialidx'].astype(str) + 'o';
     
+    
+    
     idxdf = pd.concat([widxdf, oidxdf]);
-
+    
     idxdf['species']=idxdf['species'].astype(str);
     print(idxdf[idxdf['species']=='nan']);
     
@@ -96,23 +119,28 @@ def main():
             if( np.any(tdf.movie_ts.duplicated()) ):
                 print("DUPLICATES");
                 print(tdf[ tdf.movie_ts.duplicated(keep=False) ][['timems', 'movie_ts', 'pix_x', 'pix_y', 'eyelink_ts']]);
-                pass;
+                raise Exception("Duplicates, should never happen!");
+            
             pass;
         
         pass;
-
+    
+    
+        
     ################# CORRELATIONS ##################
     #REV: compute pairwise comparisons of the upper triangle. For now just take evenly spaced and interpolate.
-
+    
     #REV: null model is correlation with OTHER videos?!
     ## With random shuffle from prior?
     
     
     
     
-    bigdf = pd.merge(left=gazedf, right=idxdf, on='trialidx');
+    bigdf = pd.merge(left=gazedf, right=idxdf, on=['trialidx', 'wotype'], how='left');
     print(len(bigdf.index));
     bigdf = bigdf.sort_values(by=['trialidx', 'movie_ts']).reset_index(drop=True);
+    print(bigdf.subj.unique());
+    bigdf.groupby(['subj']).count().to_csv('wtf.csv');
     
     ##REV: todo "plot" and show CC?
     
@@ -125,11 +153,16 @@ def main():
     ax=0;
     
     print("Unique species: {}".format( idxdf.species.unique()));
+
+
+    #REV: make pairwise distance plots here too.
+    #REV: I could do "groupby", but better to do for each timepoint (in each video), subtract distance from all other timepoints
+    #REV: in pairwise manner...huge. Note within vid of course.
+
+    #REV: need to ensure "number of timepoints" is similar? Or "distance" is kind of pointless on a per-video thing.
     
     
-    
-    
-    
+    dictlist=list();
     for v, vdf in idxdf.groupby('vid'):
         
         print("DOING for [{}]".format(v));
@@ -155,7 +188,7 @@ def main():
         ax+=1;
         
             
-        dictlist=list();
+        
         for tidx1, tdf1 in vgazedf.groupby('trialidx'):
             subj1=idxdf[ idxdf.trialidx==tidx1 ].iloc[0].subj;
             spec1=idxdf[ idxdf.trialidx==tidx1 ].iloc[0].species;
@@ -166,23 +199,27 @@ def main():
                     spec2=idxdf[ idxdf.trialidx==tidx2 ].iloc[0].species;
                     
                     mylen=np.min([len(tdf1.index), len(tdf2.index)]);
-                    tdf1=tdf1.iloc[:mylen].reset_index(drop=True);
-                    tdf2=tdf2.iloc[:mylen].reset_index(drop=True); #pd corr uses index?
+                    print("{}:{}  -  {}:{}    ({})".format(spec1,subj1,spec2,subj2,mylen));
+                    DOCORR=True;
+                    if(DOCORR):
+                        tdf1=tdf1.iloc[:mylen].reset_index(drop=True);
+                        tdf2=tdf2.iloc[:mylen].reset_index(drop=True); #pd corr uses index?
+                        
+                        x1=tdf1.pix_x;
+                        x2=tdf2.pix_x;
+                        xcc = x1.corr( x2 ); #REV: these values are LOW. Anyways, plot them to see...
+                        
+                        y1=tdf1.pix_y;
+                        y2=tdf2.pix_y;
+                        ycc = y1.corr( y2 );
+                        
+                        #xcc = np.corrcoef(x1, x2)[0][0];
+                        #ycc = np.corrcoef(y1, y2)[0][0];
+                        xycc = (xcc+ycc)/2;
+                        dictlist.append( dict(npts=mylen, vid=v, t1=tidx1, t2=tidx2, xcc=xcc, ycc=ycc, xycc=xycc, subj1=subj1, subj2=subj2, spec1=spec1, spec2=spec2) );
+                        print("CC: {} {} {}".format(xcc,ycc,xycc));
+                        pass;
                     
-                    
-                    x1=tdf1.pix_x;
-                    x2=tdf2.pix_x;
-                    xcc = x1.corr( x2 ); #REV: these values are LOW. Anyways, plot them to see...
-                    
-                    y1=tdf1.pix_y;
-                    y2=tdf2.pix_y;
-                    ycc = y1.corr( y2 );
-                    
-                    #xcc = np.corrcoef(x1, x2)[0][0];
-                    #ycc = np.corrcoef(y1, y2)[0][0];
-                    xycc = (xcc+ycc)/2;
-                    dictlist.append( dict(npts=mylen, vid=v, t1=tidx1, t2=tidx2, xcc=xcc, ycc=ycc, xycc=xycc, subj1=subj1, subj2=subj2, spec1=spec1, spec2=spec2) );
-                    print("CC: {} {} {}".format(xcc,ycc,xycc));
                     pass;
                 pass;
             pass;
