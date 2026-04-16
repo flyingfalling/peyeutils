@@ -288,6 +288,7 @@ sdf, ev = pu.peyeutils.preproc_and_compute_events( df=df,
                                                    xcol=xcol,
                                                    ycol=ycol,
                                                    sr_hzsec=targ_sr_hzsec,
+                                                   mainseq_err_gain=1.5,
                                                    PLOT=True,
                                                   );
 

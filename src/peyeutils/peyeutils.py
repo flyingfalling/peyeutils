@@ -54,19 +54,22 @@ def preproc_and_compute_events(df,
                                xcol,
                                ycol,
                                sr_hzsec,
+                               mainseq_err_gain, #REV: 1.5 for eyeXSL, 3? for tobii g3...
                                badcol='',
                                nablinks=True,
                                blinkcol='blink',
                                eyecol='eye',
                                PLOT=False,
                                DEBUG=False,
+                               
                                ):
 
     import pandas as pd;
     import numpy as np;
     
     min_sacc_dva = 0.33;
-    min_isi_sec = 0.040;
+    min_isi_sec = 0.060; #REV: true minimum time to code saccade?
+    
     blinksacc_merge_envelop_sec=0.040;
     
     ##############################
@@ -91,10 +94,11 @@ def preproc_and_compute_events(df,
     #REV: combine this into single large params dict. These do not affect results very much
     params = params1 | params2;
     
+    
     params['noiseconst'] = 8;
     params['dilate_nan_win_sec'] = 0.010;
-    params['min_sac_dur_sec'] = 0.014;
-    params['min_intersac_dur_sec'] = 0.100;
+    params['min_sac_dur_sec'] = 0.010;
+    params['min_intersac_dur_sec'] = min_isi_sec; #0.020; #REV: problem with this is situations with VOR fast phases and "real" saccades.
     params['minblinksec'] = 0.030;
     params['startvel'] = 100;
 
@@ -119,11 +123,17 @@ def preproc_and_compute_events(df,
     sparams['samplerate'] = sr_hzsec;
     sparams['noiseconst'] = 4; #REV: 4 works.
     sparams['ek_vel_thresh_lambda'] = 6; # 6 works
+    sparams['ek_min_dur_sec']=0.012;
     sparams['nh_init_vel_thresh_degsec'] = 100;
     sparams['om_max_peaks_per_sec']=10;
     sparams['om_vel_thresh_degsec']=25; #REV: was 3 or 5 wtf? #REV: won't work for saccade -> pursuit? REV: relative to "surround"?
     sparams['om_vel_peak_detect_shift_sec']=0.0075;
     sparams['om_usepca']=False;
+    
+    sparams['saccadr_min_sep_sec']=min_isi_sec; #0.050;
+    sparams['saccadr_min_dur_sec']=0.010;
+    
+       
     
     sdf, sev = pu.eyemovements.saccadr.saccadr_detect_saccades(sdf, sparams, tsecname=tcol, xname=xcol, yname=ycol);
     rdf, rev = pu.eyemovements.remodnav.remodnav_classify_events(sdf, params); #REV: ah, x/y names are stored in "params"
@@ -144,7 +154,7 @@ def preproc_and_compute_events(df,
         
         mainseq, mygraphics = pu.eyemovements.mainseq.mainseq_ampldur_linear_95pctl_human_chen2021_wplot( saccs['ampldva'],
                                                                                                           saccs['dursec'],
-                                                                                                          error_gain=1.5,
+                                                                                                          error_gain=mainseq_err_gain,
                                                                                                          );
         xmin=0;
         xmax=25;

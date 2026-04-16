@@ -817,7 +817,9 @@ def temporary_impute(df):
 #REV: note, this does NOT DETECT BLINKS (assumes they are already detected as NANs).
 #REV: oh shit, savgol will not allow NAN...
 def remodnav_preprocess_eyetrace2d(eyesamps : pd.DataFrame,
-                                   params : dict):
+                                   params : dict,
+                                   DEBUG=False,
+                                   ):
     
     samplerate=params['samplerate_hzsec'];
     dva_per_px=params['dva_per_px'];

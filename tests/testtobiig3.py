@@ -73,11 +73,17 @@ def main():
     xcol='gaze2d_lr_dva';
     ycol='gaze2d_du_dva';
     tcol='Tsec0';
+
+    #REV: need a way to filter "invalid" data based on pupilsize or fourier transform or something.
+    ## Eyes can't POSSIBLY (physiologically) move in that way...
+
+    df = df[ df[tcol] < 60 ].copy(); #REV: just do first 60 seconds  for testing...
     sdf, ev = pu.peyeutils.preproc_and_compute_events( df=df,
                                                        tcol=tcol,
                                                        xcol=xcol,
                                                        ycol=ycol,
                                                        sr_hzsec=sr,
+                                                       mainseq_err_gain=5,
                                                        PLOT=True,
                                                       );
 

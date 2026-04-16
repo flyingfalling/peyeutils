@@ -25,10 +25,12 @@ def consolidate_saccades(df,
     import pandas as pd;
     ev = pd.concat(eyelist).reset_index(drop=True);
     return ev;
-    
+
+
+
 def intersection_saccades(df,
-                         eyecol='eye',
-                         isi_threshold=0.010,):
+                          eyecol='eye',
+                          ):
     if( len((df['label'].unique() )) != 1 ):
         raise Exception("consolidate_saccades, got more than 1 unique labels (should only have SACC) : {}".format(df['label'].unique()));
     if( df['label'].unique()[0] != 'SACC' ):
@@ -40,7 +42,6 @@ def intersection_saccades(df,
         pass;
     eyelist=list();
     for eye, eyedf in df.groupby(eyecol, as_index=False):
-        #myev=_consolidate_saccades_slow(df=df, isi_threshold=isi_threshold);
         myev= consolidate_saccades_strict(df=df);
         myev[eyecol] = eye;
         eyelist.append(myev);

@@ -85,6 +85,9 @@ def mainseq_ampldur_linear_95pctl_human_chen2021( myampl_dva,
     
     params = getparams_mainseq_ampldur_linear_95pctl_human_chen2021(error_gain=error_gain);
     
+    if(error_gain <= 0):
+        return np.full(myampl_dva.shape, True);
+    
     return mainseq_ampldur_linear( myampl_dva = myampl_dva,
                                    mydur_sec = mydur_sec,
                                    **params
@@ -99,6 +102,10 @@ def mainseq_ampldur_linear_95pctl_human_chen2021_wplot( myampl_dva,
                                                        ):
     
     params = getparams_mainseq_ampldur_linear_95pctl_human_chen2021(error_gain=error_gain);
+
+    if(error_gain <= 0):
+        print("Skipping plot, all saccades are accepted");
+        return np.full(myampl_dva.shape, True);
     
     return mainseq_ampldur_linear_wplot(myampl_dva = myampl_dva,
                                         mydur_sec = mydur_sec,
