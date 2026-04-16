@@ -1,0 +1,54 @@
+
+Fix it so that center of VB center (x,y) and video center (x,y) in VID S.
+
+(It does not match unless "load" happens AFTER change in VBOX center).
+
+
+
+
+PEYEUTILS loading of fmri freeviewing trials.
+
+
+FC simple example.
+
+
+
+Extract saliency at gaze location?
+
+
+
+For wajd:
+
+when switched to 1 sec every 5sec vs 100 msec ever 1sec.
+
+LFP implanted where? Very large uV?
+Light -> heating -> activation (inward current = negative LFP).
+
+Real JAWS = inhibition (Cl open) = hyperpolarization = positive LFP.
+DOX "disables" virus?
+
+Use pre-stimulation as baseline for after ("template").
+Want "pure" artifact template... (likely includes visual info or something? But stable baseline...)
+
+
+Ah, during free viewing "random" times...
+
+
+
+
+When did you put the headpost on naushika? -> October. No headpost?
+
+
+
+
+
+
+
+
+For taka:
+
+1) Combine all scripts to make (EDF->trials->gaze->BOLD)
+2) Gaze-locked saliency.
+
+
+3) Summary of gaze (for spot checking?)
