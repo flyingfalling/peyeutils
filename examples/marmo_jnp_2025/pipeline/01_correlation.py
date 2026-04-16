@@ -140,29 +140,39 @@ def main():
     print(len(bigdf.index));
     bigdf = bigdf.sort_values(by=['trialidx', 'movie_ts']).reset_index(drop=True);
     print(bigdf.subj.unique());
-    bigdf.groupby(['subj']).count().to_csv('wtf.csv');
+    #bigdf.groupby(['subj']).count().to_csv('wtf.csv');
     
     ##REV: todo "plot" and show CC?
+
+    DOPLOT=False;
+    DOCORR=False;
     
-    nrow=len( idxdf.vid.unique() );
-    rowhei=4;
-    rowwid=8;
-    
-    ncol=len( idxdf.species.unique() );
-    fig, axs = plt.subplots(nrows=nrow, ncols=ncol, figsize=(rowwid*ncol, rowhei*nrow), sharey=True, sharex=True);
-    ax=0;
+    if(DOPLOT):
+        nrow=len( idxdf.vid.unique() );
+        rowhei=4;
+        rowwid=8;
+        
+        ncol=len( idxdf.species.unique() );
+        fig, axs = plt.subplots(nrows=nrow, ncols=ncol, figsize=(rowwid*ncol, rowhei*nrow), sharey=True, sharex=True);
+        ax=0;
+        pass;
     
     print("Unique species: {}".format( idxdf.species.unique()));
-
-
+    
+    
     #REV: make pairwise distance plots here too.
     #REV: I could do "groupby", but better to do for each timepoint (in each video), subtract distance from all other timepoints
     #REV: in pairwise manner...huge. Note within vid of course.
-
+    
     #REV: need to ensure "number of timepoints" is similar? Or "distance" is kind of pointless on a per-video thing.
     
+    #REV: clean data?
+    bigdf.loc[ ( (bigdf.pix_x > 400) | (bigdf.pix_x < -400) |
+                 (bigdf.pix_y > 400) | (bigdf.pix_y < -400) ),
+               ['pix_x', 'pix_y'] ] = np.nan;
     
-    dictlist=list();
+    corrlist=list();
+    distlist=list();
     for v, vdf in idxdf.groupby('vid'):
         
         print("DOING for [{}]".format(v));
@@ -175,18 +185,19 @@ def main():
         #vgazedf = gazedf.loc[ gazedf['trialidx'].isin(trials) ];
         vgazedf = bigdf.loc[ bigdf['trialidx'].isin(trials) ];
         #print(vgazedf);
+        
 
-        
-        for i, (spec, specdf) in enumerate(vgazedf.groupby('species')):
-            print("Species: {}".format(spec));
-            #REV: ah no error estimator -> Fast
-            sns.lineplot(data=specdf, x='movie_ts', y='pix_x', hue='subj', style='trialidx', lw=0.2, ax=axs[ax][i]);
+        if(DOPLOT):
+            for i, (spec, specdf) in enumerate(vgazedf.groupby('species')):
+                print("Species: {}".format(spec));
+                #REV: ah no error estimator -> Fast
+                sns.lineplot(data=specdf, x='movie_ts', y='pix_x', hue='subj', style='trialidx', lw=0.2, ax=axs[ax][i]);
+                pass;
+            axs[ax][i].set_ylim([-400,400]);
+            ax+=1;
+
             pass;
-        axs[ax][i].set_ylim([-400,400]);
-        
-        
-        ax+=1;
-        
+                
             
         
         for tidx1, tdf1 in vgazedf.groupby('trialidx'):
@@ -198,37 +209,98 @@ def main():
                     subj2=idxdf[ idxdf.trialidx==tidx2 ].iloc[0].subj;
                     spec2=idxdf[ idxdf.trialidx==tidx2 ].iloc[0].species;
                     
-                    mylen=np.min([len(tdf1.index), len(tdf2.index)]);
-                    print("{}:{}  -  {}:{}    ({})".format(spec1,subj1,spec2,subj2,mylen));
-                    DOCORR=True;
-                    if(DOCORR):
-                        tdf1=tdf1.iloc[:mylen].reset_index(drop=True);
-                        tdf2=tdf2.iloc[:mylen].reset_index(drop=True); #pd corr uses index?
-                        
-                        x1=tdf1.pix_x;
-                        x2=tdf2.pix_x;
-                        xcc = x1.corr( x2 ); #REV: these values are LOW. Anyways, plot them to see...
-                        
-                        y1=tdf1.pix_y;
-                        y2=tdf2.pix_y;
-                        ycc = y1.corr( y2 );
-                        
-                        #xcc = np.corrcoef(x1, x2)[0][0];
-                        #ycc = np.corrcoef(y1, y2)[0][0];
-                        xycc = (xcc+ycc)/2;
-                        dictlist.append( dict(npts=mylen, vid=v, t1=tidx1, t2=tidx2, xcc=xcc, ycc=ycc, xycc=xycc, subj1=subj1, subj2=subj2, spec1=spec1, spec2=spec2) );
-                        print("CC: {} {} {}".format(xcc,ycc,xycc));
-                        pass;
                     
+                    
+                    #REV: should not interpolate across NAN times...
+                    tdf = pd.merge(left=tdf1, left_on='movie_ts',
+                                   right=tdf2, right_on='movie_ts',
+                                   how='outer',
+                                   suffixes=('_1', '_2')
+                                   ).reset_index(drop=True)[['movie_ts', 'pix_x_1', 'pix_y_1', 'pix_x_2', 'pix_y_2']];
+                    
+                    tdf = tdf.sort_values(by='movie_ts').reset_index(drop=True);
+                    tdf = tdf.interpolate(method='linear', limit=1); #REV: limit 1 nan filled.
+
+                    mylen=len(tdf.index);
+                    
+                    tdf1 = tdf[['movie_ts', 'pix_x_1', 'pix_y_1']].reset_index(drop=True).rename(columns={'pix_x_1':'pix_x','pix_y_1':'pix_y'});
+                    tdf2 = tdf[['movie_ts', 'pix_x_2', 'pix_y_2']].reset_index(drop=True).rename(columns={'pix_x_2':'pix_x','pix_y_2':'pix_y'});
+                    
+                    #tdf1=tdf1.iloc[:mylen].reset_index(drop=True);
+                    #tdf2=tdf2.iloc[:mylen].reset_index(drop=True); #pd corr uses index?
+                    
+                    #tdf1['t'] = tdf2.movie_ts.values;
+                    
+                    tdiff = np.sum(abs(tdf1.movie_ts - tdf2.movie_ts));
+                    if(tdiff != 0):
+                        print( tdf1[ (tdf1.movie_ts - tdf1.t) != 0 ][['movie_ts', 't']] );
+                        raise Exception("TDIFF not zero {}".format(tdiff));
+                    
+                    x1=tdf1.pix_x;
+                    x2=tdf2.pix_x;
+                    xcc = x1.corr( x2 ); #REV: these values are LOW. Anyways, plot them to see...
+                    
+                    y1=tdf1.pix_y;
+                    y2=tdf2.pix_y;
+                    ycc = y1.corr( y2 );
+                    
+                    ntps1 = np.isfinite(x1).sum();
+                    ntps2 = np.isfinite(x2).sum();
+                    minpts=np.min([ntps1, ntps2]);
+
+                    noverlap = (np.isfinite(x1) & np.isfinite(x2)).sum();
+                    
+                    #xcc = np.corrcoef(x1, x2)[0][0];
+                    #ycc = np.corrcoef(y1, y2)[0][0];
+                    xycc = (xcc+ycc)/2;
+                    corrlist.append( dict(npts=mylen, vid=v, t1=tidx1, t2=tidx2, xcc=xcc, ycc=ycc, xycc=xycc, subj1=subj1, subj2=subj2, spec1=spec1, spec2=spec2, ntps1=ntps1, ntps2=ntps2, overlap=noverlap) );
+                    print("{}:{} ({}/{}={:3.1f}%)  -  {}:{} ({}/{}={:3.1f}%)  OVERLAP:{}/{}    X: {:3.2f}  Y: {:3.2f}   XY: {:3.2f}".format(spec1,subj1,ntps1,mylen,100*ntps1/mylen,spec2,subj2,ntps2,mylen, 100*ntps2/mylen, noverlap,mylen, xcc, ycc, xycc));
+
+
+                    #REV: compute distance too.
+
+                    #REV: figure out timepoints (and videos) for which we are "far apart" versus "close together" and figure out WHY
+                    # (what kind of stimuli? What videos?).
+                    ## Show videos of "most similar" or "most different" eye movements? (separate by words/faces...?)
+
+                    #REV: we need to assume that pixel size is full (i.e. it's effectively normalized). Videos are NEARLY same size in pixels
+                    # Although DVA is significantly different...
+                    pxdist=np.sqrt( (tdf1.pix_x-tdf2.pix_x)**2 +
+                                    (tdf1.pix_y-tdf2.pix_y)**2); #REV: chunk in 5 px distances? Or, save per ?
+                    #REV: then need to "merge" add one for each, copying the others down...
+                    mydict = dict(subj1=subj1,
+                                  subj2=subj2,
+                                  spec1=spec1,
+                                  spec2=spec2,
+                                  vid=v,
+                                  t1=tidx1,
+                                  t2=tidx2,
+                                  );
+                    #print(tdf1.columns);
+                    ddf = pd.DataFrame( { 'dist_px':pxdist, 'movie_ts':tdf.movie_ts } );
+                    ddf = ddf.assign( **mydict );
+                    distlist.append(ddf);
                     pass;
                 pass;
             pass;
         pass;
 
-    fig.savefig('manualplot.pdf');
+    if(DOPLOT):
+        fig.savefig('manualplot.pdf');
+        pass;
     
-    corrdf = pd.DataFrame( dictlist );
+    corrdf = pd.DataFrame( corrlist );
     corrdf.to_csv('gazecoors.csv', index=False);
+    
+    distdf = pd.concat( distlist );
+    distdf.to_csv('gazedists.csv', index=False);
+
+
+    ## 4D cube, of distance of source/dest for each distance.
+    # I need a plot of distribution distance...for each video?
+
+    # is each video quite different?
+
     
     ################# SALMAP AUROC ##################
     
