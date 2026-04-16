@@ -1,18 +1,12 @@
-import pandas as pd
-import numpy as np
-import sys
+import pandas as pd;
+import numpy as np;
+import sys;
 import os;
 
 import matplotlib.pyplot as plt
-import seaborn as sns
+import seaborn as sns;
 
-import peyeutils.utils as ut;
 import peyeutils as pu;
-import peyeutils.eyemovements.saccadr as saccr;
-import peyeutils.eyemovements.remodnav as rv;
-
-from pandas.api.types import is_numeric_dtype
-from pandas.api.types import is_string_dtype
 
 
 DEBUG=False;
@@ -186,17 +180,13 @@ xyunits_dva=1;
 truesrs = { c:tobiisr for c in df.columns  };
 
 
-
-from peyeutils.utils import interpolate_df_to_samplerate;
-
-
 #REV: taking the mean of each timepoint (should already be fine, I already dropped duplicates above) 
 df = df.groupby([tname], as_index=False).agg( saccr.safe_agg(df,'mean') ).reset_index(drop=True);
 
 #REV: interpolate (upsample) to 1000 Hz...
-df = interpolate_df_to_samplerate(df, tname, targ_sr_hzsec, startsec=None, endsec=None,
-                                  method=interptype, order=interporder, truesrs=truesrs, tcolunit_s=1,
-                                  );
+df = peyeutils.utils.tsutils.interpolate_df_to_samplerate(df, tname, targ_sr_hzsec, startsec=None, endsec=None,
+                                                          method=interptype, order=interporder, truesrs=truesrs, tcolunit_s=1,
+                                                          );
 
 baddatacol='mybaddata';
 df[baddatacol] = False;

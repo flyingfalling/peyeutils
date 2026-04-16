@@ -81,8 +81,9 @@ def strsafe_interpolate(df, tcol, method='linear', order=1,DEBUG=False):
     
     
     strdf = df[ notinterpcolumns ];
-    strdf = strdf.ffill();
-
+    strdf = strdf.ffill(); #REV: same?
+    #strdf = strdf.infer_objects(copy=False); #.ffill(); REV: same?
+    
     if(DEBUG):
         print("WILL NOT INTERP", notinterpcolumns, strdf.dtypes);
         pass;
@@ -107,8 +108,16 @@ def refill_interpolate_NANs( df, maskdf, nontcol ):
     
     for c in nontcol:
         toset= (maskdf[c] == False);
+        from pandas.api.types import is_numeric_dtype
         if(len(toset) > 0 ):
-            df.loc[ toset, c ] = np.nan;
+            #and is_numeric_dtype( df[c] ) ):
+            if( df[c].dtype == bool ):
+                print("Column {} being set".format(c));
+                df.loc[toset, c] = False; #REV: not really 'correct' per-se...
+                pass;
+            else:
+                df.loc[ toset, c ] = np.nan;
+                pass;
             pass;
         pass;
         

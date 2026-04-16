@@ -58,7 +58,7 @@ def getparams_mainseq_ampldur_linear_95pctl_human_chen2021(error_gain=1):
     
     dvavals = np.array([0, 16]);
     topvals_msec = np.array([45, 170]) * error_gain;
-    botvals_msec = np.array([18, 60]) * (1/error_gain);
+    botvals_msec = np.array([14, 60]) * (1/error_gain); #REV: was 18 msec? For low at 0.
 
     ts = topvals_msec * 1e-3;
     bs = botvals_msec * 1e-3;

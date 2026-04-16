@@ -380,7 +380,7 @@ def preproc_peyefv_edf( in_edf_path : str,
     
     
     df, ev, msgs, badtrial = pu.eyelink.preproc_EL_A_clean_samples(s,e,m);
-    df = pu.eyelink.preproc_EL_rawcalib_px(df, msgs);
+    df = pu.eyelink.preproc_EL_rawcalib_px(df, msgs); #REV: this *ASSUMES* that viewbox etc. is true.
     df = pu.peyefv.preproc_peyefreeviewing_dva_from_flatscreen(df, msgs);
     
     if( False == badtrial ):

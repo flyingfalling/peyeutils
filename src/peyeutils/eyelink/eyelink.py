@@ -432,7 +432,7 @@ def preproc_EL_A_clean_samples(rawsamps, rawevents, rawmessages,
             raise Exception("Unrecognized eye [{}], I only recognize from: {}".format(eye, [pu.PEYEUTILS_LEFT_EYE, pu.PEYEUTILS_RIGHT_EYE]));
         pass;
     
-    print("EYELINK RECORDING FROM EYES: {}".format(ELeyes));
+    print("EYELINK RECORDING FROM EYES: {} @ SR: {} Hz".format(ELeyes, ELsr));
     
     df = preproc_EL_A01_separate_samps_eye(rawsamps,
                                            samplerate=ELsr,
@@ -450,6 +450,9 @@ def preproc_EL_A_clean_samples(rawsamps, rawevents, rawmessages,
                                                            sr_hzsec=ELsr,
                                                            timeunitsec=pu.EL_TIMEUNIT_SEC,
                                                            );
+
+    elparamdict['badtrial'] = badtrial;
+    
     if( badtrial ):
         print("BADTRIAL (no data) -- skipping pupil size analysis");
         df['bad'] = True; #should fill in all bad ...
@@ -482,7 +485,7 @@ def preproc_EL_A_clean_samples(rawsamps, rawevents, rawmessages,
                                              );
         pass;
     
-    return df, ev, msgs, badtrial;
+    return df, ev, msgs, elparamdict;
     
     
     
