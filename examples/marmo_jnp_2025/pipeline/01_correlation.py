@@ -142,6 +142,13 @@ def main():
     print(bigdf.subj.unique());
     #bigdf.groupby(['subj']).count().to_csv('wtf.csv');
     
+    #REV: clean data?
+    bigdf.loc[ ( (bigdf.pix_x > 400) | (bigdf.pix_x < -400) |
+                 (bigdf.pix_y > 400) | (bigdf.pix_y < -400) ),
+               ['pix_x', 'pix_y'] ] = np.nan;
+    
+    bigdf.to_csv('bigdf.csv', index=False);
+    exit(0);
     ##REV: todo "plot" and show CC?
 
     DOPLOT=False;
@@ -166,13 +173,12 @@ def main():
     
     #REV: need to ensure "number of timepoints" is similar? Or "distance" is kind of pointless on a per-video thing.
     
-    #REV: clean data?
-    bigdf.loc[ ( (bigdf.pix_x > 400) | (bigdf.pix_x < -400) |
-                 (bigdf.pix_y > 400) | (bigdf.pix_y < -400) ),
-               ['pix_x', 'pix_y'] ] = np.nan;
-    
+        
     corrlist=list();
     distlist=list();
+    nulllist=list();
+    ncorrlist=list();
+    
     for v, vdf in idxdf.groupby('vid'):
         
         print("DOING for [{}]".format(v));
@@ -225,7 +231,12 @@ def main():
                     
                     tdf1 = tdf[['movie_ts', 'pix_x_1', 'pix_y_1']].reset_index(drop=True).rename(columns={'pix_x_1':'pix_x','pix_y_1':'pix_y'});
                     tdf2 = tdf[['movie_ts', 'pix_x_2', 'pix_y_2']].reset_index(drop=True).rename(columns={'pix_x_2':'pix_x','pix_y_2':'pix_y'});
+                    toshuffle=['pix_x', 'pix_y'];
                     
+                    ntdf1 = tdf1.copy();
+                    ntdf1[toshuffle] = ntdf1[toshuffle].sample(frac=1).values;
+                    
+                    #df[cols_to_shuffle] = df[cols_to_shuffle].sample(frac=1).values
                     #tdf1=tdf1.iloc[:mylen].reset_index(drop=True);
                     #tdf2=tdf2.iloc[:mylen].reset_index(drop=True); #pd corr uses index?
                     
@@ -243,17 +254,29 @@ def main():
                     y1=tdf1.pix_y;
                     y2=tdf2.pix_y;
                     ycc = y1.corr( y2 );
+
+                    nxcc = x2.corr( ntdf1.pix_x );
+                    nycc = y2.corr( ntdf1.pix_y );
+                    nxycc = (nxcc+nycc)/2;
+                    
+                    #REV: should randomly sample N times and take mean dist? Mean of each timepoint? Will approach the mean dist.
+                    #REV: right, problem is mean distance is different...how about mean and stddev of X/Y?
+                    null_noverlap=(np.isfinite(x2) & np.isfinite(ntdf1.pix_x)).sum();
                     
                     ntps1 = np.isfinite(x1).sum();
                     ntps2 = np.isfinite(x2).sum();
-                    minpts=np.min([ntps1, ntps2]);
-
+                    #minpts=np.min([ntps1, ntps2]);
+                    
                     noverlap = (np.isfinite(x1) & np.isfinite(x2)).sum();
                     
                     #xcc = np.corrcoef(x1, x2)[0][0];
                     #ycc = np.corrcoef(y1, y2)[0][0];
                     xycc = (xcc+ycc)/2;
+
                     corrlist.append( dict(npts=mylen, vid=v, t1=tidx1, t2=tidx2, xcc=xcc, ycc=ycc, xycc=xycc, subj1=subj1, subj2=subj2, spec1=spec1, spec2=spec2, ntps1=ntps1, ntps2=ntps2, overlap=noverlap) );
+
+                    ncorrlist.append( dict(npts=mylen, vid=v, t1=tidx1, t2=tidx2, xcc=nxcc, ycc=nycc, xycc=nxycc, subj1=subj1, subj2=subj2, spec1=spec1, spec2=spec2, ntps1=ntps1, ntps2=ntps2, overlap=null_noverlap) );
+                    
                     print("{}:{} ({}/{}={:3.1f}%)  -  {}:{} ({}/{}={:3.1f}%)  OVERLAP:{}/{}    X: {:3.2f}  Y: {:3.2f}   XY: {:3.2f}".format(spec1,subj1,ntps1,mylen,100*ntps1/mylen,spec2,subj2,ntps2,mylen, 100*ntps2/mylen, noverlap,mylen, xcc, ycc, xycc));
 
 
@@ -267,6 +290,9 @@ def main():
                     # Although DVA is significantly different...
                     pxdist=np.sqrt( (tdf1.pix_x-tdf2.pix_x)**2 +
                                     (tdf1.pix_y-tdf2.pix_y)**2); #REV: chunk in 5 px distances? Or, save per ?
+
+                    npxdist = np.sqrt( (ntdf1.pix_x-tdf2.pix_x)**2 +
+                                    (ntdf1.pix_y-tdf2.pix_y)**2); #REV: chunk in 5 px distances? Or, save per ?
                     #REV: then need to "merge" add one for each, copying the others down...
                     mydict = dict(subj1=subj1,
                                   subj2=subj2,
@@ -277,6 +303,10 @@ def main():
                                   t2=tidx2,
                                   );
                     #print(tdf1.columns);
+                    nddf = pd.DataFrame( { 'dist_px':npxdist, 'movie_ts':tdf.movie_ts } );
+                    nddf = nddf.assign( **mydict );
+                    nulllist.append(nddf);
+                    
                     ddf = pd.DataFrame( { 'dist_px':pxdist, 'movie_ts':tdf.movie_ts } );
                     ddf = ddf.assign( **mydict );
                     distlist.append(ddf);
@@ -290,11 +320,21 @@ def main():
         pass;
     
     corrdf = pd.DataFrame( corrlist );
-    corrdf.to_csv('gazecoors.csv', index=False);
+    corrdf.to_csv('gazecorrs.csv', index=False);
+
+    ncorrdf = pd.DataFrame( ncorrlist );
+    ncorrdf.to_csv('nullcorrs.csv', index=False);
     
     distdf = pd.concat( distlist );
     distdf.to_csv('gazedists.csv', index=False);
+    
+    nulldf = pd.concat( nulllist );
+    nulldf.to_csv('nulldists.csv', index=False);
 
+    
+    
+    
+    
 
     ## 4D cube, of distance of source/dest for each distance.
     # I need a plot of distribution distance...for each video?

@@ -3,33 +3,212 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np;
 import sys
+from matplotlib.lines import Line2D
 
 from distplot import *; #REV: import self?
+
+
+#REV: todo:
+## plot "distribution" of each species overall (to show it's not just
+##  "wider looking" -> it's DIFFERENT locations).
+
+## NULL MODEL -> shuffle time points, what is distance ABOVE that?
+## REV: do "within" each video?
+## REV: either use all data 
+
 
 if __name__=='__main__':
     
     incsv = sys.argv[1];
     df = pd.read_csv(incsv);
-
+    tag='';
+    if( len(sys.argv) > 2 ):
+        tag='_' + sys.argv[2];
+        pass;
+    
     # 1. Broadest overview (1 line per species)
     fig = plot_distributions(df, grouping_level='species', within_species_only=True);
-    fig.savefig('species_diffs.pdf');
+    fig.savefig('species_diffs{}.pdf'.format(tag));
+    plt.close();
+    
+    fig = plot_distributions_with_variance(df, grouping_level='species', within_species_only=True);
+    fig.savefig('species_diffs_wvar{}.pdf'.format(tag));
     plt.close();
     
     # 2. Medium detail (1 line per subject, averaging all their interactions)
     fig = plot_distributions(df, grouping_level='subject', within_species_only=True);
-    fig.savefig('subject_diffs.pdf');
+    fig.savefig('subject_diffs{}.pdf'.format(tag));
+    plt.close();
+    
+    fig = plot_distributions_with_variance(df, grouping_level='subject', within_species_only=True);
+    fig.savefig('subject_diffs_wvar{}.pdf'.format(tag));
     plt.close();
     # 3. Highest detail (1 line per unique pair of subjects)
     #REV: can't see shit.
     #plot_distributions(df, grouping_level='pair' ); #, vid_filter='vid_001')
+    '''
     for vid, vdf in df.groupby('vid'):
         print("Doing for {}".format(vid));
         fig = plot_distributions(vdf, grouping_level='species', within_species_only=True);
-        fig.savefig('species_diffs_{}.pdf'.format(vid));
+        fig.savefig('species_diffs_{}{}.pdf'.format(vid,tag));
         plt.close();
         pass;
+    '''
     pass;
+
+
+
+def plot_distributions_with_variance(df, grouping_level='species', within_species_only=False):
+    """
+    Plots distributions with variance bands representing the standard deviation across videos.
+    grouping_level: 'species', 'subject', or 'pair'
+    """
+    df_plot = df.copy()
+    
+    # 1. Apply Filters
+    if within_species_only:
+        df_plot = df_plot[df_plot['spec1'] == df_plot['spec2']]
+        
+    if df_plot.empty:
+        print("No data left after filtering!")
+        return
+        
+    df_plot['pair'] = df_plot['subj1'] + " & " + df_plot['subj2']
+    
+    # 2. Setup Grouping & Line Thickness
+    if grouping_level == 'species':
+        hue_col = 'spec1'
+        linewidth = 2.5
+    elif grouping_level == 'subject':
+        hue_col = 'subj1'
+        linewidth = 1.5
+    elif grouping_level == 'pair':
+        hue_col = 'pair'
+        linewidth = 1.0
+    else:
+        raise ValueError("grouping_level must be 'species', 'subject', or 'pair'")
+
+    # 3. Dynamic Color Logic
+    palette = {}
+    unique_species = df_plot['spec1'].unique()
+    
+    for sp in unique_species:
+        if grouping_level == 'species':
+            items = [sp]
+        elif grouping_level == 'subject':
+            items = df_plot[df_plot['spec1'] == sp]['subj1'].unique()
+        elif grouping_level == 'pair':
+            items = df_plot[df_plot['spec1'] == sp]['pair'].unique()
+            
+        n_items = len(items)
+        if sp == 'human':
+            intensities = [0.55] if n_items == 1 else np.linspace(0.35, 0.65, n_items)
+        else:
+            intensities = [0.7] if n_items == 1 else np.linspace(0.4, 0.95, n_items)
+            
+        for i, item in enumerate(items):
+            if sp == 'marmo': palette[item] = plt.cm.Blues(intensities[i])
+            elif sp == 'human': palette[item] = plt.cm.YlOrBr(intensities[i])
+            elif sp == 'macaq': palette[item] = plt.cm.Reds(intensities[i])
+            elif sp == 'infant': palette[item] = plt.cm.Greens(intensities[i])
+            else: palette[item] = plt.cm.Greys(intensities[i])
+
+    # 4. Plotting & Math Setup
+    fig, axes = plt.subplots(1, 2, figsize=(16, 6))
+    
+    # Create shared X-axis grids so we can average the video arrays together
+    max_dist = df_plot['dist_px'].max()
+    
+    # For Histogram: 50 bins across the whole range
+    n_bins = 50
+    x_grid_hist = np.linspace(0, max_dist, n_bins + 1)
+    x_centers_hist = (x_grid_hist[:-1] + x_grid_hist[1:]) / 2
+    
+    # For ECDF: 200 smooth points across the whole range
+    x_grid_ecdf = np.linspace(0, max_dist, 200)
+
+    legend_elements = []
+
+    # 5. Calculation & Plotting Loop
+    for group_val in df_plot[hue_col].unique():
+        group_df = df_plot[df_plot[hue_col] == group_val]
+        color = palette[group_val]
+        
+        hist_densities = []
+        ecdf_curves = []
+        
+        # Calculate curves for each video independently
+        for vid in group_df['vid'].unique():
+            vid_dist = group_df[group_df['vid'] == vid]['dist_px'].values
+            
+            # Skip videos that don't have enough data points for this specific pair/subject
+            if len(vid_dist) < 2:
+                continue
+                
+            # Compute Histogram Density (Area = 1) for this video
+            counts, _ = np.histogram(vid_dist, bins=x_grid_hist, density=True)
+            hist_densities.append(counts)
+            
+            # Compute ECDF for this video
+            vid_dist_sorted = np.sort(vid_dist)
+            y_ecdf = np.searchsorted(vid_dist_sorted, x_grid_ecdf, side='right') / len(vid_dist_sorted)
+            ecdf_curves.append(y_ecdf)
+            
+        # If no valid videos existed for this group, skip it
+        if not hist_densities:
+            continue
+
+        # Convert to arrays to calculate cross-video Mean and Std Dev
+        hist_densities = np.array(hist_densities)
+        mean_hist = np.mean(hist_densities, axis=0)
+        std_hist = np.std(hist_densities, axis=0)
+        
+        ecdf_curves = np.array(ecdf_curves)
+        mean_ecdf = np.mean(ecdf_curves, axis=0)
+        std_ecdf = np.std(ecdf_curves, axis=0)
+        
+        # Plot Histogram: Mean (step line) + Variance (shaded area)
+        axes[0].step(x_centers_hist, mean_hist, where='mid', color=color, linewidth=linewidth)
+        axes[0].fill_between(x_centers_hist, 
+                             np.clip(mean_hist - std_hist, 0, None), # Density can't go below 0
+                             mean_hist + std_hist, 
+                             step='mid', color=color, alpha=0.2)
+                             
+        # Plot ECDF: Mean (smooth line) + Variance (shaded area)
+        axes[1].plot(x_grid_ecdf, mean_ecdf, color=color, linewidth=linewidth)
+        axes[1].fill_between(x_grid_ecdf, 
+                             np.clip(mean_ecdf - std_ecdf, 0, 1), # ECDF bounded between 0 and 1
+                             np.clip(mean_ecdf + std_ecdf, 0, 1), 
+                             color=color, alpha=0.2)
+                             
+        # Store for the custom legend
+        legend_elements.append(Line2D([0], [0], color=color, lw=linewidth, label=group_val))
+
+    # 6. Formatting
+    filter_txt = " (Within-Species Only)" if within_species_only else " (All Data)"
+    
+    axes[0].set_title(f"Mean Distance Histogram ± 1 SD{filter_txt}")
+    axes[0].set_xlabel("Distance (px)")
+    axes[0].set_ylabel("Density (Average Across Videos)")
+
+    axes[1].set_title(f"Mean Cumulative Distribution ± 1 SD{filter_txt}")
+    axes[1].set_xlabel("Distance (px)")
+    axes[1].set_ylabel("Cumulative Proportion (Average Across Videos)")
+    
+    # Auto-column Legend
+    n_categories = len(legend_elements)
+    ncol = 3 if n_categories > 15 else 2 if n_categories > 8 else 1
+    
+    axes[1].legend(
+        handles=legend_elements, 
+        loc="lower right", 
+        title=hue_col.capitalize(), 
+        ncol=ncol, 
+        framealpha=0.9
+    )
+    
+    plt.tight_layout()
+    return fig;
 
 
 
