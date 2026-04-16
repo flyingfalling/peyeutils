@@ -79,11 +79,11 @@ def preproc_and_compute_events(df,
 
     ########### PREPROCESSING (smooth/savgol filter/median filter/dilate NANs  ################
     params1 = pu.eyemovements.remodnav.make_default_preproc_params(samplerate_hzsec=sr_hzsec,
-                                             timeunitsec=1,
-                                             dva_per_px=xyunits_dva,
-                                             xname=xcol,
-                                             yname=ycol,
-                                             tname=tcol);
+                                                                   timeunitsec=1,
+                                                                   dva_per_px=xyunits_dva,
+                                                                   xname=xcol,
+                                                                   yname=ycol,
+                                                                   tname=tcol);
     
     #REV: default other params for remodnav (will be ignored if not needed).
     params2 = pu.eyemovements.remodnav.make_default_params(samplerate_hzsec=sr_hzsec);
@@ -125,8 +125,8 @@ def preproc_and_compute_events(df,
     sparams['om_vel_peak_detect_shift_sec']=0.0075;
     sparams['om_usepca']=False;
     
-    sdf, sev = pu.eyemovements.saccadr.saccadr_detect_saccades(sdf, sparams, tsecname=tcol);
-    rdf, rev = pu.eyemovements.remodnav.remodnav_classify_events(sdf, params);
+    sdf, sev = pu.eyemovements.saccadr.saccadr_detect_saccades(sdf, sparams, tsecname=tcol, xname=xcol, yname=ycol);
+    rdf, rev = pu.eyemovements.remodnav.remodnav_classify_events(sdf, params); #REV: ah, x/y names are stored in "params"
     
     ev=rev;
     

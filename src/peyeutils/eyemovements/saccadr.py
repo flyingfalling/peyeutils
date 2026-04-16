@@ -837,11 +837,11 @@ def filter_nans_beforeafter( votes, x ):
 def saccadr_detect_saccades( sampdf,
                              params,
                              tsecname, #='Tsec',
+                             xname, #='xcdva',
+                             yname, #='ycdva',
                              namedmethods=('ek', 'om', 'nh'), #method_ek, method_om, method_nh), #REV: method_om is too forgiving?
                              extramethods=list(),
                              velocity_function=diff_ek,
-                             xname='xcdva',
-                             yname='ycdva',
                              eyecol='eye',
                             ):
 

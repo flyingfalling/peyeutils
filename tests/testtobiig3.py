@@ -12,13 +12,14 @@ import math;
 def main():
 
     mydir=sys.argv[1];
-    outcsv='tobiig3csvs';
+    outcsv='./tobiig3csvs'; #REV: ah this is hardcoded...
     
     recobj = pu.tobiig3.tobiig3_official_recording(mydir, outcsv, overwrite=False);
-    sr=500;
+    sr=1000;
     
+
+    #REV: will create_csvs cause overwrite? Nah.
     recobj.resample_interpolate_dfs(create_csvs=True, sr_hzsec=sr);
-    
     recobj.convert_to_nwu(create_csvs=True);
     recobj.gaze_to_ypr_deg(create_csvs=True);
     
@@ -69,11 +70,30 @@ def main():
     #print('saving to: {}'.format(fn));
     #df.to_csv(fn, index=False);
 
+    xcol='gaze2d_lr_dva';
+    ycol='gaze2d_du_dva';
+    tcol='Tsec0';
+    sdf, ev = pu.peyeutils.preproc_and_compute_events( df=df,
+                                                       tcol=tcol,
+                                                       xcol=xcol,
+                                                       ycol=ycol,
+                                                       sr_hzsec=sr,
+                                                       PLOT=True,
+                                                      );
+
+    print(ev);
+    
+    exit(0);
+
+
+
+
 
     
     import peyeutils.eyemovements.remodnav as rv;
     
-    params1 = rv.make_default_preproc_params(samplerate_hzsec=sr, timeunitsec=1, dva_per_px=1, xname='gaze2d_lr_dva',
+    params1 = rv.make_default_preproc_params(samplerate_hzsec=sr, timeunitsec=1, dva_per_px=1,
+                                             xname='gaze2d_lr_dva',
                                              yname='gaze2d_du_dva',
                                              tname='Tsec0');
     params2 = rv.make_default_params(samplerate_hzsec=sr);

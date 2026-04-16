@@ -617,7 +617,8 @@ def classify_intersaccade_periods(  eyesamps,
 
 def remodnav_classify_events(eyesamps,
                              params,
-                             eyecol='eye' ):
+                             eyecol='eye',
+                             DEBUG=False ):
     if eyecol not in eyesamps.columns:
         print("REMODNAV, adding eyecol {} to columns of samples (empty string)".format(eyecol));
         eyesamps[eyecol] = '';
@@ -1042,7 +1043,8 @@ def remodnav_preprocess_eyetrace2d(eyesamps : pd.DataFrame,
     #print("Filtering out >1k deg/s");
     finalvels = [];
     for vel in eyesamps.vel:
-        if( vel  >  params['maxveldegsec'] ):
+        if( vel  >  params['maxveldegsec'] and
+            True==DEBUG ):
             print("REV: Detected SAMPLE too-high velocity {:5.2f} > maxvel deg/sec {}? Maybe bad filter params?".format(vel,params['maxveldegsec'] ));
             #vel = finalvels[-1]; #REV: just replace it with the previous velocity? Fine with high sample rates...
             pass;

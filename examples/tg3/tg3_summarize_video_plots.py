@@ -534,6 +534,9 @@ def create_video_overlay(recobj, df):
   original_clip.close();
   return;
 
+
+
+
 def main():
     mypath = sys.argv[1]
     recobj = pu.tobiig3.tobiig3_official_recording(mypath, overwrite=True); 
