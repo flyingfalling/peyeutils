@@ -178,7 +178,6 @@ def preproc_and_compute_events(df,
 
     #REV: remove "impossible" ones before that.
     saccs = pu.eyemovements.combine.intersection_saccades( saccs,
-                                                           isi_threshold=0
                                                           );
     if(DEBUG):
         saccs['label'] = 'OSACC';
