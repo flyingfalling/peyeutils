@@ -1,5 +1,4 @@
 
-
 import pandas as pd
 import numpy as np;
 import sys
@@ -143,14 +142,15 @@ def main():
     #bigdf.groupby(['subj']).count().to_csv('wtf.csv');
     
     #REV: clean data?
-    bigdf.loc[ ( (bigdf.pix_x > 400) | (bigdf.pix_x < -400) |
-                 (bigdf.pix_y > 400) | (bigdf.pix_y < -400) ),
+    maxx=340;
+    maxy=340;
+    bigdf.loc[ ( (bigdf.pix_x > maxx) | (bigdf.pix_x < -maxx) |
+                 (bigdf.pix_y > maxy) | (bigdf.pix_y < -maxy) ),
                ['pix_x', 'pix_y'] ] = np.nan;
     
     bigdf.to_csv('bigdf.csv', index=False);
-    exit(0);
     ##REV: todo "plot" and show CC?
-
+    
     DOPLOT=False;
     DOCORR=False;
     
@@ -223,7 +223,8 @@ def main():
                                    how='outer',
                                    suffixes=('_1', '_2')
                                    ).reset_index(drop=True)[['movie_ts', 'pix_x_1', 'pix_y_1', 'pix_x_2', 'pix_y_2']];
-                    
+
+                    #REV: this will fail wierdly if timestamps don't exactly match up by name? Oh well FIX IT LATER.
                     tdf = tdf.sort_values(by='movie_ts').reset_index(drop=True);
                     tdf = tdf.interpolate(method='linear', limit=1); #REV: limit 1 nan filled.
 

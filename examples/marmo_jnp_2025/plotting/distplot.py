@@ -14,7 +14,17 @@ from distplot import *; #REV: import self?
 
 ## NULL MODEL -> shuffle time points, what is distance ABOVE that?
 ## REV: do "within" each video?
-## REV: either use all data 
+## REV: either use all data
+
+
+#REV: I *should* only compare WITHIN same video (for each species),
+#    because otherwise bias of which videos were watched more will have a large effect!
+##  E.g. marmosets (new ones) watched all MTV clips...
+
+# Also bias in which time points were attended in which vids.
+## E.g. babies / kids love watching mario, hate watching news shit. So it's more of a "content" problem...
+
+## REV; should do: per-video!
 
 
 if __name__=='__main__':
@@ -58,7 +68,177 @@ if __name__=='__main__':
 
 
 
-def plot_distributions_with_variance(df, grouping_level='species', within_species_only=False):
+
+def plot_distributions_with_variance(df, grouping_level='species', within_species_only=False, central_tendency='median'):
+    """
+    Plots mean distributions with standard deviation bands across videos.
+    grouping_level: 'species', 'subject', or 'pair'
+    central_tendency: 'median', 'mean', or None (draws a dashed axvline for the group)
+    """
+    df_plot = df.copy()
+    
+    # 1. Apply Filters
+    if within_species_only:
+        df_plot = df_plot[df_plot['spec1'] == df_plot['spec2']]
+        
+    if df_plot.empty:
+        print("No data left after filtering!")
+        return
+        
+    df_plot['pair'] = df_plot['subj1'] + " & " + df_plot['subj2']
+    
+    # 2. Setup Grouping & Line Thickness
+    if grouping_level == 'species':
+        hue_col = 'spec1'
+        linewidth = 2.5
+    elif grouping_level == 'subject':
+        hue_col = 'subj1'
+        linewidth = 1.5
+    elif grouping_level == 'pair':
+        hue_col = 'pair'
+        linewidth = 1.0
+    else:
+        raise ValueError("grouping_level must be 'species', 'subject', or 'pair'")
+
+    # 3. Dynamic Color Logic
+    palette = {}
+    unique_species = df_plot['spec1'].unique()
+    
+    for sp in unique_species:
+        if grouping_level == 'species':
+            items = [sp]
+        elif grouping_level == 'subject':
+            items = df_plot[df_plot['spec1'] == sp]['subj1'].unique()
+        elif grouping_level == 'pair':
+            items = df_plot[df_plot['spec1'] == sp]['pair'].unique()
+            
+        n_items = len(items)
+        if sp == 'human':
+            intensities = [0.55] if n_items == 1 else np.linspace(0.35, 0.65, n_items)
+        else:
+            intensities = [0.7] if n_items == 1 else np.linspace(0.4, 0.95, n_items)
+            
+        for i, item in enumerate(items):
+            if sp == 'marmo': palette[item] = plt.cm.Blues(intensities[i])
+            elif sp == 'human': palette[item] = plt.cm.YlOrBr(intensities[i])
+            elif sp == 'macaq': palette[item] = plt.cm.Reds(intensities[i])
+            elif sp == 'infant': palette[item] = plt.cm.Greens(intensities[i])
+            else: palette[item] = plt.cm.Greys(intensities[i])
+
+    # 4. Plotting & Math Setup
+    fig, axes = plt.subplots(1, 2, figsize=(16, 6))
+    max_dist = df_plot['dist_px'].max()
+    
+    # Shared grids to allow for matrix averaging 
+    n_bins = 50
+    x_grid_hist = np.linspace(0, max_dist, n_bins + 1)
+    x_centers_hist = (x_grid_hist[:-1] + x_grid_hist[1:]) / 2
+    x_grid_ecdf = np.linspace(0, max_dist, 200)
+
+    legend_elements = []
+
+    # 5. Calculation & Plotting Loop
+    for group_val in df_plot[hue_col].unique():
+        group_df = df_plot[df_plot[hue_col] == group_val]
+        color = palette[group_val]
+        
+        hist_densities = []
+        ecdf_curves = []
+        
+        # Calculate curves for each video independently
+        for vid in group_df['vid'].unique():
+            vid_dist = group_df[group_df['vid'] == vid]['dist_px'].values
+            
+            if len(vid_dist) < 2:
+                continue
+                
+            # Density=True normalizes THIS specific video array to integrate to 1.0 probability
+            counts, _ = np.histogram(vid_dist, bins=x_grid_hist, density=True)
+            hist_densities.append(counts)
+            
+            vid_dist_sorted = np.sort(vid_dist)
+            y_ecdf = np.searchsorted(vid_dist_sorted, x_grid_ecdf, side='right') / len(vid_dist_sorted)
+            ecdf_curves.append(y_ecdf)
+            
+        if not hist_densities:
+            continue
+
+        # Convert to arrays to calculate cross-video Mean and Std Dev
+        hist_densities = np.array(hist_densities)
+        mean_hist = np.mean(hist_densities, axis=0)
+        std_hist = np.std(hist_densities, axis=0)
+        
+        ecdf_curves = np.array(ecdf_curves)
+        mean_ecdf = np.mean(ecdf_curves, axis=0)
+        std_ecdf = np.std(ecdf_curves, axis=0)
+        
+        # Plot Histogram
+        axes[0].step(x_centers_hist, mean_hist, where='mid', color=color, linewidth=linewidth)
+        axes[0].fill_between(x_centers_hist, 
+                             np.clip(mean_hist - std_hist, 0, None), 
+                             mean_hist + std_hist, 
+                             step='mid', color=color, alpha=0.2)
+                             
+        # Plot ECDF
+        axes[1].plot(x_grid_ecdf, mean_ecdf, color=color, linewidth=linewidth)
+        axes[1].fill_between(x_grid_ecdf, 
+                             np.clip(mean_ecdf - std_ecdf, 0, 1), 
+                             np.clip(mean_ecdf + std_ecdf, 0, 1), 
+                             color=color, alpha=0.2)
+                             
+        # --- NEW: Central Tendency Line ---
+        if central_tendency == 'mean':
+            c_val = group_df['dist_px'].mean() # Overall mean for this entire group
+            axes[0].axvline(c_val, color=color, linestyle='--', linewidth=linewidth, alpha=0.8)
+            axes[1].axvline(c_val, color=color, linestyle='--', linewidth=linewidth, alpha=0.8)
+        elif central_tendency == 'median':
+            c_val = group_df['dist_px'].median() # Overall median for this entire group
+            axes[0].axvline(c_val, color=color, linestyle='--', linewidth=linewidth, alpha=0.8)
+            axes[1].axvline(c_val, color=color, linestyle='--', linewidth=linewidth, alpha=0.8)
+
+        # Store for the custom legend
+        legend_elements.append(Line2D([0], [0], color=color, lw=linewidth, label=group_val))
+
+    # 6. Formatting & Legend
+    # Add a dummy marker so the legend explains what the dashed line is
+    if central_tendency in ['mean', 'median']:
+        legend_elements.append(Line2D([0], [0], color='black', lw=1.5, linestyle='--', label=f'Group {central_tendency.capitalize()}'))
+
+    filter_txt = " (Within-Species Only)" if within_species_only else " (All Data)"
+    
+    axes[0].set_title(f"Mean Distance Histogram ± 1 SD{filter_txt}")
+    axes[0].set_xlabel("Distance (px)")
+    axes[0].set_ylabel("Density (Average Across Videos)")
+
+    axes[1].set_title(f"Mean Cumulative Distribution ± 1 SD{filter_txt}")
+    axes[1].set_xlabel("Distance (px)")
+    axes[1].set_ylabel("Cumulative Proportion (Average Across Videos)")
+    
+    n_categories = len(legend_elements)
+    ncol = 3 if n_categories > 15 else 2 if n_categories > 8 else 1
+    
+    axes[1].legend(
+        handles=legend_elements, 
+        loc="lower right", 
+        title=hue_col.capitalize(), 
+        ncol=ncol, 
+        framealpha=0.9
+    )
+
+    XMAX=600;
+    YMAX=0.010;
+    axes[0].set_ylim([0, YMAX]);
+    
+    axes[0].set_xlim([0, XMAX]);
+    axes[1].set_xlim([0, XMAX]);
+    
+    plt.tight_layout()
+    return fig;
+
+
+
+
+def plot_distributions_with_variance_OLD(df, grouping_level='species', within_species_only=False):
     """
     Plots distributions with variance bands representing the standard deviation across videos.
     grouping_level: 'species', 'subject', or 'pair'
