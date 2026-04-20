@@ -36,6 +36,8 @@ def main():
     #REV: merge binocular based on dist > 2 dva...just take nanmean...
     import peyeutils as pu;
     biglist = list();
+    
+    
     df = pd.read_csv(alledfscsv);
     print(df.columns);
     for i, row in df.iterrows():
@@ -51,7 +53,6 @@ def main():
                 pass;
             mytrials = mytrials.assign( **row.to_dict() );
             
-            
             #print(mytrials);
             #exit(0);
             biglist.append(mytrials);
@@ -65,32 +66,44 @@ def main():
     fulldf['recinfo_SESSION_DATE'] = pd.to_datetime(fulldf['recinfo_SESSION_DATE'], format='%Y-%m-%d-%H-%M-%S');
     fulldf['age'] = fulldf['recinfo_SESSION_DATE'] - fulldf['dob'];
     fulldf['vidscale'] = 640 / fulldf['vidw_px']; #REV: e.g. if 2x the size, we should mult this number by every val to get pix_x and pix_y.
+
     
+    agecuts = [ (4, 7.5), #4-7 mo
+                (8, 10.5), #8-10 mo
+                (11, 13.5), #11 to 13
+                (14, 16.5), #14 to 16
+                #(505, 575),  # 17 to 20
+                (17, 24), # up to 2yrs
+                (48, 90), # over 4
+                ];
+
+    #agecuts = np.array(agecuts);
     
+    import matplotlib.pyplot as plt;
     print(fulldf['age']);
     import seaborn as sns;
     secperday = 60*60*24;
     fulldf['agedays'] = fulldf['age'].dt.total_seconds() / secperday;
-    sns.displot(data=fulldf, x='agedays', kind='hist', hue='subj');
-    import matplotlib.pyplot as plt;
+    fulldf['agemonths'] = fulldf.agedays/30;
+    g = sns.displot(data=fulldf, x='agemonths', kind='hist', hue='subj', multiple='stack', binwidth=0.5, binrange=(0,90));
+    
+    for pr in agecuts:
+        g.ax.axvspan(pr[0], pr[1], color='grey', alpha=0.4);
+        #g.ax.axvline(pr[0]);
+        #g.ax.axvline( pr[1]);
+        pass;
+    
     plt.show();
     fulldf.to_csv('all_infant_trialsubjdob.csv', index=False);
     
     #REV: "cut" into ages (in days)
-    
-    agecuts = [ (150, 215), #4-7 mo
-                (235, 305), #8-10 mo
-                (325, 395), #11 to 13
-                (415, 485), #14 to 16
-                (505, 575),  # 17 to 20
-                (600, 750), # up to 2yrs
-                (1400, 3600), # over 4
-                ];
-    
+        
     tidx=0;
 
     finallist=list();
-
+    trialslist = list();
+    
+    #REV: this is in fulldf, chunked by CSV file.
     for edf, edfdf in fulldf.groupby('samples_csv', as_index=False):
         fn=os.path.join(csvdir, edf);
         edfsamps = pd.read_csv( fn );
@@ -100,6 +113,8 @@ def main():
             samps = edfsamps[ (edfsamps['Tsec'] >= row.start_s) & (edfsamps['Tsec'] < row.end_s) ].reset_index(drop=True);
             #    for i, row in fulldf.iterrows():
             
+            if( len(samps) < 100 ):
+                continue;
             
             samps = samps[ (samps['Tsec'] >= row.start_s) & (samps['Tsec'] < row.end_s) ].reset_index(drop=True);
             samps['movie_ts'] = samps['Tsec'] - samps['Tsec'].min();
@@ -133,6 +148,8 @@ def main():
             # --- 2. Generate exactly rounded 30 Hz timestamps ---
             # Create an array of 30Hz steps, then round to 3 decimal places
             target_times = np.round(np.arange(0, samps['movie_ts'].max(), 1/30), 3)
+            if(len(target_times)<5):
+                continue;
             
             # Create a DataFrame for our new 30 Hz data
             df30hz = pd.DataFrame({'movie_ts': target_times})
@@ -146,21 +163,30 @@ def main():
             
             
             print(df30hz);
-            df30hz['trialidx'] = str(tidx) + 'i';
+            
+            df30hz['trialidx'] = tidx; #str(tidx) + 'i';
             df30hz['vid'] = row['video'];
             df30hz['subj'] = row['subj'];
             df30hz['agedays'] = row['agedays'];
-
+            
+            row['edftrialidx'] = row['trialidx'];
+            row['trialidx'] = tidx; #REV: will add 'i' etc to it.
             if( (np.isfinite(df30hz['pix_x']).sum() / len(df30hz.index)) > 0.10 ): #10 pct?
                 finallist.append(df30hz);
+                trialslist.append(row);
                 tidx+=1;
                 pass;
             pass;
         pass;
+
+    trialsdf = pd.DataFrame(trialslist);
+    trialsdf['trialidx'] = trialsdf['trialidx'].astype(int);
+    trialsdf = trialsdf.rename(columns={'video':'vid'});
+    trialsdf.to_csv('infant_trials_final.csv', index=False);
     
     finaldf=pd.concat(finallist);
-    finaldf.to_csv('infant_gaze_finaldf.csv', index=False);
-    
+    finaldf.to_csv('infant_gaze_final.csv', index=False);
+        
     
     return 0;
 

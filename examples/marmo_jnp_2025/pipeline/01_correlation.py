@@ -12,7 +12,8 @@ def main():
     wajd_gaze=sys.argv[2];
     orig_idx=sys.argv[3];
     orig_gaze=sys.argv[4];
-    
+
+        
     
     
     widxdf=pd.read_csv(wajd_idx);
@@ -25,7 +26,9 @@ def main():
     widxdf['wotype']='w';
     widxdf['trialidx'] = widxdf['trialidx'].astype(str) + 'w'
     widxdf['vid'] = widxdf['vid'].str[:-4];
+    
     widxdf['species']='marmo';
+    
     print(widxdf.vid.unique());
     print(widxdf.species.unique());
     
@@ -33,6 +36,8 @@ def main():
     oidxdf['wotype']='o';
     oidxdf['trialidx'] = oidxdf['trialidx'].astype(str) + 'o'
 
+
+        
     '''
     print("WAJD");
     print(widxdf.iloc[0]);
@@ -56,18 +61,120 @@ def main():
     ogazedf=pd.read_csv(orig_gaze);
     ogazedf['wotype']='o';
     ogazedf['trialidx']= ogazedf['trialidx'].astype(str) + 'o';
-    
-    
-    
+
+
     idxdf = pd.concat([widxdf, oidxdf]);
+    gazedf = pd.concat([wgazedf, ogazedf]);
+
+    idxdf['agemonths'] = 0; #REV: just add 
+    
+    
+    #REV: add infant data
+    if( len(sys.argv) > 4 ):
+        inf_idx=sys.argv[5];
+        inf_gaze=sys.argv[6];
+        iidxdf=pd.read_csv(inf_idx);
+        iidxdf['trialidx'] = iidxdf['trialidx'].astype(str) + 'i';
+        iidxdf['wotype'] = 'i';
+        iidxdf['species'] = 'infant';
+        
+        if 'video' in iidxdf.columns:
+            iidxdf = iidxdf.rename(columns={'video':'vid'});
+            pass;
+        iidxdf['vid'] = iidxdf['vid'].str[:-4];
+        
+        igazedf=pd.read_csv(inf_gaze);
+        igazedf['wotype']='i';
+        igazedf['trialidx'] = igazedf['trialidx'].astype(str) + 'i';
+        
+        #igazedf['vid'] = igazedf['vid'].str[:-4];
+        
+        igazedf = igazedf.drop(columns=['subj', 'agedays', 'vid']);
+        
+        #print(iidxdf.columns);
+        #print(igazedf.columns);
+
+
+        '''
+        agecuts = pd.IntervalIndex.from_tuples([ #(2, 3.95), #3
+                                                 (4, 7.95), #4-7 mo
+                                                 (8, 10.95), #8-10 mo
+                                                 (11, 13.95), #11 to 13
+                                                 (14, 16.95), #14 to 16
+                                                 #(505, 575),  # 17 to 20
+                                                 (17, 19.95), # up to 2.5yrs (2 yrs 8mo)
+                                                 (21, 29), # 2yrs to 2.5 yrs
+                                                 (48, 90), # over 4
+                                                ],
+                                               );
+        '''
+
+        '''
+        #REV: should cluster 'within' each time I measured the infants?
+        agecuts = pd.IntervalIndex.from_tuples([ #(2, 3.95), #3
+                                                 (6, 10.95), #8-10 mo
+                                                 (11, 15.95),
+                                                 (16, 20.95),
+                                                 #(505, 575),  # 17 to 20
+                                                 (21, 30),
+                                                  (48, 90), # over 4
+                                                ],
+                                               );
+        
+        #agelabels=['03_mo', '06_mo', '09_mo', '12_mo', '15_mo', '18_mo', '24_mo', '05_yr'];
+        agelabels=[ '08_mo', '13_mo', '18_mo', '24_mo', '05_yr'];
+        iidxdf['agespecies'] = pd.cut( x=iidxdf.agemonths,
+                                       bins=agecuts,
+                                       #labels=agelabels
+                                       );
+        
+        iidxdf['agespecies'] = iidxdf['agespecies'].cat.rename_categories(agelabels);
+        iidxdf['agespecies']=iidxdf['agespecies'].astype(str);
+        
+        iidxdf['species'] = 'infant' + iidxdf['agespecies'];
+        print(iidxdf['agespecies'].unique());
+        '''
+
+        iidxdf['species'] = 'infant';
+        
+        #print(iidxdf['agespecies']);
+        #print(iidxdf[iidxdf['agespecies'].isna()]);
+        
+        #print(igazedf.columns);
+        '''
+        igazedf['agemonths'] = igazedf.agedays/30;
+        igazedf['agespecies'] =  pd.cut( x=igazedf.agemonths,
+                                         bins=agecuts,
+                                         #labels=agelabels
+                                        );
+        igazedf['agespecies'] = igazedf['agespecies'].cat.rename_categories(agelabels);
+        igazedf['agespecies']=igazedf['agespecies'].astype(str);
+        igazedf['species'] = 'infant' + igazedf['agespecies'];
+        print(igazedf['species'].unique());
+
+        
+        '''
+        
+        gazedf = pd.concat([gazedf, igazedf]).reset_index(drop=True);
+        print(gazedf.trialidx.unique());
+        #REV: already added trialidx 'i'...
+        idxdf = pd.concat([idxdf, iidxdf]).reset_index(drop=True);
+                
+        pass;
+    
     
     idxdf['species']=idxdf['species'].astype(str);
-    print(idxdf[idxdf['species']=='nan']);
+    if( idxdf[idxdf['species']=='nan'].shape[0] > 0 ):
+        print(idxdf[idxdf['species']=='nan']);
+        raise Exception("<1");
+    
+    gazedf = gazedf.drop(columns=['timems']);
     
     
-    gazedf = pd.concat([wgazedf, ogazedf]);
+    
+    
     print("BEFORE DROP: ", gazedf.shape);
-    gazedf = gazedf.dropna(subset=['timems']);
+    #gazedf = gazedf.dropna(subset=['timems']);  #REV: ah, was accidentally dropping timems guys.
     gazedf = gazedf.dropna(subset=['movie_ts']);
     gazedf = gazedf[ gazedf.movie_ts >= 0 ];
     print("AFTER DROP: ", gazedf.shape);
@@ -112,12 +219,14 @@ def main():
         
         for tidx, tdf in vgazedf.groupby('trialidx'):
             
-            print("Trial [{}] has {} timepoints ({}-{}) ({}-{})".format(tidx, len(tdf.index), tdf['timems'].min(), tdf['timems'].max(), tdf['movie_ts'].min(), tdf['movie_ts'].max()) );
+            #print("Trial [{}] has {} timepoints ({}-{}) ({}-{})".format(tidx, len(tdf.index), tdf['timems'].min(), tdf['timems'].max(), tdf['movie_ts'].min(), tdf['movie_ts'].max()) );
+            print("Trial [{}] has {} timepoints ({}-{})".format(tidx, len(tdf.index),  tdf['movie_ts'].min(), tdf['movie_ts'].max()) );
 
             #print(tdf.movie_ts.diff().unique());
             if( np.any(tdf.movie_ts.duplicated()) ):
                 print("DUPLICATES");
-                print(tdf[ tdf.movie_ts.duplicated(keep=False) ][['timems', 'movie_ts', 'pix_x', 'pix_y', 'eyelink_ts']]);
+                #print(tdf[ tdf.movie_ts.duplicated(keep=False) ][['timems', 'movie_ts', 'pix_x', 'pix_y', 'eyelink_ts']]);
+                print(tdf[ tdf.movie_ts.duplicated(keep=False) ][['movie_ts', 'pix_x', 'pix_y', 'eyelink_ts']]);
                 raise Exception("Duplicates, should never happen!");
             
             pass;
@@ -137,6 +246,7 @@ def main():
     
     bigdf = pd.merge(left=gazedf, right=idxdf, on=['trialidx', 'wotype'], how='left');
     print(len(bigdf.index));
+    
     bigdf = bigdf.sort_values(by=['trialidx', 'movie_ts']).reset_index(drop=True);
     print(bigdf.subj.unique());
     #bigdf.groupby(['subj']).count().to_csv('wtf.csv');
@@ -178,10 +288,12 @@ def main():
     distlist=list();
     nulllist=list();
     ncorrlist=list();
-    
+
+    vididx=0;
+    nvids=len(idxdf.vid.unique());
     for v, vdf in idxdf.groupby('vid'):
-        
-        print("DOING for [{}]".format(v));
+        vididx+=1;
+        print("DOING for [{}] ({}/{})".format(v, vididx, nvids));
         trials = vdf['trialidx'].to_numpy();
         #print(vdf);
         print("Legal trials: {}".format(trials));
@@ -209,12 +321,13 @@ def main():
         for tidx1, tdf1 in vgazedf.groupby('trialidx'):
             subj1=idxdf[ idxdf.trialidx==tidx1 ].iloc[0].subj;
             spec1=idxdf[ idxdf.trialidx==tidx1 ].iloc[0].species;
+            age1 =idxdf[ idxdf.trialidx==tidx1 ].iloc[0].agemonths;
                     
             for tidx2, tdf2 in vgazedf.groupby('trialidx'):
                 if(tidx1 > tidx2):
                     subj2=idxdf[ idxdf.trialidx==tidx2 ].iloc[0].subj;
                     spec2=idxdf[ idxdf.trialidx==tidx2 ].iloc[0].species;
-                    
+                    age2 =idxdf[ idxdf.trialidx==tidx2 ].iloc[0].agemonths;
                     
                     
                     #REV: should not interpolate across NAN times...
@@ -233,7 +346,9 @@ def main():
                     tdf1 = tdf[['movie_ts', 'pix_x_1', 'pix_y_1']].reset_index(drop=True).rename(columns={'pix_x_1':'pix_x','pix_y_1':'pix_y'});
                     tdf2 = tdf[['movie_ts', 'pix_x_2', 'pix_y_2']].reset_index(drop=True).rename(columns={'pix_x_2':'pix_x','pix_y_2':'pix_y'});
                     toshuffle=['pix_x', 'pix_y'];
-                    
+
+                    #REV: is it different to shuffle one? Depends on where NANs are...?
+                    #REV: should find max overlap?
                     ntdf1 = tdf1.copy();
                     ntdf1[toshuffle] = ntdf1[toshuffle].sample(frac=1).values;
                     
@@ -274,11 +389,20 @@ def main():
                     #ycc = np.corrcoef(y1, y2)[0][0];
                     xycc = (xcc+ycc)/2;
 
-                    corrlist.append( dict(npts=mylen, vid=v, t1=tidx1, t2=tidx2, xcc=xcc, ycc=ycc, xycc=xycc, subj1=subj1, subj2=subj2, spec1=spec1, spec2=spec2, ntps1=ntps1, ntps2=ntps2, overlap=noverlap) );
+                    corrlist.append( dict(npts=mylen, vid=v, t1=tidx1, t2=tidx2, xcc=xcc, ycc=ycc, xycc=xycc,
+                                          subj1=subj1, subj2=subj2, spec1=spec1, spec2=spec2, age1=age1, age2=age2,
+                                          ntps1=ntps1, ntps2=ntps2, overlap=noverlap) );
 
-                    ncorrlist.append( dict(npts=mylen, vid=v, t1=tidx1, t2=tidx2, xcc=nxcc, ycc=nycc, xycc=nxycc, subj1=subj1, subj2=subj2, spec1=spec1, spec2=spec2, ntps1=ntps1, ntps2=ntps2, overlap=null_noverlap) );
+                    ncorrlist.append( dict(npts=mylen, vid=v, t1=tidx1, t2=tidx2, xcc=nxcc, ycc=nycc, xycc=nxycc,
+                                           subj1=subj1, subj2=subj2, spec1=spec1, spec2=spec2, age1=age1, age2=age2,
+                                           ntps1=ntps1, ntps2=ntps2, overlap=null_noverlap) );
                     
-                    print("{}:{} ({}/{}={:3.1f}%)  -  {}:{} ({}/{}={:3.1f}%)  OVERLAP:{}/{}    X: {:3.2f}  Y: {:3.2f}   XY: {:3.2f}".format(spec1,subj1,ntps1,mylen,100*ntps1/mylen,spec2,subj2,ntps2,mylen, 100*ntps2/mylen, noverlap,mylen, xcc, ycc, xycc));
+                    print("{}-{}:{} ({}/{}={:3.1f}%)  -  {}-{}:{} ({}/{}={:3.1f}%)  OVERLAP:{}/{}    X: {:3.2f}  Y: {:3.2f}   XY: {:3.2f}"
+                          .format(spec1,age1,subj1,ntps1,mylen,
+                                  100*ntps1/mylen,
+                                  spec2,age2,subj2,ntps2,mylen,
+                                  100*ntps2/mylen, noverlap, mylen,
+                                  xcc, ycc, xycc));
 
 
                     #REV: compute distance too.
@@ -292,17 +416,22 @@ def main():
                     pxdist=np.sqrt( (tdf1.pix_x-tdf2.pix_x)**2 +
                                     (tdf1.pix_y-tdf2.pix_y)**2); #REV: chunk in 5 px distances? Or, save per ?
 
+                    #REV: yes intentionally one is shuffled. Same as shuffling 2...
                     npxdist = np.sqrt( (ntdf1.pix_x-tdf2.pix_x)**2 +
                                     (ntdf1.pix_y-tdf2.pix_y)**2); #REV: chunk in 5 px distances? Or, save per ?
                     #REV: then need to "merge" add one for each, copying the others down...
+                    
                     mydict = dict(subj1=subj1,
                                   subj2=subj2,
+                                  age1=age1,
                                   spec1=spec1,
                                   spec2=spec2,
+                                  age2=age2,
                                   vid=v,
                                   t1=tidx1,
                                   t2=tidx2,
                                   );
+                    
                     #print(tdf1.columns);
                     nddf = pd.DataFrame( { 'dist_px':npxdist, 'movie_ts':tdf.movie_ts } );
                     nddf = nddf.assign( **mydict );

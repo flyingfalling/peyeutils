@@ -36,6 +36,9 @@ if __name__=='__main__':
         tag='_' + sys.argv[2];
         pass;
     
+    df = df[ df['spec1'] != 'infant03_mo' ];
+    df = df[ df['spec2'] != 'infant03_mo' ];
+    
     # 1. Broadest overview (1 line per species)
     fig = plot_distributions(df, grouping_level='species', within_species_only=True);
     fig.savefig('species_diffs{}.pdf'.format(tag));
@@ -44,7 +47,9 @@ if __name__=='__main__':
     fig = plot_distributions_with_variance(df, grouping_level='species', within_species_only=True);
     fig.savefig('species_diffs_wvar{}.pdf'.format(tag));
     plt.close();
-    
+
+
+    '''
     # 2. Medium detail (1 line per subject, averaging all their interactions)
     fig = plot_distributions(df, grouping_level='subject', within_species_only=True);
     fig.savefig('subject_diffs{}.pdf'.format(tag));
@@ -53,6 +58,7 @@ if __name__=='__main__':
     fig = plot_distributions_with_variance(df, grouping_level='subject', within_species_only=True);
     fig.savefig('subject_diffs_wvar{}.pdf'.format(tag));
     plt.close();
+    '''
     # 3. Highest detail (1 line per unique pair of subjects)
     #REV: can't see shit.
     #plot_distributions(df, grouping_level='pair' ); #, vid_filter='vid_001')
@@ -117,12 +123,19 @@ def plot_distributions_with_variance(df, grouping_level='species', within_specie
             intensities = [0.55] if n_items == 1 else np.linspace(0.35, 0.65, n_items)
         else:
             intensities = [0.7] if n_items == 1 else np.linspace(0.4, 0.95, n_items)
-            
+            pass;
+
+        infantspec= [ 'infant'+i+'_mo' for i in ['08', '13', '18', '24'] ] + ['infant05_yr'];
+        myintensities = np.linspace(0.4, 0.95, len(infantspec))
+        infantgreens = {grp: plt.cm.Greens(myintensities[i]) for i, grp in enumerate(infantspec) };
+
+        
         for i, item in enumerate(items):
             if sp == 'marmo': palette[item] = plt.cm.Blues(intensities[i])
             elif sp == 'human': palette[item] = plt.cm.YlOrBr(intensities[i])
             elif sp == 'macaq': palette[item] = plt.cm.Reds(intensities[i])
-            elif sp == 'infant': palette[item] = plt.cm.Greens(intensities[i])
+            elif sp in infantgreens:
+                palette[item] = infantgreens[sp];
             else: palette[item] = plt.cm.Greys(intensities[i])
 
     # 4. Plotting & Math Setup
@@ -448,7 +461,12 @@ def plot_distributions(df, grouping_level='pair', within_species_only=False, vid
             intensities = [0.55] if n_items == 1 else np.linspace(0.35, 0.65, n_items)
         else:
             intensities = [0.7] if n_items == 1 else np.linspace(0.4, 0.95, n_items)
-            
+            pass;
+        
+        infantspec= [ 'infant'+i+'_mo' for i in ['08', '13', '18', '24'] ] + ['infant05_yr'];
+        myintensities = np.linspace(0.4, 0.95, len(infantspec))
+        infantgreens = {grp: plt.cm.Greens(myintensities[i]) for i, grp in enumerate(infantspec) };
+        
         # Assign colors
         for i, item in enumerate(items):
             if sp == 'marmo':
@@ -457,11 +475,12 @@ def plot_distributions(df, grouping_level='pair', within_species_only=False, vid
                 palette[item] = plt.cm.YlOrBr(intensities[i])
             elif sp == 'macaq':
                 palette[item] = plt.cm.Reds(intensities[i])
-            elif sp == 'infant':
-                palette[item] = plt.cm.Greens(intensities[i])
+            elif sp in infantgreens:
+                palette[item] = infantgreens[sp];
             else:
                 palette[item] = plt.cm.Greys(intensities[i])
-
+                pass;
+            
     # 4. Plotting
     fig, axes = plt.subplots(1, 2, figsize=(16, 6))
     
