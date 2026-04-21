@@ -8,12 +8,12 @@ import sys
 incsv = sys.argv[1];
 df = pd.read_csv(incsv);
 
-if 'species' not in df.columns:
-    df['species'] = 'infant';
-    pass;
-
-df = df[ df['species'] != 'infant03_mo' ];
-df = df[ df['species'] != 'infant03_mo' ];
+print(df.species.unique());
+df.loc[ (df.species=='infant')&(df.agemonths>36), 'species' ] = 'child(>3yr)';
+df.loc[ (df.species=='infant')&(df.agemonths>18), 'species' ] = 'toddler(>18mo)';
+df.loc[ (df.species=='infant'), 'species' ] = 'infant(<18mo)';
+#df = df[ ~df['species'].str.contains('infant') ];
+#df = df[ df['species'] != 'infant03_mo' ];
 
 #df = df.dropna(subset=['pix_x']); #REV: is this causing it?
 df = df[['pix_x', 'pix_y', 'species', 'subj', 'vid', 'movie_ts', 'trialidx']];

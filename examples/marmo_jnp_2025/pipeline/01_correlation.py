@@ -36,7 +36,7 @@ def main():
     oidxdf['wotype']='o';
     oidxdf['trialidx'] = oidxdf['trialidx'].astype(str) + 'o'
 
-
+    
         
     '''
     print("WAJD");
@@ -86,7 +86,7 @@ def main():
         igazedf=pd.read_csv(inf_gaze);
         igazedf['wotype']='i';
         igazedf['trialidx'] = igazedf['trialidx'].astype(str) + 'i';
-        
+        #igazedf['species'] = 'infant';
         #igazedf['vid'] = igazedf['vid'].str[:-4];
         
         igazedf = igazedf.drop(columns=['subj', 'agedays', 'vid']);
@@ -135,7 +135,7 @@ def main():
         print(iidxdf['agespecies'].unique());
         '''
 
-        iidxdf['species'] = 'infant';
+        #iidxdf['species'] = 'infant';
         
         #print(iidxdf['agespecies']);
         #print(iidxdf[iidxdf['agespecies'].isna()]);
@@ -151,8 +151,6 @@ def main():
         igazedf['agespecies']=igazedf['agespecies'].astype(str);
         igazedf['species'] = 'infant' + igazedf['agespecies'];
         print(igazedf['species'].unique());
-
-        
         '''
         
         gazedf = pd.concat([gazedf, igazedf]).reset_index(drop=True);
@@ -240,13 +238,35 @@ def main():
     
     #REV: null model is correlation with OTHER videos?!
     ## With random shuffle from prior?
+        
+    #print(gazedf.columns);
+    #print(idxdf.columns.to_list()); #REV: need to_list to print whole thing or it will be elided.
     
+    print([ c for c in gazedf.columns if c in idxdf.columns ] );
+    #REV: some can not be found in idxdf?
+
+    '''
+    gazetidx = set(np.unique([ t for t in gazedf.trialidx if t not in idxdf.trialidx ]))# gazedf.trialidx;
+    idxtidx = set(np.unique([ t for t in idxdf.trialidx if t not in gazedf.trialidx ])) #idxdf.trialidx;
     
-    
-    
-    bigdf = pd.merge(left=gazedf, right=idxdf, on=['trialidx', 'wotype'], how='left');
-    print(len(bigdf.index));
-    
+    gazes = sorted(np.unique( gazedf.trialidx ));
+    idxs = sorted(np.unique( idxdf.trialidx ));
+    gazes2 = [ g for g in gazes if g not in idxs ];
+    idxs2 = [ g for g in idxs if g not in gazes ];
+    '''
+    #for g,i in zip(gazes,idxs):
+    #    print(g,i);
+    #    pass;
+    #print(gazes2, idxs2);
+    #for g, i in zip(gazetidx, idxtidx):
+    #    print(g, i);
+    #print( "GAZE BUT NOT IDX: ", set(np.unique([ t for t in gazetidx if t not in idxtidx ])) );
+    #print( "IDX BUT NOT GAZE: ", set(np.unique([ t for t in idxtidx if t not in gazetidx ])) );
+    #exit(0);
+    #REV: ah, some are missing due to muscimol.
+    bigdf = pd.merge(left=gazedf, right=idxdf, on=['trialidx', 'wotype'], how='inner');
+    print(bigdf.species.unique());
+        
     bigdf = bigdf.sort_values(by=['trialidx', 'movie_ts']).reset_index(drop=True);
     print(bigdf.subj.unique());
     #bigdf.groupby(['subj']).count().to_csv('wtf.csv');
@@ -258,8 +278,10 @@ def main():
                  (bigdf.pix_y > maxy) | (bigdf.pix_y < -maxy) ),
                ['pix_x', 'pix_y'] ] = np.nan;
     
+    print(bigdf.species.unique());
+        
     bigdf.to_csv('bigdf.csv', index=False);
-    ##REV: todo "plot" and show CC?
+    
     
     DOPLOT=False;
     DOCORR=False;
