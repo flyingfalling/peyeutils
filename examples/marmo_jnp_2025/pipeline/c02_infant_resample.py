@@ -47,10 +47,13 @@ def main():
         print(mytrials);
         if( len(mytrials.index) > 0 ):
             mytrials = mytrials.drop(columns=['haseyetracking']);
+            print(mytrials)
+            '''
             for c in mytrials.columns:
                 if( c in row.to_dict() ):
                     raise Exception("WTF FAIL {} double".format(c));
                 pass;
+            '''
             mytrials = mytrials.assign( **row.to_dict() );
             
             #print(mytrials);
