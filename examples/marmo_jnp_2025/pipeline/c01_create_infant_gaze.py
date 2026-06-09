@@ -121,7 +121,7 @@ def main():
     print(bigtrialdf);
     print(bigedfdf);
     
-    bigtrialdf.to_csv('allinfanttrials_FULL.csv', index=False);
+    #bigtrialdf.to_csv('allinfanttrials_FULL.csv', index=False);
     bigedfdf.to_csv('allinfantedfs_FULL.csv', index=False); #REV: ah, I am writing over it...
     
     return 0;
