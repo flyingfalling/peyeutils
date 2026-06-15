@@ -73,6 +73,8 @@ def select_legal_timepoints4(ts, vals, maxdt, DEBUG=False):
         return list(), list();
     return;
 
+
+#REV: interpolates, filling in NANs.
 def strsafe_interpolate(df, tcol, method='linear', order=1,DEBUG=False):
     df = df.sort_values(by=tcol).reset_index(drop=True);
     
@@ -94,7 +96,8 @@ def strsafe_interpolate(df, tcol, method='linear', order=1,DEBUG=False):
         pass;
     
     tmpdf = tmpdf.set_index( tmpdf[tcol] );
-    tmpdf = tmpdf.interpolate(method=method, order=order);
+    #REV: added limit_direction='both' so that savgol stops failing due to leading nans...
+    tmpdf = tmpdf.interpolate(method=method, order=order, limit_direction='both');
     tmpdf = tmpdf.reset_index(drop=True); #REV: assume index will be tight and unimodal?
     
     df = pd.merge( left=tmpdf, right=strdf, how='inner', left_index=True, right_index=True );

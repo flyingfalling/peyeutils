@@ -184,7 +184,7 @@ truesrs = { c:tobiisr for c in df.columns  };
 df = df.groupby([tname], as_index=False).agg( saccr.safe_agg(df,'mean') ).reset_index(drop=True);
 
 #REV: interpolate (upsample) to 1000 Hz...
-df = peyeutils.utils.tsutils.interpolate_df_to_samplerate(df, tname, targ_sr_hzsec, startsec=None, endsec=None,
+df = pu.utils.tsutils.interpolate_df_to_samplerate(df, tname, targ_sr_hzsec, startsec=None, endsec=None,
                                                           method=interptype, order=interporder, truesrs=truesrs, tcolunit_s=1,
                                                           );
 

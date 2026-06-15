@@ -148,7 +148,7 @@ def preproc_and_compute_events(df,
     
     saccs = allsaccs.reset_index(drop=True);
     
-    if(PLOT):
+    if(True==PLOT):
         import matplotlib.pyplot as plt;
         import seaborn as sns;
         
@@ -163,10 +163,10 @@ def preproc_and_compute_events(df,
         plt.show();
         pass;
     else:
-        mainseq = pu.eyemovements.mainseq.mainseq_ampldur_linear_95pctl_human_chen2021_wplot( saccs['ampldva'],
-                                                                                              saccs['dursec'],
-                                                                                              error_gain=1.5,
-                                                                                             );
+        mainseq = pu.eyemovements.mainseq.mainseq_ampldur_linear_95pctl_human_chen2021( saccs['ampldva'],
+                                                                                        saccs['dursec'],
+                                                                                        error_gain=mainseq_err_gain,
+                                                                                       );
         pass;
 
     

@@ -917,10 +917,10 @@ def remodnav_preprocess_eyetrace2d(eyesamps : pd.DataFrame,
         #REV: note savgol requires no NAN...so we need to artificially impute ALL values (even bad ones) and then throw
         ## away the old ones.
         from peyeutils.utils import refill_interpolate_NANs, strsafe_interpolate;
-
+        
         #REV: linear interpolate...
         eyesamps = strsafe_interpolate( df=eyesamps, tcol=tname, method='linear' );
-        
+                
         eyesamps[xname] = savgol_filter(eyesamps[xname], savgol_window, savgolorder);
         eyesamps[yname] = savgol_filter(eyesamps[yname], savgol_window, savgolorder);
         
