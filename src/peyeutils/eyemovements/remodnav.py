@@ -59,14 +59,20 @@ def find_peaks(vels, threshold):
 def get_adaptive_saccade_velocity_velthresh( vels, params ):
     cur_thresh = params['startvel'];
     noiseconst = params['noiseconst'];
-
+    
     #REV: all velocities BELOW the cut (the threshold)
     #REV: iterate until I am not moving down very much each time.
     def _get_thresh(cut):
         # helper function
         vel_uthr = vels[vels < cut]
-        med = np.median(vel_uthr)
-        scale = mad(vel_uthr); #median absolute deviation
+        if( len(vel_uthr) < 1 ):
+            med=np.nan;
+            scale=np.nan;
+            pass;
+        else:
+            med = np.median(vel_uthr)
+            scale = mad(vel_uthr); #median absolute deviation
+            pass;
         return ( med+(2*noiseconst*scale), med, scale );
     
     # re-compute threshold until value converges
@@ -182,10 +188,15 @@ def make_event(mydata, idx, lab, stidx, enidx, params={}):
             pass;
         event["dxdva"] = params['dva_per_px'] * (event["enx"] - event["stx"]);
         event["dydva"] = params['dva_per_px'] * (event["eny"] - event["sty"]);
-
+        if( mydata.empty ):
+            print("REV: Empty slice!")
+            pass;
+        
         event["pvel"] = np.nanmax(mydata.vel );
         event["medvel"] = np.nanmedian( mydata.vel );
         event["avgvel"] = np.nanmean( mydata.vel );
+        
+        
         
         #REV: fixed dx, dy in atan to dy, dx... (20260402)
         event["angle"] = math.degrees( math.atan2( event["dydva"], event["dxdva"] ) );
@@ -619,6 +630,7 @@ def remodnav_classify_events(eyesamps,
                              params,
                              eyecol, #='eye',
                              DEBUG=False ):
+    
     if eyecol not in eyesamps.columns:
         print("REMODNAV, adding eyecol {} to columns of samples (empty string)".format(eyecol));
         eyesamps[eyecol] = '';
@@ -626,6 +638,10 @@ def remodnav_classify_events(eyesamps,
 
     evlist=list();
     for eye, eyedf in eyesamps.groupby(eyecol, as_index=False):
+        
+        eyedf = eyedf.copy().sort_values(by=params['tname']).reset_index(drop=True);
+        print("REMODNAV CLASSIFY (eye={}): Size of eyedf: {}".format(eye, len(eyedf.index)));
+        #eyedf = eyedf.reset_index(drop=True);
         myev = _remodnav_classify_events(eyesamps=eyedf,
                                          params=params);
         myev[eyecol] = eye;
@@ -633,6 +649,7 @@ def remodnav_classify_events(eyesamps,
         pass;
     import pandas as pd;
     ev = pd.concat(evlist).reset_index(drop=True);
+    print("Finished classify (remodnav)");
     return eyesamps, ev;
 
 #REV: R package based on old algo (huh??? This is not remodnav):
@@ -645,9 +662,10 @@ def _remodnav_classify_events(eyesamps,
     
     # find threshold velocities
     #print("CLASS EVENTS", params);
+    #REV: this is mean of empty slice.
     sac_peak_med_velthresh, sac_onset_med_velthresh = get_adaptive_saccade_velocity_velthresh( eyesamps['medvel'],
                                                                                                params=params );
-    
+        
     #REV: this is simply left/right is below curr.
     saccade_locs = find_peaks( eyesamps['medvel'],
                                sac_peak_med_velthresh );
@@ -680,8 +698,9 @@ def _remodnav_classify_events(eyesamps,
                                                   params=params )
                   );
     
+        
     df = pd.DataFrame( events );
-
+    
     tcol = params['tname'];
     tunits = params['timeunitsec'];
     firstsec = eyesamps[tcol].min() * tunits;
@@ -691,8 +710,7 @@ def _remodnav_classify_events(eyesamps,
         df['stsec'] = df['stidx'] / samplerate + firstsec;
         df['ensec'] = df['enidx'] / samplerate + firstsec;
         df['dursec'] = df['ensec'] - df['stsec'];
-        df.sort_values( inplace=True, by='stidx' );
-        df.reset_index( inplace=True, drop=True );
+        df = df.sort_values(  by='stidx' ).reset_index(drop=True);
         pass;
     
     return df;
@@ -821,7 +839,7 @@ def remodnav_preprocess_eyetrace2d(eyesamps : pd.DataFrame,
                                    eyecol : str = 'eye',
                                    DEBUG=False,
                                    ):
-
+    
     if( eyecol not in eyesamps ):
         print("Eye column [{}] not in eyesamps...adding?".format(eyecol));
         eyesamps[eyecol] = ''
@@ -891,6 +909,9 @@ def remodnav_preprocess_eyetrace2d(eyesamps : pd.DataFrame,
             print("EYEUTILS, PREPROC (eye={}) BEGINNING BEFORE SPIKEFILTER -> ALL NAN".format(eye));
             result.append(eyesamps2);
             continue;
+        else:
+            print("EYEUTILS, PREPROC (eye={}) before SPIKEFILTER is OK!".format(eye));
+            pass;
         
         
         if( params['filterspikes'] ):
@@ -898,7 +919,7 @@ def remodnav_preprocess_eyetrace2d(eyesamps : pd.DataFrame,
             eyesamps2[xname] = filter_spikes(eyesamps2[xname].copy());
             eyesamps2[yname] = filter_spikes(eyesamps2[yname].copy());
             pass;
-                
+        
         if(allnan(eyesamps2[xname]) or allnan(eyesamps2[yname])):
             print("EYEUTILS, PREPROC AFTER FILTER SPIKES -> ALL NAN");
             result.append(eyesamps2);
@@ -936,9 +957,13 @@ def remodnav_preprocess_eyetrace2d(eyesamps : pd.DataFrame,
             bcol=params['blinkcol'];
             #print("1st) Re-NANing x/y based on blinkcolumn [{}] (in case smoothing added?)".format(bcol));
             eyesamps2.loc[ (eyesamps2[bcol]==True), [xname, yname] ] = np.nan;
-            eyesamps2.loc[ (eyesamps2[xname].isna()), bcol ] = True;
+            eyesamps2.loc[ (eyesamps2[xname].isna()), bcol ] = True; #What?
             pass;
-        
+
+        if(allnan(eyesamps2[xname]) or allnan(eyesamps2[yname])):
+            print("EYEUTILS -> PREPROC AFTER BLINKCOL to NAN -> ALL NAN");
+            result.append(eyesamps2);
+            continue;
         #print('after savgol', len(eyesamps2));
         
         ############# REMOVE INSANE VALUES #####################
@@ -1066,10 +1091,47 @@ def remodnav_preprocess_eyetrace2d(eyesamps : pd.DataFrame,
             print("EYEUTILS -> PREPROC END OF FUNCT -> ALL NAN");
             result.append(eyesamps2);
             continue;
-        
-        
+        else:
+            print("SUCCESS preproc for eye={}".format(eye));
+            result.append(eyesamps2); #REV: success
+            pass;
         pass; #for EYE in eyecol (L, R, B, etc.)
+
+    cols=list();
     
-    eyesamps = pd.concat(result).reset_index(drop=True);
+    valid_results = []
+    for df in result:
+        cols = cols + list(df.columns);
+        if not df.empty:
+            # If a column is completely NaN, explicitly cast it to float64
+            all_na_cols = df.columns[df.isna().all()]
+            
+            if not all_na_cols.empty:
+                df = df.drop(columns=all_na_cols);
+                pass;
+            valid_results.append(df)
+            pass;
+        else:
+            print("Skipping a DF because it was empty");
+            pass;
+        pass;
+
+    cols = list(set(cols));
+    if valid_results:
+        eyesamps = pd.concat(valid_results).reset_index(drop=True)
+        pass;
+    else:
+        eyesamps = pd.DataFrame()
+        pass;
+
+    for c in cols:
+        if c not in eyesamps.columns:
+            print("Re-adding missing (due to all NAN) column: [{}]".format(c));
+            eyesamps[c] = np.nan;
+            pass;
+        pass;
+    
+    #valid_results = [df for df in result if not df.empty and not df.isna().all().all()]
+    #eyesamps = pd.concat(valid_results).reset_index(drop=True);
     return eyesamps;
     

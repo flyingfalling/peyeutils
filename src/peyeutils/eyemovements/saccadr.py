@@ -6,6 +6,8 @@ import peyeutils as pu;
 
 from peyeutils.utils.tsutils import get_dilated_nan_mask, rle, inverse_rle;
 
+import peyeutils as pu;
+
 from pandas.api.types import is_numeric_dtype
 from pandas.api.types import is_string_dtype
 
@@ -388,7 +390,13 @@ def method_om(df, params, eyepfix,
         if (False==v):
             continue;
         
-        peakvel = np.nanmax( vel[s:e] );
+        
+        if( pu.utils.allnan(vel[s:e]) ):
+            peakvel = np.nan;
+            pass;
+        else:
+            peakvel = np.nanmax( vel[s:e] );
+            pass;
         
         #REV: could be zero accel phase
         # if it suddenly jumps up from below threshold to above, and that is the peak, then decreases but still above thresh.
@@ -410,17 +418,30 @@ def method_om(df, params, eyepfix,
         #print(e-true_ipeakvel);
         
         #REV: +1 because end of slice is PAST end of actual slice.
-        peakaccel = np.nanmax( acc[s:(true_ipeakvel+1)] );
-        peakdecel = np.nanmax( acc[(true_ipeakvel):e] ); #REV: peak should never be peak accel or decel...its velocity switch so should be 0.
-    
-        #print(peakvel, peakaccel, peakdecel);
+        #print("PeakAccel from {} samps".format((true_ipeakvel+1)-s));
+        if( pu.utils.allnan(acc[s:(true_ipeakvel+1)]) ):
+            peakaccel=np.nan;
+            pass;
+        else:
+            peakaccel = np.nanmax( acc[s:(true_ipeakvel+1)] );
+            pass;
         
+        #print("PeakDecel from {} samps".format(e-(true_ipeakvel)));
+        if( pu.utils.allnan(acc[(true_ipeakvel):e]) ):
+            peakdecel=np.nan;
+            pass;
+        else:
+            peakdecel = np.nanmax( acc[(true_ipeakvel):e] ); #REV: peak should never be peak accel or decel...its velocity switch so should be 0.
+            pass;
+                
+        
+        #REV: I have accel without decel or decel without accel, so I can't really make a cluster.
+        #REV: i.e. the "peak" vel is next to a chunk of NANs on one side...
         if( not np.isfinite(peakvel) or
             not np.isfinite(peakaccel) or
             not np.isfinite(peakdecel)
             ):
-            print( peakvel, peakaccel, peakdecel );
-            print("Peak had NAN velocity/accel/decel. Skipping");
+            print("Peak had NAN velocity/accel/decel ({}, {}, {}). Skipping".format(peakvel, peakaccel, peakdecel));
             continue;
         
         logpvel=np.log( peakvel );
@@ -873,8 +894,8 @@ def saccadr_detect_saccades( sampdf,
     sdflist=list();
     edflist=list();
     for eye, eyedf in sampdf.groupby(eyecol, as_index=False):
-
-        if( pu.utils.not_enough_data( eyedf[xname], minpct=0.10, minsamps=100  ) ):
+        
+        if( pu.utils.not_enough_data( eyedf[xname], minpct=0.10, minsamps=100, printit=True  ) ):
             print("Skipping eye={} due to insufficient data".format(eye));
             sdflist.append(eyedf);
             continue;
@@ -953,7 +974,7 @@ def _saccadr_sacc( sampdf,
     
     votecols=[];
 
-    print(sampdf[xname]); #REV: seems NAN. Velfunc returns wtf 0?
+    
     xvel, yvel, vel =  velocity_function( sampdf[xname],
                                           sampdf[yname],
                                           params

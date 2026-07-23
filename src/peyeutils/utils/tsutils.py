@@ -83,7 +83,8 @@ def strsafe_interpolate(df, tcol, method='linear', order=1,DEBUG=False):
     
     
     strdf = df[ notinterpcolumns ];
-    strdf = strdf.ffill(); #REV: same?
+    #strdf = strdf.ffill().infer_objects(copy=False); #REV: same?
+    strdf = strdf.convert_dtypes().ffill(); #.infer_objects(copy=False); #REV: same?
     #strdf = strdf.infer_objects(copy=False); #.ffill(); REV: same?
     
     if(DEBUG):
@@ -1101,11 +1102,15 @@ def pearson_gaze_CC(x1, x2):
 
 
 
-def not_enough_data( x, minpct, minsamps ):
+def not_enough_data( x, minpct, minsamps, printit=False ):
     import numpy as np;
     total = len(x);
     nonnans = np.count_nonzero(~np.isnan(x) )
     pct = nonnans / total;
+
+    if( printit ):
+        print("{}/{} good samples ({:3.1f})".format(nonnans, total, pct*100));
+        pass;
     
     if( total < minsamps ):
         print("Len {} < minsamps ({})".format(total, minsamps));

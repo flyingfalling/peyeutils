@@ -116,6 +116,7 @@ def preproc_and_compute_events(df,
 
     #REV: this does NAN dilation etc.... it removes data, not just setting "bad" column or something?
     #REV: handles eyes separately.
+    #print(df);
     sdf = pu.eyemovements.remodnav.remodnav_preprocess_eyetrace2d(eyesamps=df, params=params, eyecol=eyecol);
 
 
@@ -138,11 +139,13 @@ def preproc_and_compute_events(df,
     
     
     #REV: this will not auto-separate eyes!!!
+    #print(sdf);
     sdf, sev = pu.eyemovements.saccadr.saccadr_detect_saccades(sdf, sparams, tsecname=tcol, xname=xcol, yname=ycol);
+    
     rdf, rev = pu.eyemovements.remodnav.remodnav_classify_events(sdf, params, eyecol=eyecol); #REV: ah, x/y names are stored in "params"
 
-    print(sev);
-    print(rev);
+    #print(sev);
+    #print(rev);
     
     evlist = list();
     if( len(sev.index) > 0 ):
