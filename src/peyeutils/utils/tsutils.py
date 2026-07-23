@@ -1098,3 +1098,25 @@ def pearson_gaze_CC(x1, x2):
         raise Exception("Unexpected shape not (2,2): {}".format(cc.shape));
     cc=cc[0][1];
     return cc, ngood, n;
+
+
+
+def not_enough_data( df, minpct, minsamps ):
+    import numpy as np;
+    total = len(df.index);
+    nonnans = np.count_nonzero(~np.isnan(x) )
+    pct = nonnans / total;
+    
+    if( total < minsamps ):
+        print("Len {} < minsamps ({})".format(total, minsamps));
+        return True;
+    
+    if( pct < minpct ):
+        print("Pct {} < minpct ({})".format(pct, minpct));
+        return True;
+    
+    if( nonnans < minsamps ):
+        print("Non-Nan {} < minsamps ({})".format(nonnans, minsamps));
+        return True;
+        
+    return False;

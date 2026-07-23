@@ -44,7 +44,8 @@ def merge_from_prefix( sampdf, prefixes, col ):
 def compute_velocity_ek(x, tw_samp, dt):
     max_hs = tw_samp//2; #REV: half-span
     isfinite = np.isfinite(x);
-    vel = np.zeros(len(x), dtype=x.dtype);
+    #REV: if all zeros, we should never even compute it...but we do.
+    vel = np.full(len(x), np.nan, dtype=x.dtype); #np.zeros(len(x), dtype=x.dtype);
     
     #REV: naive impl...
     for imid in range(1, len(x)): #len(x)-1
@@ -208,7 +209,7 @@ def method_ek(df, params, eyepfix=''):
     
     xvel = df[eyepfix+'xvel'];
     yvel = df[eyepfix+'yvel'];
-
+    
     
     sd_x = sd_funct( xvel );
     sd_y = sd_funct( yvel );
@@ -847,7 +848,7 @@ def saccadr_detect_saccades( sampdf,
                              velocity_function=diff_ek,
                              eyecol='eye',
                             ):
-
+    
     mymethods=list();
     if('ek' in namedmethods):
         mymethods.append(method_ek);
@@ -871,6 +872,12 @@ def saccadr_detect_saccades( sampdf,
     sdflist=list();
     edflist=list();
     for eye, eyedf in sampdf.groupby(eyecol, as_index=False):
+
+        if( pu.utils.not_enough_data( eyedf[xname], minpct=0.10, minsamps=100  ) ):
+            print("Skipping eye={} due to insufficient data".format(eye));
+            sdflist.append(sdf);
+            continue;
+        
         sdf, edf = _saccadr_sacc( sampdf=eyedf,
                                   params=params,
                                   tsecname=tsecname,
@@ -941,7 +948,7 @@ def _saccadr_sacc( sampdf,
     
     votecols=[];
 
-    print(sampdf[xname]);
+    print(sampdf[xname]); #REV: seems NAN. Velfunc returns wtf 0?
     xvel, yvel, vel =  velocity_function( sampdf[xname],
                                           sampdf[yname],
                                           params
