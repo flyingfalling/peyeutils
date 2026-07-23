@@ -441,8 +441,11 @@ def method_om(df, params, eyepfix,
             not np.isfinite(peakaccel) or
             not np.isfinite(peakdecel)
             ):
-            print("Peak had NAN velocity/accel/decel ({}, {}, {}). Skipping".format(peakvel, peakaccel, peakdecel));
+            #print("Peak had NAN velocity/accel/decel ({}, {}, {}). Skipping".format(peakvel, peakaccel, peakdecel));
             continue;
+        else:
+            #print("Peak is OK ({}, {}, {})".format(peakvel, peakaccel, peakdecel));
+            pass;
         
         logpvel=np.log( peakvel );
         logpaccel = np.log( peakaccel );
@@ -1069,15 +1072,31 @@ def _saccadr_sacc( sampdf,
         e=s+l-1; #REV: oh shit do I have an off-by-one error here?
         #print("Event: s={}  e={}  (l={})   {}".format(s, e, l, v));
         #REV: aligning names with removdnav
+
+        #REV: 2026/07/23 fix for mean of nan slice.
+        tmpvel = sampdf[ (sampdf[tsecname]>=sampdf[tsecname][s]) &
+                           (sampdf[tsecname]<sampdf[tsecname][e])
+                          ]['vel'] ;
+        if( pu.utils.allnan( tmpvel ) ):
+            pvel = np.nan;
+            medvel = np.nan;
+            avgvel = np.nan;
+            pass;
+        else:
+            pvel=np.nanmax( tmpvel );
+            medvel=np.nanmedian( tmpvel );
+            avgvel=np.nanmean( tmpvel );
+            pass;
+        
         ev = dict(stsec=sampdf[tsecname][s],
                   ensec=sampdf[tsecname][e],
                   stx=sampdf[xname][s],
                   sty=sampdf[yname][s],
                   enx=sampdf[xname][e],
                   eny=sampdf[yname][e],
-                  pvel=np.nanmax(sampdf[ (sampdf[tsecname]>=sampdf[tsecname][s]) & (sampdf[tsecname]<sampdf[tsecname][e]) ]['vel'] ),
-                  medvel=np.nanmedian(sampdf[ (sampdf[tsecname]>=sampdf[tsecname][s]) & (sampdf[tsecname]<sampdf[tsecname][e]) ]['vel'] ),
-                  avgvel=np.nanmean(sampdf[ (sampdf[tsecname]>=sampdf[tsecname][s]) & (sampdf[tsecname]<sampdf[tsecname][e]) ]['vel'] ),
+                  pvel=pvel,
+                  medvel=medvel,
+                  avgvel=avgvel,
                   label='SACC' if (True==v) else 'SISI',
                   );
 

@@ -1097,6 +1097,9 @@ def remodnav_preprocess_eyetrace2d(eyesamps : pd.DataFrame,
             pass;
         pass; #for EYE in eyecol (L, R, B, etc.)
 
+    eyesamps = pu.utils.safe_df_concat( result );
+    
+    '''
     cols=list();
     
     valid_results = []
@@ -1133,5 +1136,6 @@ def remodnav_preprocess_eyetrace2d(eyesamps : pd.DataFrame,
     
     #valid_results = [df for df in result if not df.empty and not df.isna().all().all()]
     #eyesamps = pd.concat(valid_results).reset_index(drop=True);
+    '''
     return eyesamps;
     

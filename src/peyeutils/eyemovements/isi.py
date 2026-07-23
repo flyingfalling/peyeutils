@@ -187,7 +187,9 @@ def absorb_blink_artifacts(df, margin_sec=0.050):
 
     # 5. Recombine
     merged_df = pd.DataFrame(merged_list)
-    final_df = pd.concat([merged_df, others], ignore_index=True, join='outer')
+
+    final_df = pu.utils.safe_df_concat([merged_df, others]);
+    #final_df = pd.concat([merged_df, others], ignore_index=True );
     
     return final_df.sort_values('stsec').reset_index(drop=True)
 
