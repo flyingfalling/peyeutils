@@ -876,7 +876,7 @@ def saccadr_detect_saccades( sampdf,
 
         if( pu.utils.not_enough_data( eyedf[xname], minpct=0.10, minsamps=100  ) ):
             print("Skipping eye={} due to insufficient data".format(eye));
-            sdflist.append(sdf);
+            sdflist.append(eyedf);
             continue;
         
         sdf, edf = _saccadr_sacc( sampdf=eyedf,
@@ -895,7 +895,11 @@ def saccadr_detect_saccades( sampdf,
         pass;
     
     sampdf = pd.concat(sdflist).reset_index(drop=True);
-    evdf = pd.concat(edflist).reset_index(drop=True);
+    
+    evdf = pd.DataFrame();
+    if( len(edflist) > 0 ):
+        evdf = pd.concat(edflist).reset_index(drop=True);
+        pass;
     return sampdf, evdf;
     
 

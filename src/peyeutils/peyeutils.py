@@ -139,146 +139,157 @@ def preproc_and_compute_events(df,
     
     #REV: this will not auto-separate eyes!!!
     sdf, sev = pu.eyemovements.saccadr.saccadr_detect_saccades(sdf, sparams, tsecname=tcol, xname=xcol, yname=ycol);
-    rdf, rev = pu.eyemovements.remodnav.remodnav_classify_events(sdf, params); #REV: ah, x/y names are stored in "params"
+    rdf, rev = pu.eyemovements.remodnav.remodnav_classify_events(sdf, params, eyecol=eyecol); #REV: ah, x/y names are stored in "params"
     
-    ev=rev;
-    
-    allsaccs = pd.concat( [ sev[sev['label']=='SACC' ],
-                            rev[rev['label']=='SACC' ],
-                           ]
-                          );
-    
-    
-    saccs = allsaccs.reset_index(drop=True);
-    
-    if(True==PLOT):
-        import matplotlib.pyplot as plt;
-        import seaborn as sns;
+    evlist = list();
+    if( len(sev.index) > 0 ):
+        evlist.append(sev);
+        pass;
+    if( len(rev.index) > 0 ):
+        evlist.append(rev);
+        pass;
+
+    if( evlist ):
         
-        mainseq, mygraphics = pu.eyemovements.mainseq.mainseq_ampldur_linear_95pctl_human_chen2021_wplot( saccs['ampldva'],
-                                                                                                          saccs['dursec'],
-                                                                                                          error_gain=mainseq_err_gain,
-                                                                                                         );
-        xmin=0;
-        xmax=25;
-        mygraphics.ax.set_xlim([xmin, xmax]);
-        mygraphics.savefig('mainseq.pdf');
-        plt.show();
+        allsaccs = pd.concat( [ sev[sev['label']=='SACC' ],
+                                rev[rev['label']=='SACC' ],
+                               ]
+                             );
+        
+        
+        saccs = allsaccs.reset_index(drop=True);
+        
+        if(True==PLOT):
+            import matplotlib.pyplot as plt;
+            import seaborn as sns;
+            
+            mainseq, mygraphics = pu.eyemovements.mainseq.mainseq_ampldur_linear_95pctl_human_chen2021_wplot( saccs['ampldva'],
+                                                                                                              saccs['dursec'],
+                                                                                                              error_gain=mainseq_err_gain,
+                                                                                                             );
+            xmin=0;
+            xmax=25;
+            mygraphics.ax.set_xlim([xmin, xmax]);
+            mygraphics.savefig('mainseq.pdf');
+            plt.show();
+            pass;
+        else:
+            mainseq = pu.eyemovements.mainseq.mainseq_ampldur_linear_95pctl_human_chen2021( saccs['ampldva'],
+                                                                                            saccs['dursec'],
+                                                                                            error_gain=mainseq_err_gain,
+                                                                                           );
+            pass;
+        
+        saccs['ismain'] = mainseq; #Any way to always just make it give me first?
+        saccs = saccs[ (saccs.ismain==True) ].reset_index(drop=True); #REV: main seq, very small ones would be bad too?
+        
+        saccs = saccs[ saccs['ampldva'] > min_sacc_dva ];
+        
+        
+        #REV: remove "impossible" ones before that.
+        #REV: handles eyecol
+        saccs = pu.eyemovements.combine.intersection_saccades( saccs,
+                                                              );
+        if(DEBUG):
+            saccs['label'] = 'OSACC';
+            saccs2['label'] = 'SACC';
+            saccs = pd.concat([saccs, saccs2]).reset_index(drop=True);
+            pass;
+        
+        nonsaccs = rev[ ~(rev['label'] == 'SACC') ];
+        
+        #REV: handles eyecol
+        blinks = pu.eyemovements.blink.compute_blinks_from_sampcol( sdf,
+                                                                    dva_per_px=params['dva_per_px'],
+                                                                    badcol=params['blinkcol'],
+                                                                    tcol=tcol,
+                                                                    xcol=xcol,
+                                                                    ycol=ycol )
+        
+        #REV: should I remove blinks in which eye did not move much (< 0.5 deg ?). I.e. fixation with intermediate lbink?
+        # Vision is not happening during that time and physiologically it is equivalent...and then ISI is?
+        
+        ev = pd.concat( [saccs,
+                         blinks,
+                         nonsaccs, #REV: this is currently just PISI (original ISI from saccade detection...). In other cases
+                         # there may also be e.g. drifts/smooth pursuits, etc.?
+                         ] ).reset_index(drop=True);
+        
+        ev = ev.sort_values(by='stsec').reset_index(drop=True);
+        
+        #REV: handles eyecol
+        ev = pu.eyemovements.isi.eye_event_merge( ev,
+                                                  eyecol=eyecol,
+                                                  min_isi_dur=blinksacc_merge_envelop_sec,
+                                                 );
+        
+        ISIevents=['SACC', 'BLNK']; #REV: i.e. use blinks as saccades (gaze shifts often happen during blinks...)
+        
+        #REV: handles eyecol
+        isis = pu.eyemovements.isi.compute_ISIs_from_events( ev,
+                                                             zerotime=sdf[tcol].iloc[0], #REV: or .min()
+                                                             eventstouse=ISIevents,
+                                                            );
+        ev = pd.concat([ev, isis]);
+        ev = ev.sort_values(by='stsec').reset_index(drop=True);
+        #isis = isis[ isis['dursec'] > min_isi_sec ];
+        
+        isis = ev[ (ev['label']=='ISI') ];
+        
+        saccblnks = ev[ (ev.label=='SACC') | (ev.label=='BLNK') | (ev.label=='SACCBLNK')];
+        
+        if(PLOT):
+            
+            sns.histplot(data=saccblnks,
+                         x='ampldva',
+                         multiple='stack',
+                         binwidth=0.5, binrange=(0, 30), hue='label' );
+            plt.xlabel('Sacc Ampl (deg)');
+            plt.tight_layout();
+            plt.savefig('amplhist.pdf');
+            plt.show();
+            
+            sns.histplot(isis['dursec'], binwidth=0.050, binrange=(0, 2) );
+            plt.xlabel('ISI (sec)');
+            plt.tight_layout();
+            plt.savefig('isihist.pdf');
+            plt.show();
+            
+            
+            
+            sns.relplot( data=isis, x='stx', y='sty', kind='scatter', size='dursec' );
+            plt.title("Gaze during ISI (blinks/saccades removed)");
+            plt.tight_layout();
+            plt.savefig('isiXYlocs.pdf');
+            plt.show();
+            
+            
+            fig = plt.figure();
+            for i, row in saccblnks.iterrows():
+                plt.plot( [row['stx'], row['enx']], [row['sty'], row['eny'] ] );
+                pass;
+            plt.xlabel("X (dva)");
+            plt.ylabel("Y (dva)");
+            plt.tight_layout();
+            plt.savefig('saccades.pdf');
+            plt.show();
+            
+            for i,fig in enumerate(
+                    pu.plotting.plot_gaze_chunks_wpupil( df=sdf, timestamp_col=tcol, x_col=xcol, y_col=ycol, chunk_size_sec=10,
+                                                         events_df=ev, event_start_col='stsec', event_end_col='ensec',
+                                                         event_type_col='label', max_chunks_per_fig=4,
+                                                         pupil_col='DiameterPupilRightEye',
+                                                        )
+            ):
+                fig.savefig('testfig_{:04d}.pdf'.format(i));
+                pass;
+            
+            pass;
         pass;
     else:
-        mainseq = pu.eyemovements.mainseq.mainseq_ampldur_linear_95pctl_human_chen2021( saccs['ampldva'],
-                                                                                        saccs['dursec'],
-                                                                                        error_gain=mainseq_err_gain,
-                                                                                       );
-        pass;
-
-    
-    saccs['ismain'] = mainseq; #Any way to always just make it give me first?
-    saccs = saccs[ (saccs.ismain==True) ].reset_index(drop=True); #REV: main seq, very small ones would be bad too?
-    
-    saccs = saccs[ saccs['ampldva'] > min_sacc_dva ];
-    
-    
-    #REV: remove "impossible" ones before that.
-    #REV: handles eyecol
-    saccs = pu.eyemovements.combine.intersection_saccades( saccs,
-                                                          );
-    if(DEBUG):
-        saccs['label'] = 'OSACC';
-        saccs2['label'] = 'SACC';
-        saccs = pd.concat([saccs, saccs2]).reset_index(drop=True);
+        ev = pd.DataFrame();
         pass;
     
-    nonsaccs = rev[ ~(rev['label'] == 'SACC') ];
-
-    #REV: handles eyecol
-    blinks = pu.eyemovements.blink.compute_blinks_from_sampcol( sdf,
-                                                                dva_per_px=params['dva_per_px'],
-                                                                badcol=params['blinkcol'],
-                                                                tcol=tcol,
-                                                                xcol=xcol,
-                                                                ycol=ycol )
-    
-    #REV: should I remove blinks in which eye did not move much (< 0.5 deg ?). I.e. fixation with intermediate lbink?
-    # Vision is not happening during that time and physiologically it is equivalent...and then ISI is?
-    
-    ev = pd.concat( [saccs,
-                     blinks,
-                     nonsaccs, #REV: this is currently just PISI (original ISI from saccade detection...). In other cases
-                     # there may also be e.g. drifts/smooth pursuits, etc.?
-                     ] ).reset_index(drop=True);
-
-    ev = ev.sort_values(by='stsec').reset_index(drop=True);
-
-    #REV: handles eyecol
-    ev = pu.eyemovements.isi.eye_event_merge( ev,
-                                              eyecol=eyecol,
-                                              min_isi_dur=blinksacc_merge_envelop_sec,
-                                             );
-    
-    ISIevents=['SACC', 'BLNK']; #REV: i.e. use blinks as saccades (gaze shifts often happen during blinks...)
-
-    #REV: handles eyecol
-    isis = pu.eyemovements.isi.compute_ISIs_from_events( ev,
-                                                         zerotime=sdf[tcol].iloc[0], #REV: or .min()
-                                                         eventstouse=ISIevents,
-                                                        );
-    ev = pd.concat([ev, isis]);
-    ev = ev.sort_values(by='stsec').reset_index(drop=True);
-    #isis = isis[ isis['dursec'] > min_isi_sec ];
-    
-    isis = ev[ (ev['label']=='ISI') ];
-    
-    saccblnks = ev[ (ev.label=='SACC') | (ev.label=='BLNK') | (ev.label=='SACCBLNK')];
-    
-    if(PLOT):
-        
-        sns.histplot(data=saccblnks,
-                     x='ampldva',
-                     multiple='stack',
-                     binwidth=0.5, binrange=(0, 30), hue='label' );
-        plt.xlabel('Sacc Ampl (deg)');
-        plt.tight_layout();
-        plt.savefig('amplhist.pdf');
-        plt.show();
-        
-        sns.histplot(isis['dursec'], binwidth=0.050, binrange=(0, 2) );
-        plt.xlabel('ISI (sec)');
-        plt.tight_layout();
-        plt.savefig('isihist.pdf');
-        plt.show();
-        
-        
-        
-        sns.relplot( data=isis, x='stx', y='sty', kind='scatter', size='dursec' );
-        plt.title("Gaze during ISI (blinks/saccades removed)");
-        plt.tight_layout();
-        plt.savefig('isiXYlocs.pdf');
-        plt.show();
-        
-        
-        fig = plt.figure();
-        for i, row in saccblnks.iterrows():
-            plt.plot( [row['stx'], row['enx']], [row['sty'], row['eny'] ] );
-            pass;
-        plt.xlabel("X (dva)");
-        plt.ylabel("Y (dva)");
-        plt.tight_layout();
-        plt.savefig('saccades.pdf');
-        plt.show();
-                
-        for i,fig in enumerate(
-                pu.plotting.plot_gaze_chunks_wpupil( df=sdf, timestamp_col=tcol, x_col=xcol, y_col=ycol, chunk_size_sec=10,
-                                              events_df=ev, event_start_col='stsec', event_end_col='ensec',
-                                              event_type_col='label', max_chunks_per_fig=4,
-                                              pupil_col='DiameterPupilRightEye',
-                                              )
-        ):
-            fig.savefig('testfig_{:04d}.pdf'.format(i));
-            pass;
-        
-        pass;
-        
     return sdf, ev;
 
 

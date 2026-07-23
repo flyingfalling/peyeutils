@@ -1101,9 +1101,9 @@ def pearson_gaze_CC(x1, x2):
 
 
 
-def not_enough_data( df, minpct, minsamps ):
+def not_enough_data( x, minpct, minsamps ):
     import numpy as np;
-    total = len(df.index);
+    total = len(x);
     nonnans = np.count_nonzero(~np.isnan(x) )
     pct = nonnans / total;
     
