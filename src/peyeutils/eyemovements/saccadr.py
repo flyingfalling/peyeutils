@@ -169,7 +169,8 @@ def sd_via_median_estimator(x):
         sd = np.sqrt( np.nanmean(x**2) - np.nanmean(x)**2 );
         pass;
     if( sd < SMALL_EPSIL ):
-        raise Exception("ERROR, median too small...");
+        print( "Num NONZERO: {} / {}".format( np.count_nonzero(~np.isnan(x)) ), len(x) );
+        raise Exception("ERROR, median too small... (or insufficient data?)");
     
     return sd;
 

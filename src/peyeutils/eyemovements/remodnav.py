@@ -888,7 +888,7 @@ def remodnav_preprocess_eyetrace2d(eyesamps : pd.DataFrame,
         
         
         if(allnan(eyesamps2[xname]) or allnan(eyesamps2[yname])):
-            print("EYEUTILS, PREPROC BEGINNING BEFORE SPIKEFILTER -> ALL NAN");
+            print("EYEUTILS, PREPROC (eye={}) BEGINNING BEFORE SPIKEFILTER -> ALL NAN".format(eye));
             result.append(eyesamps2);
             continue;
         
