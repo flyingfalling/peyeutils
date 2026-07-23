@@ -170,6 +170,7 @@ def sd_via_median_estimator(x):
         pass;
     if( sd < SMALL_EPSIL ):
         print( "Num NONZERO: {} / {}".format( np.count_nonzero(~np.isnan(x) ), len(x) ) );
+        print(x);
         raise Exception("ERROR, median too small... (or insufficient data?)");
     
     return sd;
