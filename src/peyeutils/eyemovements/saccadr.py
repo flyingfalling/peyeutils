@@ -2,6 +2,7 @@ import numpy as np;
 import pandas as pd;
 import math;
 import sklearn;
+import peyeutils as pu;
 
 from peyeutils.utils.tsutils import get_dilated_nan_mask, rle, inverse_rle;
 
