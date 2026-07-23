@@ -700,15 +700,15 @@ def preproc_SHARED_label_blinks(df,
 def blink_df_from_samples(indf,
                           badcol, #='bad',
                           tcol, #='Tsec',
+                          xcol : str, # = '',
+                          ycol : str, # = '',
                           dva_per_px,
                           stcol='stsec',
                           encol='ensec',
                           stidx='stidx',
                           enidx='enidx',
-                          xcol : str = '',
-                          ycol : str = '',
                           use_index=True,
-                          eyecol='',
+                          eyecol='eye',
                           DEBUG=False,
                           ):
     
@@ -755,12 +755,14 @@ def blink_df_from_samples(indf,
         if(DEBUG):
             print(ev);
             pass;
-        
-        if( xcol and ycol ):
+
+        #REV: could separate out and do "tcol" without xcol and ycol...
+        if( xcol and ycol and tcol ):
             if(DEBUG):
                 print("Computing X/Y for blinks!");
                 pass;
-            
+
+            #REV: gets "seconds" time etc.
             tmpdf = df[[tcol, xcol, ycol ]].copy();
             tmpdf['index'] = tmpdf.index;
             
@@ -789,24 +791,30 @@ def blink_df_from_samples(indf,
             import math;
             ev["angle"] = np.rad2deg( np.atan2( ev["dydva"], ev["dxdva"] ) ); #REV: why is this x and y, shouldn't be Y/X?a
             ev["ampldva"] = np.sqrt( (ev["dxdva"])**2 + (ev["dydva"])**2  ); #REV: assumes these are pitch/yaw angles.
-            pass;
-        
-        
-        ev['label'] = 'BLNK';
-        ev['dursec'] = ev[encol] - ev[stcol];
 
+
+            ev['dursec'] = ev[encol] - ev[stcol];
+            pass;
+                
+        ev['label'] = 'BLNK';
+        
         ev = ev[ [ c for c in ev if c in
                    ['label', stcol, encol, stidx, enidx,
                     'dursec', 'stx', 'sty', 'enx', 'eny',
                     'dxdva', 'dydva', 'ampldva', 'angle' ]
                   ]
                 ];
+        
         if( eyecol ):
             myeye=df[eyecol].unique()[0];
             ev[eyecol] = myeye;
             pass;
         evlist.append(ev);
-        pass;
+        
+        
+        pass; #REV: end for each eye!
+    
+    
     ev = pd.concat(evlist).sort_values(by=stcol).reset_index(drop=True);
     return ev;
 
