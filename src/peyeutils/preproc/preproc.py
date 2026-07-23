@@ -348,7 +348,7 @@ def preproc_SHARED_dva_from_flatscreen(df, ppm, distm, method='trig', dropraw=Tr
                   ]
                 ];
         pass;
-    return df;
+    return df, dva_per_px;
 
 
 

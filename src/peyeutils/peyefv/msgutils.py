@@ -334,8 +334,8 @@ def preproc_peyefreeviewing_dva_from_flatscreen(df, msgs):
     rdict = get_recordingsession_info(msgs);
     distm=float(rdict['VB_DM']);
     ppm=float(rdict['VB_PPM']);
-    df = pre.preproc_SHARED_dva_from_flatscreen(df, ppm, distm);
-    return df;
+    df, dva_per_px = pre.preproc_SHARED_dva_from_flatscreen(df, ppm, distm);
+    return df, dva_per_px;
 
 
 

@@ -403,8 +403,8 @@ def preproc_peyefv_edf( in_edf_path : str,
     df = pu.eyelink.preproc_EL_rawcalib_px(df, msgs); #REV: this *ASSUMES* that viewbox etc. is true/correct
     
     #REV: computes to flatscreen dva (VIEWBOX), still not related to videos/contents.
-    df = pu.peyefv.preproc_peyefreeviewing_dva_from_flatscreen(df, msgs);
-    
+    df, dva_per_px = pu.peyefv.preproc_peyefreeviewing_dva_from_flatscreen(df, msgs);
+    eldict['dva_per_px'] = dva_per_px;
 
     #REV: adds binocular gaze, if one is NAN, uses the other one, etc.
     ##   if gaze points are > exclude_thresh_dva apart, assumes bad data and sets binoc to NAN.

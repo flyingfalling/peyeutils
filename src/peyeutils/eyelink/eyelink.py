@@ -738,7 +738,8 @@ def preproc_EL_A03_filter_samps_by_ELevents(df, ev,
     return df, badtrial;
 
 #REV: adds vbox space (pixels from...bottom-left?), stimulus space (if stimulus?), dvaspace (given physical).
-#REV: this ASSUMES caliabration 
+#REV: this ASSUMES caliabration
+#REV: this is only due to the "top" "bot" order of eyelink coords...FLIPY
 def preproc_EL_rawcalib_px(df, msgs, FLIPY=-1):
     """
 
