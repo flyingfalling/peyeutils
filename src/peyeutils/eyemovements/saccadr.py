@@ -208,6 +208,7 @@ def method_ek(df, params, eyepfix=''):
     
     xvel = df[eyepfix+'xvel'];
     yvel = df[eyepfix+'yvel'];
+
     
     sd_x = sd_funct( xvel );
     sd_y = sd_funct( yvel );
@@ -939,7 +940,8 @@ def _saccadr_sacc( sampdf,
     
     
     votecols=[];
-    
+
+    print(sampdf[xname]);
     xvel, yvel, vel =  velocity_function( sampdf[xname],
                                           sampdf[yname],
                                           params
