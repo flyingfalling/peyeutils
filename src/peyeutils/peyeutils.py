@@ -140,6 +140,9 @@ def preproc_and_compute_events(df,
     #REV: this will not auto-separate eyes!!!
     sdf, sev = pu.eyemovements.saccadr.saccadr_detect_saccades(sdf, sparams, tsecname=tcol, xname=xcol, yname=ycol);
     rdf, rev = pu.eyemovements.remodnav.remodnav_classify_events(sdf, params, eyecol=eyecol); #REV: ah, x/y names are stored in "params"
+
+    print(sev);
+    print(rev);
     
     evlist = list();
     if( len(sev.index) > 0 ):
@@ -148,8 +151,8 @@ def preproc_and_compute_events(df,
     if( len(rev.index) > 0 ):
         evlist.append(rev);
         pass;
-
-    if( evlist ):
+    
+    if( len(evlist) > 0 ):
         
         allsaccs = pd.concat( [ sev[sev['label']=='SACC' ],
                                 rev[rev['label']=='SACC' ],
