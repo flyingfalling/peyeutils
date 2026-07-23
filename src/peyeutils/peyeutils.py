@@ -76,9 +76,9 @@ def preproc_and_compute_events(df,
     
     ##############################
     xyunits_dva=1;
-
-    sr = pu.utils.tsutils.check_samplerate(df, tcol=tcol );
-
+    
+    sr = pu.utils.tsutils.check_samplerate(df[df[eyecol]==df[eyecol].unique()[0]], tcol=tcol );
+    
     if( not np.isclose( sr, sr_hzsec ) ):
         raise Exception("Samplerate not good, expected {}, got {}".format(sr_hzsec, sr));
 
