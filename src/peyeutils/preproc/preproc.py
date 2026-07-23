@@ -377,6 +377,7 @@ def preproc_SHARED_pupilsize(sampledf,
                              pacol, #e.g. 'pa'
                              eyecol, #e.g. 'eye'
                              characteristic_timescale_sec=0.010, #Rough characteristic timescale
+                             tunitsec=1,
                              ## of pupil size change
                              ):
     """
@@ -400,6 +401,8 @@ def preproc_SHARED_pupilsize(sampledf,
     -------
 
     """
+    if(tunitsec != 1 ):
+        raise Exception("REV: Assumes use seconds units for timecol...");
     
     lst=[];
     for eye, df in sampledf.groupby(eyecol):
@@ -569,10 +572,10 @@ def preproc_SHARED_label_blinks(df,
         badeye = len(finites) == len(finites[finites==True]);
         if( badeye ):
             #REV: will not 'readd' with correct "bad data"? Just do at end.
-            neweyedf['badpupilPRE'] = True; #combined EL/pupilarea, no expansion or orphans.
-            neweyedf['badpupil'] = True; #just pupil > thresh
-            neweyedf['badPRE'] = True; #just gaze (pupil center detection) is NAN, or pre-detected as blink by e.g. eyelink
-            neweyedf['bad'] = True; #combined, and expanded NANs, re-added orphans.
+            neweyedf[badcol+'pupilPRE'] = True; #combined EL/pupilarea, no expansion or orphans.
+            neweyedf[badcol+'pupil'] = True; #just pupil > thresh
+            neweyedf[badcol+'PRE'] = True; #just gaze (pupil center detection) is NAN, or pre-detected as blink by e.g. eyelink
+            neweyedf[badcol+''] = True; #combined, and expanded NANs, re-added orphans.
             newdflist.append(neweyedf);
             continue;
         

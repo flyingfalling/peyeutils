@@ -102,7 +102,7 @@ def preproc_EL_A01_separate_samps_eye( samples,
     ########### RESAMPLING ##########
     #samples = resample_at_rate_nearest( samples, samples[ELtname].min(), samples[ELtname].max(), ELtname, samplerate, timeunit );
         
-    #REV: should replace NULL first?
+    #REV: this does not change starting time, just resamples. (i.e. does not ZERO shift times).
     samples = ut.interpolate_df_to_samplerate( samples, tcol=ELtname, targ_srhzsec=samplerate, tcolunit_s=timeunit, );
     #samples = interpolate_df_to_samplerate( samples, tcol=tsecname, targ_srhzsec=samplerate, tcolunit_s=1 );
     print("Finished resampling");
@@ -119,7 +119,8 @@ def preproc_EL_A01_separate_samps_eye( samples,
         samples[tname] = samples[ELtname];
         samples = samples[ [c for c in samples.columns if c!=ELtname ] ];
         pass;
-    
+
+    #REV: add Tmsec0
     samples[tname+'0'] = samples[tname] - samples[tname].min();
     
     tsecs = samples[tname]*timeunit;
@@ -131,7 +132,8 @@ def preproc_EL_A01_separate_samps_eye( samples,
     else:
         samples[tsecname] = samples[tname]*timeunit;
         pass;
-    
+
+    #REV: add Tsec0
     samples[tsecname+'0'] = samples[tsecname] - samples[tsecname].min();
     
     
@@ -304,7 +306,10 @@ def preproc_EL_A02_clean_events(eventdf,
     -------
 
     """
-    
+
+    #REV: this is just catching "old" versions of data (which have blink but not contains_blink).
+    #REV: contains_blink means that the event itself is a saccade, but there is a blink inside of it. "blink" only is pure blink with no
+    # other event type... (REV: aren't blinks "always" saccades? Could be more unnatural, e.g. occluded eye etc.).
     containblinkcol='contains_blink';
     if( containblinkcol not in eventdf.columns ):
         if( 'blink' not in eventdf.columns ):
@@ -320,10 +325,11 @@ def preproc_EL_A02_clean_events(eventdf,
 
         #REV: this might fail if EV size is zero?
         eventdf['contains_blink'] = eventdf['blink'];
-        eventdf = eventdf[ [c for c in eventdf.columns if c!='blink']]; #REV: remove "blink" as field of events (saccs)
+        eventdf = eventdf[ [c for c in eventdf.columns if c!='blink']]; #REV: remove "blink" as column in events (saccs)
         pass;
     
-    
+
+    eventdf = eventdf.rename(columns={'start':'stEL', 'end':'enEL'});
     
     
     eventdf['ELevlabel'] = eventdf['type'];
@@ -360,8 +366,8 @@ def preproc_EL_A02_clean_events(eventdf,
         
         if( len(lev.index)>0 ):
             lev['eye'] = pu.PEYEUTILS_LEFT_EYE; #REV: set to "my" labels (not eyelink anymore)
-            lev['stsec'] = lev.start * timeunitsec;
-            lev['ensec'] = lev.end * timeunitsec;
+            lev['stsec'] = lev['stEL'] * timeunitsec;
+            lev['ensec'] = lev['enEL'] * timeunitsec;
             lev['useeye']=False;
             if( pu.PEYEUTILS_LEFT_EYE in eyes_to_use ):
                 lev['useeye']=True;
@@ -370,19 +376,20 @@ def preproc_EL_A02_clean_events(eventdf,
         
         if( len(rev.index)>0 ):
             rev['eye'] = pu.PEYEUTILS_RIGHT_EYE;
-            rev['stsec'] = rev.start * timeunitsec;
-            rev['ensec'] = rev.end * timeunitsec;
+            rev['stsec'] = rev['stEL'] * timeunitsec;
+            rev['ensec'] = rev['enEL'] * timeunitsec;
             rev['useeye']=False;
             if( pu.PEYEUTILS_RIGHT_EYE in eyes_to_use ):
                 rev['useeye']=True;
                 pass;
             pass;
         
-        ev = pd.concat( [lev, rev] ).sort_values(by=['eye','stsec']).reset_index(drop=True);
+        ev = pd.concat( [lev, rev] ).sort_values(
+            by=['eye','stsec']).reset_index(drop=True);
         
         #REV: drop events involving bad eye.
         ev = ev[ ev.useeye == True ];
-                
+        
         pass;
     else:
         ev = pd.DataFrame();
@@ -439,18 +446,20 @@ def preproc_EL_A_clean_samples(rawsamps, rawevents, rawmessages,
                                            eyes_to_use=ELeyes,
                                            );
     
-    #REV: this removes "time"
+    #REV: cleans events (i.e. renames saccade->SACC, fixa->FIXA, and sets 'stsec' and 'ensec'
+    # Note, stsec and ensec will be accurate because no re-zeroing.
+    # Uses "start" and "end" which are in MSEC time.
     ev = preproc_EL_A02_clean_events(rawevents,
                                      timeunitsec=pu.EL_TIMEUNIT_SEC,
                                      );
     
     
-    #REV: if all bad datapoints do what? Exit?
+    #REV: if all bad, i.e. NAN etc., return 'badtrial=True'
     df, badtrial = preproc_EL_A03_filter_samps_by_ELevents(df, ev,
                                                            sr_hzsec=ELsr,
                                                            timeunitsec=pu.EL_TIMEUNIT_SEC,
                                                            );
-
+    
     elparamdict['badtrial'] = badtrial;
     
     if( badtrial ):
@@ -488,7 +497,8 @@ def preproc_EL_A_clean_samples(rawsamps, rawevents, rawmessages,
     return df, ev, msgs, elparamdict;
     
     
-    
+
+#REV: this only works because start/end are in 'msec' time, and so it is tname=Tmsec
 def preproc_EL_A03_filter_samps_by_ELevents(df, ev,
                                             sr_hzsec,
                                             timeunitsec=1e-3,
@@ -534,6 +544,10 @@ def preproc_EL_A03_filter_samps_by_ELevents(df, ev,
     -------
 
     """
+
+    if( tname != 'Tmsec' ):
+        raise Exception("REV: Will compare Tmsec against raw EL start and end for events (i.e. units are msec), so tname must be Tmsec...");
+    
     df['elblink']=False;
     df['elhasblink']=False;
     df['elsacc']=False;
@@ -584,8 +598,8 @@ def preproc_EL_A03_filter_samps_by_ELevents(df, ev,
         #REV: this will set all events
         for rowidx, event in pureblinks.iterrows():
             eye=event.eye;
-            start=event.start; #start is ELstart (msec in EL raw time, not zeroed)
-            end=event.end;
+            start=event['stEL']; #start is ELstart (msec in EL raw time, not zeroed)
+            end=event['enEL'];
 
             #REV: OK, I understand...a saccade can contain multiple blinks within it...(?).
             #REV: blinks are always shorter than a saccade etc. if contained...
@@ -617,8 +631,8 @@ def preproc_EL_A03_filter_samps_by_ELevents(df, ev,
         #REV: this will set all events
         for rowidx, event in containsblinks.iterrows():
             eye=event.eye;
-            start=event.start; #start is ELstart (msec in EL raw time, not zeroed)
-            end=event.end;
+            start=event['stEL']; #start is ELstart (msec in EL raw time, not zeroed)
+            end=event['enEL'];
             
             if( nan_EL_contains_blinks ):
                 fixed=False;
@@ -646,8 +660,8 @@ def preproc_EL_A03_filter_samps_by_ELevents(df, ev,
         mysaccs = ev[(ev['ELevlabel']=='saccade')]; #REV: how about blink AND SACCADE?
         for rowidx, event in mysaccs.iterrows():
             eye=event.eye;
-            start=event.start;
-            end=event.end;
+            start=event['stEL'];
+            end=event['enEL'];
             #df.loc[ df[ (df[tname] >= start) & (df[tname] <= end) & (df.eye == eye) ].index, ['gx', 'gy'] ] = np.nan;
             df.loc[ ( (df[tname] >= start) & (df[tname] <= end) & (df.eye == eye) ), 'elsacc' ] = True;
             pass;
@@ -655,8 +669,8 @@ def preproc_EL_A03_filter_samps_by_ELevents(df, ev,
         myfixs = ev[(ev['ELevlabel']=='fixation')]; #REV: how about blink AND SACCADE?
         for rowidx, event in myfixs.iterrows():
             eye=event.eye;
-            start=event.start;
-            end=event.end;
+            start=event['stEL'];
+            end=event['enEL'];
             #df.loc[ df[ (df[tname] >= start) & (df[tname] <= end) & (df.eye == eye) ].index, ['gx', 'gy'] ] = np.nan;
             df.loc[ ( (df[tname] >= start) & (df[tname] <= end) & (df.eye == eye) ), 'elfix' ] = True;
             pass;
@@ -720,7 +734,7 @@ def preproc_EL_A03_filter_samps_by_ELevents(df, ev,
     
     df = pd.concat([ldf, rdf]).sort_values(by=['eye',tname]).reset_index(drop=True);
 
-    badtrial=False;
+    badtrial=False; #REV: if badtrial was true, we would've broken/returned earlier with badtrial=True.
     return df, badtrial;
 
 #REV: adds vbox space (pixels from...bottom-left?), stimulus space (if stimulus?), dvaspace (given physical).

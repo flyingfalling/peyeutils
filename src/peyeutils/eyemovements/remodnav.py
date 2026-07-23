@@ -617,7 +617,7 @@ def classify_intersaccade_periods(  eyesamps,
 
 def remodnav_classify_events(eyesamps,
                              params,
-                             eyecol='eye',
+                             eyecol, #='eye',
                              DEBUG=False ):
     if eyecol not in eyesamps.columns:
         print("REMODNAV, adding eyecol {} to columns of samples (empty string)".format(eyecol));
@@ -818,8 +818,15 @@ def temporary_impute(df):
 #REV: oh shit, savgol will not allow NAN...
 def remodnav_preprocess_eyetrace2d(eyesamps : pd.DataFrame,
                                    params : dict,
+                                   eyecol : str = 'eye',
                                    DEBUG=False,
                                    ):
+
+    if( eyecol not in eyesamps ):
+        print("Eye column [{}] not in eyesamps...adding?".format(eyecol));
+        eyesamps[eyecol] = ''
+        pass;
+    
     
     samplerate=params['samplerate_hzsec'];
     dva_per_px=params['dva_per_px'];
@@ -844,27 +851,15 @@ def remodnav_preprocess_eyetrace2d(eyesamps : pd.DataFrame,
     eyesamps['medvel'] = np.nan;
     eyesamps['acc'] = np.nan;
     
-    if(allnan(eyesamps[xname]) or allnan(eyesamps[yname])):
-        print("EYEUTILS -> PREPROC FIRST LINE -> ALL NAN");
-        return eyesamps;
+    #if(allnan(eyesamps[xname]) or allnan(eyesamps[yname])):
+    #    print("EYEUTILS -> PREPROC FIRST LINE -> ALL NAN");
+    #    result.append(eyesamps2);
+    #    continue;
+    
     
     #print('beginning', len(eyesamps));
     
-    #REV: resample first?
-
-    '''
-    if( 'tstartsec' in params and 'tlensec' in params ):
-        eyesamps = resample_at_rate_nearest( eyesamps, params['tstartsec'], params['tstartsec']+params['tlensec'], tname, params['samplerate_hzsec'], params['timeunitsec'] );
-        #REV: start time at tstart
-        pass;
-    else:
-        eyesamps = resample_at_rate_nearest( eyesamps, eyesamps[tname].min(), eyesamps[tname].max(), tname, params['samplerate_hzsec'], params['timeunitsec'] );
-        pass;
-    '''
-    
-    #print('after resamp', len(eyesamps));
-    
-    
+        
     #REV: PYTHON logical precedence not > and > or...
     if( savgol_window > 0 ): #params['savgollensec'] != 0 ) ):
         if( (savgol_window % 2 != 1) or (savgol_window < params['savgolorder'] ) ):
@@ -874,201 +869,207 @@ def remodnav_preprocess_eyetrace2d(eyesamps : pd.DataFrame,
             pass;
         pass;
     
+    result=list();
+    
+    for eye in eyesamps[eyecol].unique():
         
-    eyesamps.sort_values( by=tname, inplace=True );
-    eyesamps.reset_index( inplace=True, drop=True);
-    
-    #REV: handle improper size of data based on sample rate?
-    #print(len(eyesamps.index));
-    #print("EYESAMP TIME DIFF", eyesamps.time.max() - eyesamps.time.min());
-    dur = (eyesamps[tname].max() - eyesamps[tname].min()) * (1/params['timeunitsec']); # e.g. 1/0.001 is 1000.
-    #print("Time sacc diff: {}".format(dur));
-    GRACE_SEC=0.0005*dur; #REV: drift...
-    expecteddur=((len(eyesamps.index)-1) / samplerate); #500 samples / 500 samp/sec = 1 sec. #2 samples makes 2 msec...so 1 sample is...0.
-    
-    if( abs(expecteddur - dur) > GRACE_SEC ):
-        raise Exception("ERROR, missing samples (not dense)  expected from #samples {} ({} samps @ {} hz)   observed {} ({}-{})".format(expecteddur, len(eyesamps.index)-1, samplerate, dur, eyesamps[tname].min(), eyesamps[tname].max()));
-        
-    
-    if(allnan(eyesamps[xname]) or allnan(eyesamps[yname])):
-        print("EYEUTILS, PREPROC BEGINNING BEFORE SPIKEFILTER -> ALL NAN");
-        return eyesamps;
-    
-    
-    if( params['filterspikes'] ):
-        #REV:  this is passing by reference...and trying to set shit wtf.
-        eyesamps[xname] = filter_spikes(eyesamps[xname].copy());
-        eyesamps[yname] = filter_spikes(eyesamps[yname].copy());
-        pass;
-    
-    #print('after spikes', len(eyesamps));
-    
-    if(allnan(eyesamps[xname]) or allnan(eyesamps[yname])):
-        print("EYEUTILS, PREPROC AFTER FILTER SPIKES -> ALL NAN");
-        return eyesamps;
-        
-    
-    
-    #REV: up-down-up-down oscillation...is what? 
-    
-    
-    if( savgol_window > 0 ):
-
-        #REV: note savgol requires no NAN...so we need to artificially impute ALL values (even bad ones) and then throw
-        ## away the old ones.
-        from peyeutils.utils import refill_interpolate_NANs, strsafe_interpolate;
-        
-        #REV: linear interpolate...
-        eyesamps = strsafe_interpolate( df=eyesamps, tcol=tname, method='linear' );
+        eyesamps2 = eyesamps[ eyesamps[eyecol] == eye ].copy();
                 
-        eyesamps[xname] = savgol_filter(eyesamps[xname], savgol_window, savgolorder);
-        eyesamps[yname] = savgol_filter(eyesamps[yname], savgol_window, savgolorder);
+        eyesamps2.sort_values( by=tname, inplace=True );
+        eyesamps2.reset_index( inplace=True, drop=True);
         
-        #REV: remove NA at the end? After I re-merge?
-        '''
-        before=len(eyesamps.index);
-        eyesamps = eyesamps.dropna(); #REV: does this drop non-numeric? If it is "None" it will, 
-        if( len(eyesamps.index) != before ):
-            raise Exception("Interpolation failed, b4 not same as after? There should be no NAN... possibly due to string NAN?");
-        '''
-        pass;
+        dur = (eyesamps2[tname].max() - eyesamps2[tname].min()) * (1/params['timeunitsec']); # e.g. 1/0.001 is 1000.
+        #print("Time sacc diff: {}".format(dur));
+        GRACE_SEC=0.0005*dur; #REV: drift...
+        expecteddur=((len(eyesamps2.index)-1) / samplerate); #500 samples / 500 samp/sec = 1 sec. #2 samples makes 2 msec...so 1 sample is...0.
     
-    if(allnan(eyesamps[xname]) or allnan(eyesamps[yname])):
-        print("EYEUTILS -> PREPROC AFTER SAVGOL -> ALL NAN");
-        return eyesamps;
-    
-    
-    if( 'blinkcol' in params ):
-        bcol=params['blinkcol'];
-        #print("1st) Re-NANing x/y based on blinkcolumn [{}] (in case smoothing added?)".format(bcol));
-        eyesamps.loc[ (eyesamps[bcol]==True), [xname, yname] ] = np.nan;
-        eyesamps.loc[ (eyesamps[xname].isna()), bcol ] = True;
-        pass;
-    
-    #print('after savgol', len(eyesamps));
-    
-    ############# REMOVE INSANE VALUES #####################
-    
-    
-    blink_vel_thresh_degsec = params['blink_vel_thresh_degsec'];
-    blink_acc_thresh_degsecsec = params['blink_acc_thresh_degsecsec'];
-    
-    velspx = np.sqrt( np.diff(eyesamps[xname])**2 + np.diff(eyesamps[yname])**2 ); #REV: this is PER SAMPLE. Shit...is this radians?
-
-    #REV: if time is in msec, then what? I don't use that info...
-    velsdva = velspx * dva_per_px * samplerate; 
-    velsdva = np.append([0], velsdva);
-    
-    eyesamps['vel'] = velsdva;
-    
-    accs = np.zeros(len(velsdva));
-    accs[1:] = (velsdva[1:] - velsdva[:-1]) * samplerate; #REV: just a ghetto diff thing (diff between self shifted by one);
-    
-    #velsdva[ velsdva > blink_vel_thresh_degsec ] = np.nan;
-    #accs[ accs > blink_acc_thresh_degsecsec ] = np.nan;
-    
-    #print('after vel', len(eyesamps));
-    
-    eyesamps['acc'] = accs;
-    
-    cols = [xname, yname, 'vel', 'acc']; #REV: remove actual samples too I guess lol...
-    es2 = eyesamps[ (eyesamps.acc >= blink_acc_thresh_degsecsec) | (eyesamps.vel >= blink_vel_thresh_degsec) ]; #[cols] = np.nan;
-    print("REMODNAV (preproc): Detected {} timepoints outside of velocity or acceleration allowance.".format(len(es2.index)));
-    
-    eyesamps.loc[ ((eyesamps.acc >= blink_acc_thresh_degsecsec) | (eyesamps.vel >= blink_vel_thresh_degsec)), cols ] = np.nan;
-    
-    pren = eyesamps[ eyesamps[cols].isna().any(axis=1) ]; #  len(eyesamps[ eyesamps[cols].isna() ].index);
-    
-    eyesamps.loc[ eyesamps[cols].isna().any(axis=1), cols ] = np.nan;
-    
-    eyesamps = dilate_nans(eyesamps, cols, params);
-    
-    #print('after nans', len(eyesamps));
-    
-    if(allnan(eyesamps[xname]) or allnan(eyesamps[yname])):
-        print("EYEUTILS -> PREPROC AFTER DILATE NANS -> ALL NAN");
-        return eyesamps;
-    
-    postn = eyesamps[ eyesamps[cols].isna().any(axis=1) ]; #  len(eyesamps[ eyesamps[cols].isna() ].index);
-    print("Dilated from {}->{} NAN".format(len(pren.index), len(postn.index)));
-
-    
-    if( 'blinkcol' in params ):
-        bcol=params['blinkcol'];
-        #print("2nd) Re-NANing x/y based on blinkcolumn [{}]".format(bcol));
-        eyesamps.loc[ (eyesamps[bcol]==True), [xname, yname] ] = np.nan;
-        eyesamps.loc[ (eyesamps[xname].isna()), bcol ] = True;
-        pass;
-    
-    ############# END REMOVE INSANE VALUES ################
-    
-    if( xname == yname ):
-        raise Exception("WARNING/ERROR, xname==yname");
+        if( abs(expecteddur - dur) > GRACE_SEC ):
+            raise Exception("ERROR, missing samples (not dense)  expected from #samples {} ({} samps @ {} hz)   observed {} ({}-{})".format(expecteddur, len(eyesamps2.index)-1, samplerate, dur, eyesamps2[tname].min(), eyesamps2[tname].max()));
         
-    
-    if( dva_per_px != 1 ):
-        raise Exception("DVAPPX NOT 1 (convert your x/y to dva before passing to this function!)");
-    
-    #print('before median', len(eyesamps));
-    med_vels = eyesamps.vel;
-    
-    if( median_window > 0 ):
-        med_vels = np.zeros((len(eyesamps.index),), eyesamps.vel.dtype); #REV: zeros of original size
         
-        med_vels[1:] =  np.sqrt( np.diff(median_filter(eyesamps[xname],
-                                                       size=median_window)) ** 2 +
-                                 np.diff(median_filter(eyesamps[yname],
-                                                       size=median_window)) ** 2
-                                );
-        med_vels *= dva_per_px * samplerate;
-        #med_vels[ get_dilated_nan_mask(med_vels, dilate_nan_window, 0) ] = np.nan;
-        pass;
-
-    #print('after median', len(eyesamps));
-    
-    eyesamps['medvel'] = med_vels;
-    
-    #REV: only dilate medvels? :( Second time...
-    cols = ['medvel'];
-    eyesamps = dilate_nans(eyesamps, cols, params);
-
-    
-    if( 'blinkcol' in params ):
-        bcol=params['blinkcol'];
-        #print("3rd) Re-NANing x/y based on blinkcolumn [{}]".format(bcol));
-        eyesamps.loc[ (eyesamps[bcol]==True), [xname, yname] ] = np.nan;
-        eyesamps.loc[ (eyesamps[xname].isna()), bcol ] = True;
-        pass;
-    
-    #print('after med nans', len(eyesamps));
-    
-    #print("Filtering out >1k deg/s");
-    finalvels = [];
-    for vel in eyesamps.vel:
-        if( vel  >  params['maxveldegsec'] and
-            True==DEBUG ):
-            print("REV: Detected SAMPLE too-high velocity {:5.2f} > maxvel deg/sec {}? Maybe bad filter params?".format(vel,params['maxveldegsec'] ));
-            #vel = finalvels[-1]; #REV: just replace it with the previous velocity? Fine with high sample rates...
+        if(allnan(eyesamps2[xname]) or allnan(eyesamps2[yname])):
+            print("EYEUTILS, PREPROC BEGINNING BEFORE SPIKEFILTER -> ALL NAN");
+            result.append(eyesamps2);
+            continue;
+        
+        
+        if( params['filterspikes'] ):
+            #REV:  this is passing by reference...and trying to set shit wtf.
+            eyesamps2[xname] = filter_spikes(eyesamps2[xname].copy());
+            eyesamps2[yname] = filter_spikes(eyesamps2[yname].copy());
             pass;
-        finalvels.append(vel);
-        pass;
-
-    #print('after finalvels', len(eyesamps));
+                
+        if(allnan(eyesamps2[xname]) or allnan(eyesamps2[yname])):
+            print("EYEUTILS, PREPROC AFTER FILTER SPIKES -> ALL NAN");
+            result.append(eyesamps2);
+            continue;
+        
+        
+        if( savgol_window > 0 ):
+            
+            #REV: note savgol requires no NAN...so we need to artificially impute ALL values (even bad ones) and then throw
+            ## away the old ones.
+            from peyeutils.utils import refill_interpolate_NANs, strsafe_interpolate;
+            
+            #REV: linear interpolate...
+            eyesamps2 = strsafe_interpolate( df=eyesamps2, tcol=tname, method='linear' );
+            
+            eyesamps2[xname] = savgol_filter(eyesamps2[xname], savgol_window, savgolorder);
+            eyesamps2[yname] = savgol_filter(eyesamps2[yname], savgol_window, savgolorder);
+            
+            #REV: remove NA at the end? After I re-merge?
+            '''
+            before=len(eyesamps2.index);
+            eyesamps2 = eyesamps2.dropna(); #REV: does this drop non-numeric? If it is "None" it will, 
+            if( len(eyesamps2.index) != before ):
+            raise Exception("Interpolation failed, b4 not same as after? There should be no NAN... possibly due to string NAN?");
+            '''
+            pass;
+        
+        if(allnan(eyesamps2[xname]) or allnan(eyesamps2[yname])):
+            print("EYEUTILS -> PREPROC AFTER SAVGOL -> ALL NAN");
+            result.append(eyesamps2);
+            continue;
+        
+        
+        if( 'blinkcol' in params ):
+            bcol=params['blinkcol'];
+            #print("1st) Re-NANing x/y based on blinkcolumn [{}] (in case smoothing added?)".format(bcol));
+            eyesamps2.loc[ (eyesamps2[bcol]==True), [xname, yname] ] = np.nan;
+            eyesamps2.loc[ (eyesamps2[xname].isna()), bcol ] = True;
+            pass;
+        
+        #print('after savgol', len(eyesamps2));
+        
+        ############# REMOVE INSANE VALUES #####################
+        
+        
+        blink_vel_thresh_degsec = params['blink_vel_thresh_degsec'];
+        blink_acc_thresh_degsecsec = params['blink_acc_thresh_degsecsec'];
+        
+        velspx = np.sqrt( np.diff(eyesamps2[xname])**2 + np.diff(eyesamps2[yname])**2 ); #REV: this is PER SAMPLE. Shit...is this radians?
+        
+        #REV: if time is in msec, then what? I don't use that info...
+        velsdva = velspx * dva_per_px * samplerate; 
+        velsdva = np.append([0], velsdva);
+        
+        eyesamps2['vel'] = velsdva;
+        
+        accs = np.zeros(len(velsdva));
+        accs[1:] = (velsdva[1:] - velsdva[:-1]) * samplerate; #REV: just a ghetto diff thing (diff between self shifted by one);
+        
+        #velsdva[ velsdva > blink_vel_thresh_degsec ] = np.nan;
+        #accs[ accs > blink_acc_thresh_degsecsec ] = np.nan;
+        
+        #print('after vel', len(eyesamps2));
+        
+        eyesamps2['acc'] = accs;
+        
+        cols = [xname, yname, 'vel', 'acc']; #REV: remove actual samples too I guess lol...
+        es2 = eyesamps2[ (eyesamps2.acc >= blink_acc_thresh_degsecsec) | (eyesamps2.vel >= blink_vel_thresh_degsec) ]; #[cols] = np.nan;
+        print("REMODNAV (preproc): Detected {} timepoints outside of velocity or acceleration allowance.".format(len(es2.index)));
+        
+        eyesamps2.loc[ ((eyesamps2.acc >= blink_acc_thresh_degsecsec) | (eyesamps2.vel >= blink_vel_thresh_degsec)), cols ] = np.nan;
+        
+        pren = eyesamps2[ eyesamps2[cols].isna().any(axis=1) ]; #  len(eyesamps2[ eyesamps2[cols].isna() ].index);
+        
+        eyesamps2.loc[ eyesamps2[cols].isna().any(axis=1), cols ] = np.nan;
+        
+        eyesamps2 = dilate_nans(eyesamps2, cols, params);
+        
+        #print('after nans', len(eyesamps2));
+        
+        if(allnan(eyesamps2[xname]) or allnan(eyesamps2[yname])):
+            print("EYEUTILS -> PREPROC AFTER DILATE NANS -> ALL NAN");
+            result.append(eyesamps2);
+            continue;
+        
+        postn = eyesamps2[ eyesamps2[cols].isna().any(axis=1) ]; #  len(eyesamps2[ eyesamps2[cols].isna() ].index);
+        print("Dilated from {}->{} NAN".format(len(pren.index), len(postn.index)));
+        
+        
+        if( 'blinkcol' in params ):
+            bcol=params['blinkcol'];
+            #print("2nd) Re-NANing x/y based on blinkcolumn [{}]".format(bcol));
+            eyesamps2.loc[ (eyesamps2[bcol]==True), [xname, yname] ] = np.nan;
+            eyesamps2.loc[ (eyesamps2[xname].isna()), bcol ] = True;
+            pass;
+        
+        ############# END REMOVE INSANE VALUES ################
+        
+        if( xname == yname ):
+            raise Exception("WARNING/ERROR, xname==yname");
+        
+        
+        if( dva_per_px != 1 ):
+            raise Exception("DVAPPX NOT 1 (convert your x/y to dva before passing to this function!)");
+        
+        #print('before median', len(eyesamps2));
+        med_vels = eyesamps2.vel;
+        
+        if( median_window > 0 ):
+            med_vels = np.zeros((len(eyesamps2.index),), eyesamps2.vel.dtype); #REV: zeros of original size
+            
+            med_vels[1:] =  np.sqrt( np.diff(median_filter(eyesamps2[xname],
+                                                           size=median_window)) ** 2 +
+                                     np.diff(median_filter(eyesamps2[yname],
+                                                           size=median_window)) ** 2
+                                    );
+            med_vels *= dva_per_px * samplerate;
+            #med_vels[ get_dilated_nan_mask(med_vels, dilate_nan_window, 0) ] = np.nan;
+            pass;
+        
+        #print('after median', len(eyesamps2));
+        
+        eyesamps2['medvel'] = med_vels;
+        
+        #REV: only dilate medvels? :( Second time...
+        cols = ['medvel'];
+        eyesamps2 = dilate_nans(eyesamps2, cols, params);
+        
+        
+        if( 'blinkcol' in params ):
+            bcol=params['blinkcol'];
+            #print("3rd) Re-NANing x/y based on blinkcolumn [{}]".format(bcol));
+            eyesamps2.loc[ (eyesamps2[bcol]==True), [xname, yname] ] = np.nan;
+            eyesamps2.loc[ (eyesamps2[xname].isna()), bcol ] = True;
+            pass;
+        
+        #print('after med nans', len(eyesamps2));
+        
+        #print("Filtering out >1k deg/s");
+        finalvels = [];
+        for vel in eyesamps2.vel:
+            if( vel  >  params['maxveldegsec'] and
+               True==DEBUG ):
+                print("REV: Detected SAMPLE too-high velocity {:5.2f} > maxvel deg/sec {}? Maybe bad filter params?".format(vel,params['maxveldegsec'] ));
+                #vel = finalvels[-1]; #REV: just replace it with the previous velocity? Fine with high sample rates...
+                pass;
+            finalvels.append(vel);
+            pass;
+        
+        #print('after finalvels', len(eyesamps2));
+        
+        eyesamps2.vel = np.array(finalvels);
+        
+        if( median_window <= 0 ):
+            eyesamps2.medvel = eyesamps2.vel;
+            pass;
+        
+        #REV: difference of velocity in deg/sec.
+        #REV: change in velocity between two samples should then represent
+        #REV: acceleration... 25 deg/sec - 26 deg/sec represents
+        #REV: change of 1 deg/sec in one sample time, i.e. 4 msec,
+        #REV: so to get deg/sec/sec, multiply by samplerate. OK.
+        
+        if(allnan(eyesamps2[xname]) or allnan(eyesamps2[yname])):
+            print("EYEUTILS -> PREPROC END OF FUNCT -> ALL NAN");
+            result.append(eyesamps2);
+            continue;
+        
+        
+        pass; #for EYE in eyecol (L, R, B, etc.)
     
-    eyesamps.vel = np.array(finalvels);
-    
-    if( median_window <= 0 ):
-        eyesamps.medvel = eyesamps.vel;
-        pass;
-    
-    #REV: difference of velocity in deg/sec.
-    #REV: change in velocity between two samples should then represent
-    #REV: acceleration... 25 deg/sec - 26 deg/sec represents
-    #REV: change of 1 deg/sec in one sample time, i.e. 4 msec,
-    #REV: so to get deg/sec/sec, multiply by samplerate. OK.
-    
-    if(allnan(eyesamps[xname]) or allnan(eyesamps[yname])):
-        print("EYEUTILS -> PREPROC END OF FUNCT -> ALL NAN");
-        return eyesamps;
-    
+    eyesamps = pd.concat(result).reset_index(drop=True);
     return eyesamps;
+    

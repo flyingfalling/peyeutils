@@ -864,7 +864,7 @@ def saccadr_detect_saccades( sampdf,
         print("Adding missing eyecol {} to samples df (all values empty string)...".format(eyecol));
         sampdf[eyecol]='';
         pass;
-
+    
     sdflist=list();
     edflist=list();
     for eye, eyedf in sampdf.groupby(eyecol, as_index=False):

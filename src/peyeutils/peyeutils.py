@@ -49,6 +49,8 @@ def prepare_data( df,
 ## REV: user must "upsample" their data first, and ensure "level" (label/id) columns are stored as "string" to avoid
 ## imputation.
 
+
+## REV: may need to handle blinks more reliably...i.e. pre-blink using pupil size?
 def preproc_and_compute_events(df,
                                tcol,
                                xcol,
@@ -112,8 +114,9 @@ def preproc_and_compute_events(df,
         df[ params['blinkcol'] ] = df[xcol].isna();
         pass;
 
-    #REV: this does NAN dilation etc.... it removes data, not just setting "bad" column or something? 
-    sdf = pu.eyemovements.remodnav.remodnav_preprocess_eyetrace2d(eyesamps=df, params=params);
+    #REV: this does NAN dilation etc.... it removes data, not just setting "bad" column or something?
+    #REV: handles eyes separately.
+    sdf = pu.eyemovements.remodnav.remodnav_preprocess_eyetrace2d(eyesamps=df, params=params, eyecol=eyecol);
 
 
 
@@ -133,8 +136,8 @@ def preproc_and_compute_events(df,
     sparams['saccadr_min_sep_sec']=min_isi_sec; #0.050;
     sparams['saccadr_min_dur_sec']=0.010;
     
-       
     
+    #REV: this will not auto-separate eyes!!!
     sdf, sev = pu.eyemovements.saccadr.saccadr_detect_saccades(sdf, sparams, tsecname=tcol, xname=xcol, yname=ycol);
     rdf, rev = pu.eyemovements.remodnav.remodnav_classify_events(sdf, params); #REV: ah, x/y names are stored in "params"
     
@@ -172,11 +175,12 @@ def preproc_and_compute_events(df,
     
     saccs['ismain'] = mainseq; #Any way to always just make it give me first?
     saccs = saccs[ (saccs.ismain==True) ].reset_index(drop=True); #REV: main seq, very small ones would be bad too?
-
+    
     saccs = saccs[ saccs['ampldva'] > min_sacc_dva ];
-
-
+    
+    
     #REV: remove "impossible" ones before that.
+    #REV: handles eyecol
     saccs = pu.eyemovements.combine.intersection_saccades( saccs,
                                                           );
     if(DEBUG):
@@ -186,7 +190,8 @@ def preproc_and_compute_events(df,
         pass;
     
     nonsaccs = rev[ ~(rev['label'] == 'SACC') ];
-    
+
+    #REV: handles eyecol
     blinks = pu.eyemovements.blink.compute_blinks_from_sampcol( sdf,
                                                                 dva_per_px=params['dva_per_px'],
                                                                 badcol=params['blinkcol'],
@@ -204,13 +209,16 @@ def preproc_and_compute_events(df,
                      ] ).reset_index(drop=True);
 
     ev = ev.sort_values(by='stsec').reset_index(drop=True);
-    
+
+    #REV: handles eyecol
     ev = pu.eyemovements.isi.eye_event_merge( ev,
                                               eyecol=eyecol,
                                               min_isi_dur=blinksacc_merge_envelop_sec,
                                              );
     
     ISIevents=['SACC', 'BLNK']; #REV: i.e. use blinks as saccades (gaze shifts often happen during blinks...)
+
+    #REV: handles eyecol
     isis = pu.eyemovements.isi.compute_ISIs_from_events( ev,
                                                          zerotime=sdf[tcol].iloc[0], #REV: or .min()
                                                          eventstouse=ISIevents,
@@ -369,7 +377,7 @@ def preproc_peyefv_edf( in_edf_path : str,
         pass;
     
     recinfo = pu.peyefv.get_recordingsession_info(m);
-
+    
     pretag='recinfo_';
     for key in recinfo:
         if( key in row ):
@@ -379,12 +387,34 @@ def preproc_peyefv_edf( in_edf_path : str,
         pass;
     
     
-    df, ev, msgs, badtrial = pu.eyelink.preproc_EL_A_clean_samples(s,e,m);
-    df = pu.eyelink.preproc_EL_rawcalib_px(df, msgs); #REV: this *ASSUMES* that viewbox etc. is true.
+    #REV: this
+    #(0) extracts messages etc.
+    #(1) separates samples per eye
+    #(2) cleans events i.e. renames eyes, renames saccade->SACC, fix->FIXA etc.
+    #(3) Checks simult events, sets "elblink" and "elhasblink" for where eventtype='blink' versus 'contains_blink'. Note events.blink is removed in A02 clean events. 'blink' just means CONTAINS blink in the first place. Oh shit, no it is added in there. OK, contains blink just means that
+    # a blink is either started/ended or totally contained within the thing. BLINK IS ALWAYS SANDWICHED BY A SACCADE!!! (right? REV)
+    #(4) (if not bad) Adds pupilsize columns (LPF etc., MAD) - for blinks
+    #(5) labels blinks (SHARED) -- i.e. adds columns "bad" (badpupil, badPRE etc.) -> Note uses some parameters/thresholds
+    df, ev, msgs, eldict = pu.eyelink.preproc_EL_A_clean_samples(s,e,m);
+    badtrial = eldict['badtrial'];
+    
+    #REV: just adds "px" names etc., i.e. cgx_px, etc., and centers based on coordinates.
+    #REV: note everything is in terms of VIEWBOX (not STIMULUS!)
+    df = pu.eyelink.preproc_EL_rawcalib_px(df, msgs); #REV: this *ASSUMES* that viewbox etc. is true/correct
+    
+    #REV: computes to flatscreen dva (VIEWBOX), still not related to videos/contents.
     df = pu.peyefv.preproc_peyefreeviewing_dva_from_flatscreen(df, msgs);
     
+
+    #REV: adds binocular gaze, if one is NAN, uses the other one, etc.
+    ##   if gaze points are > exclude_thresh_dva apart, assumes bad data and sets binoc to NAN.
+    ##    replaces with mean offset for one eye missing points.
+    ## REV: need to reconsider this, and filter out unphysiological stuff like jumps, recording nostril, etc.
+    ##   Use the "more reliable eye" at every time point...
     if( False == badtrial ):
-        df = pu.preproc.preproc_SHARED_C_binoc_gaze(df, xcol='cgx_dva', ycol='cgy_dva', tcol='Tsec', exclude_thresh=2);
+        exclude_thresh_dva=2;
+        df = pu.preproc.preproc_SHARED_C_binoc_gaze(df, xcol='cgx_dva', ycol='cgy_dva', tcol='Tsec',
+                                                    exclude_thresh = exclude_thresh_dva);
         pass;
     
     #df = preproc_SHARED_D_exclude_bad( df, xcol='cgx_dva', ycol='cgy_dva', badcol='bad' );
@@ -419,7 +449,8 @@ def preproc_peyefv_edf( in_edf_path : str,
     
     
     blockdf, trialdf = pu.peyefv.import_fv_blocks(msgs, df, trialdf);
-    
+
+    #REV: if no eyetracking, there will be no "trials"
     trialdf['haseyetracking']=haseyetracking;
     blockdf['haseyetracking']=haseyetracking;
     row['haseyetracking'] = haseyetracking;
