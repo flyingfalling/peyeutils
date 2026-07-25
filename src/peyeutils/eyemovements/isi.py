@@ -1,6 +1,7 @@
 
 import pandas as pd;
 import numpy as np;
+import peyeutils as pu;
 
 def compute_ISIs_from_events( ev,
                               zerotime,

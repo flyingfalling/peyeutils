@@ -6,7 +6,7 @@ def consolidate_saccades(df,
                          eyecol='eye',
                          isi_threshold=0.010,):
     if( len((df['label'].unique() )) != 1 ):
-        raise Exception("consolidate_saccades, got more than 1 unique labels (should only have SACC) : {}".format(df['label'].unique()));
+        raise Exception("consolidate_saccades, got !=1 unique labels (should only have SACC) : {}".format(df['label'].unique()));
     if( df['label'].unique()[0] != 'SACC' ):
         raise Exception("Consolidate saccades, label is not SACC (should only have SACC) : {}".format(df['label'].unique()));
     

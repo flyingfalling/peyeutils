@@ -1,10 +1,11 @@
 from peyeutils.utils import filter_spikes, allnan, dilate_nans;
 
-
+import peyeutils as pu;
 
 import numpy as np;
 import pandas as pd;
 import math;
+
 
 
 from statsmodels.robust.scale import mad;
@@ -854,6 +855,11 @@ def remodnav_preprocess_eyetrace2d(eyesamps : pd.DataFrame,
     dilate_nan_window = int(params['dilate_nan_win_sec'] * samplerate);
     min_blink_window = int(params['minblinksec'] * samplerate);
     savgol_window = int(params['savgollensec'] * samplerate);
+    
+    if( savgol_window % 2 != 1 ):
+        savgol_window += 1;
+        pass;
+    
     median_window = int(params['medianfiltlensec'] * samplerate );
     savgolorder = params['savgolorder'];
     

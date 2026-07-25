@@ -20,20 +20,6 @@ import numpy as np;
 #REV: remove "unrealistic" periods of zero eye movements (i.e. nostril detected as pupil?).
 
 
-
-def prepare_data( df,
-                  tcol,
-                  targ_sr_hzsec,
-                  truesrs : dict, #REV: true samplerates of each sensor (column cluster).
-                  method='polynomial',
-                  order=2,
-                  tcolunit_s=1,
-                  startsec=None,
-                  endsec=None,
-                  ):
-    
-    
-    return;
                   
 #REV: user must:
 
@@ -140,69 +126,91 @@ def preproc_and_compute_events(df,
     
     #REV: this will not auto-separate eyes!!!
     #print(sdf);
-    sdf, sev = pu.eyemovements.saccadr.saccadr_detect_saccades(sdf, sparams, tsecname=tcol, xname=xcol, yname=ycol);
+    sdf, sev = pu.eyemovements.saccadr.saccadr_detect_saccades(sdf, sparams, tsecname=tcol, xname=xcol, yname=ycol, eyecol=eyecol);
     
     rdf, rev = pu.eyemovements.remodnav.remodnav_classify_events(sdf, params, eyecol=eyecol); #REV: ah, x/y names are stored in "params"
-
+    
     #print(sev);
     #print(rev);
     
+    
+    
     evlist = list();
     if( len(sev.index) > 0 ):
+        sev['source'] = 'saccadr';
         evlist.append(sev);
         pass;
     if( len(rev.index) > 0 ):
+        rev['source'] = 'remodnav';
         evlist.append(rev);
         pass;
+    ev = pu.utils.safe_df_concat( evlist );
     
-    if( len(evlist) > 0 ):
+    if( not ev.empty ):
+        print(rev.columns);
+        print(sev.columns);
+
         
-        allsaccs = pd.concat( [ sev[sev['label']=='SACC' ],
-                                rev[rev['label']=='SACC' ],
-                               ]
-                             );
+        saccs = ev[ ev['label'] =='SACC' ].copy().reset_index(drop=True);
         
-        
-        saccs = allsaccs.reset_index(drop=True);
-        
-        if(True==PLOT):
-            import matplotlib.pyplot as plt;
-            import seaborn as sns;
+        if( not saccs.empty ):
+            print("Process Events -> Processing Saccades");
+            if(True==PLOT):
+                import matplotlib.pyplot as plt;
+                import seaborn as sns;
+                
+                mainseq, mygraphics = pu.eyemovements.mainseq.mainseq_ampldur_linear_95pctl_human_chen2021_wplot( saccs['ampldva'],
+                                                                                                                  saccs['dursec'],
+                                                                                                                  error_gain=mainseq_err_gain,
+                                                                                                                 );
+                xmin=0;
+                xmax=25;
+                mygraphics.ax.set_xlim([xmin, xmax]);
+                mygraphics.savefig('mainseq.pdf');
+                plt.show();
+                pass;
+            else:
+                mainseq = pu.eyemovements.mainseq.mainseq_ampldur_linear_95pctl_human_chen2021( saccs['ampldva'],
+                                                                                                saccs['dursec'],
+                                                                                                error_gain=mainseq_err_gain,
+                                                                                               );
+                pass;
             
-            mainseq, mygraphics = pu.eyemovements.mainseq.mainseq_ampldur_linear_95pctl_human_chen2021_wplot( saccs['ampldva'],
-                                                                                                              saccs['dursec'],
-                                                                                                              error_gain=mainseq_err_gain,
-                                                                                                             );
-            xmin=0;
-            xmax=25;
-            mygraphics.ax.set_xlim([xmin, xmax]);
-            mygraphics.savefig('mainseq.pdf');
-            plt.show();
+            b4size=len(saccs.index);
+            saccs['ismain'] = mainseq; #Any way to always just make it give me first?
+            saccs = saccs[ (saccs.ismain==True) ].reset_index(drop=True); #REV: main seq, very small ones would be bad too?
+            
+            if( saccs.empty ):
+                print("WARNING: Main sequence check removed all saccs ({}->{})".format(b4size, 0));
+                pass;
+            
+            b4size=len(saccs.index);
+            saccs = saccs[ saccs['ampldva'] > min_sacc_dva ];
+            if( saccs.empty ):
+                print("WARNING: Min AMPL DVA check removed all saccs ({}->{})".format(b4size, 0));
+                pass;
+            
+            
+            #REV: remove "impossible" ones before that.
+            #REV: handles eyecol
+            
+            if( not saccs.empty ):
+                saccs = pu.eyemovements.combine.intersection_saccades( saccs  );
+                pass;
+            
+            pass; #end SACCS not empty
+        else:
+            print("Process Events -> No Saccades (sacc EV empty)");
+            pass;
+        
+        
+        #REV: only rev has non-saccs...
+        if( 'label' in rev.columns ):
+            nonsaccs = rev[ ~(rev['label'] == 'SACC') ];
             pass;
         else:
-            mainseq = pu.eyemovements.mainseq.mainseq_ampldur_linear_95pctl_human_chen2021( saccs['ampldva'],
-                                                                                            saccs['dursec'],
-                                                                                            error_gain=mainseq_err_gain,
-                                                                                           );
+            nonsaccs = rev;
             pass;
-        
-        saccs['ismain'] = mainseq; #Any way to always just make it give me first?
-        saccs = saccs[ (saccs.ismain==True) ].reset_index(drop=True); #REV: main seq, very small ones would be bad too?
-        
-        saccs = saccs[ saccs['ampldva'] > min_sacc_dva ];
-        
-        
-        #REV: remove "impossible" ones before that.
-        #REV: handles eyecol
-        saccs = pu.eyemovements.combine.intersection_saccades( saccs,
-                                                              );
-        if(DEBUG):
-            saccs['label'] = 'OSACC';
-            saccs2['label'] = 'SACC';
-            saccs = pd.concat([saccs, saccs2]).reset_index(drop=True);
-            pass;
-        
-        nonsaccs = rev[ ~(rev['label'] == 'SACC') ];
         
         #REV: handles eyecol
         blinks = pu.eyemovements.blink.compute_blinks_from_sampcol( sdf,
@@ -215,7 +223,7 @@ def preproc_and_compute_events(df,
         #REV: should I remove blinks in which eye did not move much (< 0.5 deg ?). I.e. fixation with intermediate lbink?
         # Vision is not happening during that time and physiologically it is equivalent...and then ISI is?
         
-        ev = pd.concat( [saccs,
+        ev = pu.utils.safe_df_concat( [saccs,
                          blinks,
                          nonsaccs, #REV: this is currently just PISI (original ISI from saccade detection...). In other cases
                          # there may also be e.g. drifts/smooth pursuits, etc.?
@@ -307,6 +315,7 @@ def preproc_and_compute_events(df,
 
 def preproc_peyefv_edf( in_edf_path : str,
                         out_csv_path : str = None,
+                        targ_sr_hzsec : float = -1,
                        ):
     """
 
@@ -412,8 +421,11 @@ def preproc_peyefv_edf( in_edf_path : str,
     # a blink is either started/ended or totally contained within the thing. BLINK IS ALWAYS SANDWICHED BY A SACCADE!!! (right? REV)
     #(4) (if not bad) Adds pupilsize columns (LPF etc., MAD) - for blinks
     #(5) labels blinks (SHARED) -- i.e. adds columns "bad" (badpupil, badPRE etc.) -> Note uses some parameters/thresholds
-    df, ev, msgs, eldict = pu.eyelink.preproc_EL_A_clean_samples(s,e,m);
+    df, ev, msgs, eldict = pu.eyelink.preproc_EL_A_clean_samples(s,e,m,targ_sr_hzsec=targ_sr_hzsec);
+    
     badtrial = eldict['badtrial'];
+    #REV: set resampled samplerate of this file...
+    row['sr_hzsec'] = eldict['sr_hzsec'];
     
     #REV: just adds "px" names etc., i.e. cgx_px, etc., and centers based on coordinates.
     #REV: note everything is in terms of VIEWBOX (not STIMULUS!)
@@ -422,14 +434,14 @@ def preproc_peyefv_edf( in_edf_path : str,
     #REV: computes to flatscreen dva (VIEWBOX), still not related to videos/contents.
     df, dva_per_px = pu.peyefv.preproc_peyefreeviewing_dva_from_flatscreen(df, msgs);
     eldict['dva_per_px'] = dva_per_px;
-
+    
     #REV: adds binocular gaze, if one is NAN, uses the other one, etc.
     ##   if gaze points are > exclude_thresh_dva apart, assumes bad data and sets binoc to NAN.
     ##    replaces with mean offset for one eye missing points.
     ## REV: need to reconsider this, and filter out unphysiological stuff like jumps, recording nostril, etc.
     ##   Use the "more reliable eye" at every time point...
     if( False == badtrial ):
-        exclude_thresh_dva=2;
+        exclude_thresh_dva=1.5;
         df = pu.preproc.preproc_SHARED_C_binoc_gaze(df, xcol='cgx_dva', ycol='cgy_dva', tcol='Tsec',
                                                     exclude_thresh = exclude_thresh_dva);
         pass;

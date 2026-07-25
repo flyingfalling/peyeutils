@@ -44,6 +44,9 @@ def preproc_EL_A00_add_Tsec(rawdf, timecol='time', timeunitsec=pu.EL_TIMEUNIT_SE
     return rawdf;
 
 
+
+
+
 def preproc_EL_A01_separate_samps_eye( samples,
                                        samplerate,
                                        ELtname='time', #REV: this is "EL" default time column
@@ -401,7 +404,10 @@ def preproc_EL_A02_clean_events(eventdf,
 
 
 
-def preproc_EL_A_clean_samples(rawsamps, rawevents, rawmessages,
+def preproc_EL_A_clean_samples(rawsamps,
+                               rawevents,
+                               rawmessages,
+                               targ_sr_hzsec=-1,
                                preblinks=False):
     """
 
@@ -432,6 +438,10 @@ def preproc_EL_A_clean_samples(rawsamps, rawevents, rawmessages,
     
     print(elparamdict);
     ELsr=elparamdict['samplerate'];
+    if(targ_sr_hzsec <= 0):
+        targ_sr_hzsec = ELsr;
+        pass;
+    
     ELeyes = [ eye for eye in elparamdict['eyes'] ];
     #REV: this lists "L", "R"
     for eye in ELeyes:
@@ -439,10 +449,12 @@ def preproc_EL_A_clean_samples(rawsamps, rawevents, rawmessages,
             raise Exception("Unrecognized eye [{}], I only recognize from: {}".format(eye, [pu.PEYEUTILS_LEFT_EYE, pu.PEYEUTILS_RIGHT_EYE]));
         pass;
     
-    print("EYELINK RECORDING FROM EYES: {} @ SR: {} Hz".format(ELeyes, ELsr));
+    print("EYELINK RECORDING FROM EYES: {} @ SR: {} Hz   (will resample to {})".format(ELeyes, ELsr, targ_sr_hzsec));
     
+    #REV: this will resample to my identical samplerate already...
+    #REV: this *may* mess up indexing/timing of events/etc.? Should I resample *after*?
     df = preproc_EL_A01_separate_samps_eye(rawsamps,
-                                           samplerate=ELsr,
+                                           samplerate=targ_sr_hzsec,
                                            eyes_to_use=ELeyes,
                                            );
     
@@ -456,11 +468,12 @@ def preproc_EL_A_clean_samples(rawsamps, rawevents, rawmessages,
     
     #REV: if all bad, i.e. NAN etc., return 'badtrial=True'
     df, badtrial = preproc_EL_A03_filter_samps_by_ELevents(df, ev,
-                                                           sr_hzsec=ELsr,
+                                                           sr_hzsec=targ_sr_hzsec,
                                                            timeunitsec=pu.EL_TIMEUNIT_SEC,
                                                            );
     
     elparamdict['badtrial'] = badtrial;
+    elparamdict['sr_hzsec'] = targ_sr_hzsec;
     
     if( badtrial ):
         print("BADTRIAL (no data) -- skipping pupil size analysis");
@@ -479,7 +492,7 @@ def preproc_EL_A_clean_samples(rawsamps, rawevents, rawmessages,
             preblinkcols=['elblink']; #elhasblink?
             pass;
         df = pre.preproc_SHARED_label_blinks(df,
-                                             sr_hzsec=ELsr,
+                                             sr_hzsec=targ_sr_hzsec,
                                              blinkremoval_MAD_mult=5,
                                              blinkremoval_med_mult=1,
                                              blinkremoval_dilate_win_sec=0.030,
