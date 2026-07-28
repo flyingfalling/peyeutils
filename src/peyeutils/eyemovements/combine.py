@@ -17,7 +17,7 @@ def consolidate_saccades(df,
     eyelist=list();
     for eye, eyedf in df.groupby(eyecol, as_index=False):
         #myev=_consolidate_saccades_slow(df=df, isi_threshold=isi_threshold);
-        myev= consolidate_consensus_saccades(df=df, isi_threshold=isi_threshold);
+        myev= consolidate_consensus_saccades(df=eyedf, isi_threshold=isi_threshold); #REV: whoops fixed df->eyedf
         myev[eyecol] = eye;
         eyelist.append(myev);
         pass;
@@ -42,7 +42,7 @@ def intersection_saccades(df,
         pass;
     eyelist=list();
     for eye, eyedf in df.groupby(eyecol, as_index=False):
-        myev= consolidate_saccades_strict(df=df);
+        myev= consolidate_saccades_strict(df=eyedf);
         myev[eyecol] = eye;
         eyelist.append(myev);
         pass;

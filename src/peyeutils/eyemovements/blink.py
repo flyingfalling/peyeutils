@@ -19,7 +19,7 @@ def compute_blinks_from_sampcol( samps,
     
     blinkevs=list();
     for eye, eyedf in samps.groupby(eyecol, as_index=False):
-        blinkev = pu.preproc.blink_df_from_samples(samps,
+        blinkev = pu.preproc.blink_df_from_samples(eyedf, #REV: fixed 2026/07/28 whoops was samps
                                                    dva_per_px=dva_per_px,
                                                    badcol=badcol,
                                                    tcol=tcol,

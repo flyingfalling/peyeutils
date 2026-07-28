@@ -643,7 +643,7 @@ def remodnav_classify_events(eyesamps,
         eyedf = eyedf.copy().sort_values(by=params['tname']).reset_index(drop=True);
         print("REMODNAV CLASSIFY (eye={}): Size of eyedf: {}".format(eye, len(eyedf.index)));
         #eyedf = eyedf.reset_index(drop=True);
-        myev = _remodnav_classify_events(eyesamps=eyedf,
+        myev = _remodnav_classify_events(eyesamps=eyedf, #REV: ok checked 2026/07/28
                                          params=params);
         myev[eyecol] = eye;
         evlist.append(myev);

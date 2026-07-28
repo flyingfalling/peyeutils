@@ -903,7 +903,7 @@ def saccadr_detect_saccades( sampdf,
             sdflist.append(eyedf);
             continue;
         
-        sdf, edf = _saccadr_sacc( sampdf=eyedf,
+        sdf, edf = _saccadr_sacc( sampdf=eyedf, #REV: ok checked 2026/07/28
                                   params=params,
                                   tsecname=tsecname,
                                   methods=methods,
