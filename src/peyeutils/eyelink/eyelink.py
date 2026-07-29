@@ -402,13 +402,20 @@ def preproc_EL_A02_clean_events(eventdf,
     
     return ev;
 
-
+def preproc_EL_A04_check_nogazedata( df,
+                                     colstouse ):
+        
+    #REV: if all false, all are all nan.
+    nogazedata = all([ pu.utils.allnan( df[c] ) for c in colstouse ] );
+    
+    return nogazedata;
 
 def preproc_EL_A_clean_samples(rawsamps,
                                rawevents,
                                rawmessages,
                                targ_sr_hzsec=-1,
-                               preblinks=False):
+                               preblinks=False,
+                               nogazecols=['gx','gy']):
     """
 
     Parameters
@@ -467,16 +474,19 @@ def preproc_EL_A_clean_samples(rawsamps,
     
     
     #REV: if all bad, i.e. NAN etc., return 'badtrial=True'
-    df, badtrial = preproc_EL_A03_filter_samps_by_ELevents(df, ev,
-                                                           sr_hzsec=targ_sr_hzsec,
-                                                           timeunitsec=pu.EL_TIMEUNIT_SEC,
-                                                           );
+    df, nogazedata = preproc_EL_A03_filter_samps_by_ELevents(df, ev,
+                                                             sr_hzsec=targ_sr_hzsec,
+                                                             timeunitsec=pu.EL_TIMEUNIT_SEC,
+                                                             );
+
+    #REV: could pa also do it? Could I have pa without gaze data?
+    #nogazedata = preproc_EL_A04_check_nogazedata( df, colstouse=nogazecols );
     
-    elparamdict['badtrial'] = badtrial;
+    elparamdict['badtrial'] = nogazedata;
     elparamdict['sr_hzsec'] = targ_sr_hzsec;
     
-    if( badtrial ):
-        print("BADTRIAL (no data) -- skipping pupil size analysis");
+    if( nogazedata ):
+        print("BADTRIAL (no gaze data) -- skipping pupil size analysis");
         df['bad'] = True; #should fill in all bad ...
         pass;
     else:
@@ -690,12 +700,10 @@ def preproc_EL_A03_filter_samps_by_ELevents(df, ev,
         
         pass;
     
-
-
     
     ldf = df[df.eye==pu.PEYEUTILS_LEFT_EYE];
     rdf = df[df.eye==pu.PEYEUTILS_RIGHT_EYE];
-
+    
     #REV: this ASSUMES that we have equal number of L/R samples!!!!! I.e. I can't drop bad eye.
     if(len(ldf.index) != len(rdf.index)):
         raise Exception("START -> Unequal LDF {}  RDF {}".format(len(ldf.index), len(rdf.index)));
@@ -710,7 +718,7 @@ def preproc_EL_A03_filter_samps_by_ELevents(df, ev,
         raise Exception("LDF Failed to match expected samplerate to DT");
     if( not np.isclose( np.nanmax(ldf[tsecname].diff()), 1/sr_hzsec ) ): #1 for true DT, other NAN for first sample...
         raise Exception("LDF NOT CONSTANT SAMPLERATE OF 1/SR tdelta");
-
+    
     if( len(rdf[tname].diff().unique()) != 2 ): #1 for true DT, other NAN for first sample...
         raise Exception("RDF MISSING TIMEPOINTS IN EDF DATA");
     if( not np.isclose( np.nanmax(rdf[tsecname].diff()), 1/sr_hzsec ) ): #1 for true DT, other NAN for first sample...
@@ -746,8 +754,9 @@ def preproc_EL_A03_filter_samps_by_ELevents(df, ev,
         pass;  ## END if events exist.
     
     df = pd.concat([ldf, rdf]).sort_values(by=['eye',tname]).reset_index(drop=True);
-
+    
     badtrial=False; #REV: if badtrial was true, we would've broken/returned earlier with badtrial=True.
+    # (REV would have returned true earlier if was allnan...?)
     return df, badtrial;
 
 #REV: adds vbox space (pixels from...bottom-left?), stimulus space (if stimulus?), dvaspace (given physical).

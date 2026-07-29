@@ -237,6 +237,9 @@ def preproc_and_compute_events(df,
         ev = ev.sort_values(by='stsec').reset_index(drop=True);
         #REV: drop first and last "blink" since they are simply NAN at edges.
 
+        
+        '''
+        #REV: REmoval pointless since may be overlap of multiple "kinds" of things e.g. pursuit/isi
         if( remove_firstlast ):
             evs=list();
             for _eye,_ev in ev.groupby(eyecol):
@@ -254,7 +257,7 @@ def preproc_and_compute_events(df,
                 pass;
             ev = pu.utils.safe_df_concat(evs);
             pass;
-        
+        '''
         
         
         
@@ -477,6 +480,14 @@ def preproc_peyefv_edf( in_edf_path : str,
     
     #df = preproc_SHARED_D_exclude_bad( df, xcol='cgx_dva', ycol='cgy_dva', badcol='bad' );
     
+    trialdf = pu.peyefv.import_fv_trials( msgs );
+    if( badtrial ):
+        #trialdf['haseyetracking'] = False;
+        haseyetracking=False;
+        print(" BAD TRIAL (no data?)...");
+        pass;
+    
+    
     if( out_csv_path ):
         #REV: preprocessed messages etc.
         sfn = fname + '.samples.csv'
@@ -498,14 +509,7 @@ def preproc_peyefv_edf( in_edf_path : str,
     
         
     
-    trialdf = pu.peyefv.import_fv_trials( msgs );
-    if( badtrial ):
-        #trialdf['haseyetracking'] = False;
-        haseyetracking=False;
-        print(" BAD TRIAL (no data?)...");
-        pass;
-    
-    
+        
     blockdf, trialdf = pu.peyefv.import_fv_blocks(msgs, df, trialdf);
 
     #REV: if no eyetracking, there will be no "trials"
