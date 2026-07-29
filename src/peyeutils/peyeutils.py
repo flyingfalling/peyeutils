@@ -103,6 +103,8 @@ def preproc_and_compute_events(df,
     #REV: this does NAN dilation etc.... it removes data, not just setting "bad" column or something?
     #REV: handles eyes separately.
     #print(df);
+
+    #REV: this should "smooth" samples (i.e. smooth over jittery/droppy missing NANs due to some small stuff like FMRI EPI noise).
     sdf = pu.eyemovements.remodnav.remodnav_preprocess_eyetrace2d(eyesamps=df, params=params, eyecol=eyecol);
     
     
@@ -110,7 +112,7 @@ def preproc_and_compute_events(df,
     ################ SACCADE DETECTION #######################
     
     sparams = pu.eyemovements.saccadr.default_saccadr_params();
-    sparams['samplerate'] = sr_hzsec;
+    sparams['samplerate_hzsec'] = sr_hzsec;
     sparams['noiseconst'] = 4; #REV: 4 works.
     sparams['ek_vel_thresh_lambda'] = 6; # 6 works
     sparams['ek_min_dur_sec']=0.012;

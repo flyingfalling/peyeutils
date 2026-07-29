@@ -883,7 +883,7 @@ def remodnav_preprocess_eyetrace2d(eyesamps : pd.DataFrame,
     
     #print('beginning', len(eyesamps));
     
-        
+    #REV: OK, first thing is SAVGOL!
     #REV: PYTHON logical precedence not > and > or...
     if( savgol_window > 0 ): #params['savgollensec'] != 0 ) ):
         if( (savgol_window % 2 != 1) or (savgol_window < params['savgolorder'] ) ):
@@ -898,7 +898,7 @@ def remodnav_preprocess_eyetrace2d(eyesamps : pd.DataFrame,
     for eye in eyesamps[eyecol].unique():
         
         eyesamps2 = eyesamps[ eyesamps[eyecol] == eye ].copy();
-                
+        
         eyesamps2.sort_values( by=tname, inplace=True );
         eyesamps2.reset_index( inplace=True, drop=True);
         
@@ -927,9 +927,12 @@ def remodnav_preprocess_eyetrace2d(eyesamps : pd.DataFrame,
             pass;
         
         if(allnan(eyesamps2[xname]) or allnan(eyesamps2[yname])):
-            print("EYEUTILS, PREPROC AFTER FILTER SPIKES -> ALL NAN");
+            print("EYEUTILS, PREPROC (eye={}) AFTER FILTER SPIKES -> ALL NAN".format(eye));
             result.append(eyesamps2);
             continue;
+        else:
+            print("EYEUTILS, PREPROC (eye={}) AFTER FILTER SPIKES is OK!".format(eye));
+            pass;
         
         
         if( savgol_window > 0 ):
@@ -938,7 +941,11 @@ def remodnav_preprocess_eyetrace2d(eyesamps : pd.DataFrame,
             ## away the old ones.
             from peyeutils.utils import refill_interpolate_NANs, strsafe_interpolate;
             
+                        
             #REV: linear interpolate...
+            #REV: I will replace NANs after the fact (by setting with BLINKCOL==TRUE).
+            #REV: so I need to "re-detect" valid values...i.e. drop any "blink" clusters which are less than some size/length in second?
+            #REV: Or less than some number of samples per sliding window...
             eyesamps2 = strsafe_interpolate( df=eyesamps2, tcol=tname, method='linear' );
             
             eyesamps2[xname] = savgol_filter(eyesamps2[xname], savgol_window, savgolorder);
@@ -952,22 +959,27 @@ def remodnav_preprocess_eyetrace2d(eyesamps : pd.DataFrame,
             raise Exception("Interpolation failed, b4 not same as after? There should be no NAN... possibly due to string NAN?");
             '''
             pass;
+
         
         if(allnan(eyesamps2[xname]) or allnan(eyesamps2[yname])):
-            print("EYEUTILS -> PREPROC AFTER SAVGOL -> ALL NAN");
+            print("EYEUTILS -> PREPROC (eye={}) AFTER SAVGOL -> ALL NAN".format(eye));
             result.append(eyesamps2);
             continue;
         
         
+        #REV: fuck, this sets to NAN again!!!
+        #REV: I need to make sure that only "true" blinks (from e.g. pupil acceleration) are blinks, and not just jittery/dropped data.
+        #REV: I need to identify "bad/dropped data" and "blinks"...
         if( 'blinkcol' in params ):
             bcol=params['blinkcol'];
+            print("SETTING BLINKS X/Y to NAN (And, ensuring that all NAN locations are set with BLINKCOL=True)!!");
             #print("1st) Re-NANing x/y based on blinkcolumn [{}] (in case smoothing added?)".format(bcol));
             eyesamps2.loc[ (eyesamps2[bcol]==True), [xname, yname] ] = np.nan;
             eyesamps2.loc[ (eyesamps2[xname].isna()), bcol ] = True; #What?
             pass;
-
+        
         if(allnan(eyesamps2[xname]) or allnan(eyesamps2[yname])):
-            print("EYEUTILS -> PREPROC AFTER BLINKCOL to NAN -> ALL NAN");
+            print("EYEUTILS -> PREPROC (eye={}) AFTER BLINKCOL to NAN -> ALL NAN".format(eye));
             result.append(eyesamps2);
             continue;
         #print('after savgol', len(eyesamps2));
@@ -1003,20 +1015,25 @@ def remodnav_preprocess_eyetrace2d(eyesamps : pd.DataFrame,
         eyesamps2.loc[ ((eyesamps2.acc >= blink_acc_thresh_degsecsec) | (eyesamps2.vel >= blink_vel_thresh_degsec)), cols ] = np.nan;
         
         pren = eyesamps2[ eyesamps2[cols].isna().any(axis=1) ]; #  len(eyesamps2[ eyesamps2[cols].isna() ].index);
-        
+
+        #REV: if ANY of cols is NAN, set all to!
         eyesamps2.loc[ eyesamps2[cols].isna().any(axis=1), cols ] = np.nan;
         
         eyesamps2 = dilate_nans(eyesamps2, cols, params);
-        
-        #print('after nans', len(eyesamps2));
-        
-        if(allnan(eyesamps2[xname]) or allnan(eyesamps2[yname])):
-            print("EYEUTILS -> PREPROC AFTER DILATE NANS -> ALL NAN");
-            result.append(eyesamps2);
-            continue;
+
         
         postn = eyesamps2[ eyesamps2[cols].isna().any(axis=1) ]; #  len(eyesamps2[ eyesamps2[cols].isna() ].index);
-        print("Dilated from {}->{} NAN".format(len(pren.index), len(postn.index)));
+        print("Dilated from {}->{} NAN (note len={})".format(len(pren.index), len(postn.index), len(eyesamps2.index)));
+        
+                
+        if(allnan(eyesamps2[xname]) or allnan(eyesamps2[yname])):
+            print("EYEUTILS -> PREPROC (eye={}) AFTER DILATE NANS -> ALL NAN".format(eye));
+            result.append(eyesamps2);
+            continue;
+        else:
+            print("EYEUTILS -> PREPROC (eye={}) AFTER DILATE NANS is OK!".format(eye));
+            pass;
+        
         
         
         if( 'blinkcol' in params ):

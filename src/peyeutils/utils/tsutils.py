@@ -75,7 +75,12 @@ def select_legal_timepoints4(ts, vals, maxdt, DEBUG=False):
 
 
 #REV: interpolates, filling in NANs.
-def strsafe_interpolate(df, tcol, method='linear', order=1,DEBUG=False):
+def strsafe_interpolate(df,
+                        tcol,
+                        method='linear',
+                        order=1,
+                        DEBUG=False):
+    
     df = df.sort_values(by=tcol).reset_index(drop=True);
     
     interpcolumns = [ colname  for colname in df.columns if (True==is_numeric_dtype(df[colname])) ]
@@ -407,23 +412,13 @@ def interpolate_df_to_samplerate(df, tcol, targ_srhzsec, tcolunit_s, truesrs=dic
 
 
 
-
+#REV: this gets clusters of where it is NAN!
+#                                    0     0    0    nan   0    0     0
+#                dilates into:       0     0   nan   nan  nan   0     0
+# i.e. into a mask of:             FALSE FALSE TRUE TRUE TRUE FALSE FALSE
+# (actually,      into bool first) FALSE FALSE TRUE TRUE TRUE FALSE FALSE 
 def get_dilated_nan_mask(arr, iterations, max_ignore_size=None):
-    """
-
-    Parameters
-    ----------
-    arr :
-        
-    iterations :
-        
-    max_ignore_size :
-         (Default value = None)
-
-    Returns
-    -------
-
-    """
+    
     from scipy import ndimage
     clusters, nclusters = ndimage.label(np.isnan(arr))
     # go through all clusters and remove any cluster that is less
@@ -434,11 +429,13 @@ def get_dilated_nan_mask(arr, iterations, max_ignore_size=None):
             # cluster index is base1
             i = i + 1;
             if (clusters == i).sum() <= max_ignore_size:
-                clusters[clusters == i] = 0;
+                clusters[clusters == i] = 0; #REV: "remove" the cluster (by setting it to 0, i.e. not part of the "true" clusters).
                 pass;
             pass;
         pass;
-        
+
+    #REV: mask is where it is "nan". I.e. only those where "true", it set to 1, 2, 3, 4.
+    #REV: and this will "dilate" it.
     mask = ndimage.binary_dilation(clusters > 0, iterations=iterations);
     return mask;
 
@@ -911,36 +908,29 @@ def remove_suspicious_repeats(df, params):
 
 
 
+#REV: dilates where mask is TRUE
 def dilate_nans( df, cols, params ):
-    """
-
-    Parameters
-    ----------
-    df :
-        
-    cols :
-        
-    params :
-        
-
-    Returns
-    -------
-
-    """
+    if( 'samplerate_hzsec' not in params or
+        'dilate_nan_win_sec' not in params ):
+        print(params);
+        raise Exception("Params dict must contain required fields: samplerate_hzsec and dilate_nan_win_sec");
+    
     sr=params['samplerate_hzsec'];
     dilate_nan_win_samp = math.ceil(params['dilate_nan_win_sec'] * sr); # E.g. if 0.030 sec and SR=100, 0.030 * 100 = 3
     #REV: maybe better to interpolate barely missing values?
     #min_blink_samp = int(params['min_blink_sec'] * sr);
-    mask = np.full( len(df.index), False );
+    mask = np.full( len(df.index), False ); #REV: just array of "False"
+    
+    #For each col, take OR of old mask and get_dilated_nan_mask( array, nsamps );
     for col in cols:
-        mask = mask | (get_dilated_nan_mask( df[col],
-                                             dilate_nan_win_samp ) );
+        mask = mask | (get_dilated_nan_mask( arr = df[col],
+                                             iterations = dilate_nan_win_samp ) );
         pass;
-
-    df = df.reset_index(drop=True);
+    
+    df = df.reset_index(drop=True); #REV: make sure df index is 0->N (for mask)
     for col in cols:
         #REV: only works if df index is dense and from 0 to length?
-        df.loc[mask, col] = np.nan;
+        df.loc[mask, col] = np.nan;  #REV: where mask is TRUE (i.e. where it should be turned NAN), we set to NAN.
         pass;
     
     return df;

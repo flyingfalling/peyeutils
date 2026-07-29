@@ -82,7 +82,7 @@ def compute_velocity_ek(x, tw_samp, dt):
 #REV: they use 6 sample moving average, and 250 hz eyetracker, so 6 samples is...0.024 seconds i.e. 24 msec
 #REV: saccadr uses 20 msec default.
 def diff_ek(x, y, params):
-    sr = params['samplerate'];
+    sr = params['samplerate_hzsec'];
     tw_sec = params['ek_vel_window_sec'];
     dt = 1/sr;
     tw_samp = int(tw_sec * sr);
@@ -101,8 +101,11 @@ def diff_ek(x, y, params):
     return xvel, yvel, ampl;
 
 
-def dilate_nans( df, cols, params ):
-    sr=params['samplerate'];
+'''
+#REV: "flips" dilated nans, i.e. sets to NAN where mask is FALSE.
+#REV: don't use this...wtf?
+def saccadr_dilate_nans( df, cols, params ):
+    sr=params['samplerate_hzsec'];
     df = df.copy();
     dilate_nan_win_samp = math.ceil(params['dilate_nan_win_sec'] * sr);
     #min_blink_samp = int(params['min_blink_sec'] * sr);
@@ -121,8 +124,9 @@ def dilate_nans( df, cols, params ):
         pass;
     
     return df;
+'''
 
-
+'''
 def dilate_val( arr, val, winsamp ):
     #min_blink_samp = int(params['min_blink_sec'] * sr);
     mask = np.full( len(arr), False );
@@ -132,9 +136,11 @@ def dilate_val( arr, val, winsamp ):
     arr[mask] = val;
         
     return arr;
+'''
 
+'''
 def dilate_xy_nans( df, params ):
-    sr=params['samplerate'];
+    sr=params['samplerate_hzsec'];
     dilate_nan_win_samp = math.ceil(params['dilate_nan_win_sec'] * sr);
     min_blink_samp = math.ceil(params['min_blink_sec'] * sr);
     xname=params['xname'];
@@ -145,12 +151,12 @@ def dilate_xy_nans( df, params ):
     df[xname][mask] = np.nan;
     df[yname][mask] = np.nan;
     return df;
-
+'''
 
 def diff_nh(x, y, params):
     sg_order = params['nh_savgol_order'];
     sg_win_sec = params['nh_savgol_window_sec'];
-    sr = params['samplerate'];
+    sr = params['samplerate_hzsec'];
     dt = 1/sr;
     sg_win_samp = sg_window_sec * sr;
     
@@ -184,7 +190,7 @@ def sd_via_median_estimator(x):
 #REV: this is SIMPLE AND STUPID, just points over vel threshold, but
 # uses a normalized velocity based on stddev of vel.
 def method_ek(df, params, eyepfix=''):
-    sr = params['samplerate'];
+    sr = params['samplerate_hzsec'];
     #velth_degsec = params['ek_vel_thresh_degsec']; 
         
     #REV: they use "6". Then, they multiply vel_thresh times sigma_xy
@@ -262,7 +268,7 @@ def method_om(df, params, eyepfix,
     peak_detect_shift_sec = params['om_vel_peak_detect_shift_sec'];
     usepca=params['om_usepca'];
     
-    sr = params['samplerate'];
+    sr = params['samplerate_hzsec'];
     peak_detect_shift_samp = int( peak_detect_shift_sec * sr );
     #pca_var_thresh_degsec = params['om_pca_var_thresh_degsec']; #REV: not used now (would normally only used PCA components > this thresh of
     #explanation)
@@ -632,18 +638,20 @@ def stampe_filter(df, params):
 #  1) median filter (remove jumpy noise in x/y signal)
 #  2) savgol filter (large saccs).
 
+'''
 def preproc_saccadr(df, params):
     if( 'tstartsec' in params and 'tlensec' in params ):
-        df = resample_at_rate_nearest( df, params['tstartsec'], params['tstartsec']+params['tlensec'], params['tname'], params['samplerate'], params['timeunit'] );
+        df = resample_at_rate_nearest( df, params['tstartsec'], params['tstartsec']+params['tlensec'], params['tname'], params['samplerate_hzsec'], params['timeunit'] );
         #REV: start time at tstart
         pass;
     else:
-        df = resample_at_rate_nearest( df, df[params['tname']].min(), df[params['tname']].max(), params['tname'], params['samplerate'], params['timeunit'] );
+        df = resample_at_rate_nearest( df, df[params['tname']].min(), df[params['tname']].max(), params['tname'], params['samplerate_hzsec'], params['timeunit'] );
         pass;
     df = remove_suspicious_repeats(df, params);
     #df = dilate_xy_nans(df, params);
     df = stampe_filter(df, params); #REV: this prevenst OM from working LOL. (uses down-up-down for detecting peaks wtf?)
     return df;
+'''
 
 #REV: this was basis for redmonav
 def method_nh(df, params, eyepfix):
@@ -651,7 +659,7 @@ def method_nh(df, params, eyepfix):
     max_acc_degsecsec = params['nh_max_acc_degsecsec']; #100k
     init_vel_thresh_degsec = params['nh_init_vel_thresh_degsec']; #100
     
-    sr=params['samplerate'];
+    sr=params['samplerate_hzsec'];
     dt = 1/sr;
 
     vel = df[eyepfix+'vel'];
@@ -942,7 +950,8 @@ def _saccadr_sacc( sampdf,
     
     #REV: sort by time point (note assumes it must be resampled at regular rate, check that and that diff roughly matches
     #     parameter 1/samplerate);
-    sr=params['samplerate'];
+    sr=params['samplerate_hzsec'];
+    params['samplerate_hzsec'] = sr;
     blink_vel_thresh_degsec = params['blink_vel_thresh_degsec'];
     
     vote_thresh=0.99*(len(methods)-1)/len(methods);
@@ -984,18 +993,21 @@ def _saccadr_sacc( sampdf,
                                          );
     
     #REV: optionally, remove biologically unrealistic values and re-dilate?
-        #REV: removing those over some maximum velocity (likely blinks or biologically unrealistic data...)
+    #REV: removing those over some maximum velocity (likely blinks or biologically unrealistic data...)
     vel[ vel > blink_vel_thresh_degsec ] = np.nan;
 
     sampdf['xvel'] = xvel;
     sampdf['yvel'] = yvel;
     sampdf['vel'] = vel;
-
+    
     cols = [xname, yname, 'vel', 'xvel', 'yvel'];
     cols = [s for s in cols];
-
-    sampdf = dilate_nans(sampdf, cols, params);
-
+    
+    #REV: why is this "inverse"?
+    # REV: this dilates nans of those where mask is FALSE.
+    #REV: this raw dilates where
+    sampdf = pu.utils.dilate_nans(sampdf, cols, params);
+    
     #REV: could run median filter if I want...
     sampdf['medvel'] = vel;
 
