@@ -51,7 +51,7 @@ def preproc_and_compute_events(df,
                                DEBUG=False,
                                remove_firstlast=True,
                                ):
-
+    
     import pandas as pd;
     import numpy as np;
     
@@ -233,11 +233,9 @@ def preproc_and_compute_events(df,
 
         
         ev = ev.sort_values(by='stsec').reset_index(drop=True);
-
-
-        
         #REV: drop first and last "blink" since they are simply NAN at edges.
-	if( remove_firstlast ):
+
+        if( remove_firstlast ):
             evs=list();
             for _eye,_ev in ev.groupby(eyecol):
                 if( len(_ev.index) > 1 ):
