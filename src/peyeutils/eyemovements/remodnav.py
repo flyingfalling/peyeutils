@@ -804,6 +804,7 @@ def make_default_preproc_params(samplerate_hzsec, timeunitsec, dva_per_px, xname
                 yname=yname,
                 tname=tname,
                 timeunitsec=timeunitsec,
+                interpol_dropped_signal_sec=0.012,
                 );
     
     return params;
@@ -967,10 +968,44 @@ def remodnav_preprocess_eyetrace2d(eyesamps : pd.DataFrame,
             continue;
         
         
+        
+        
         #REV: fuck, this sets to NAN again!!!
         #REV: I need to make sure that only "true" blinks (from e.g. pupil acceleration) are blinks, and not just jittery/dropped data.
         #REV: I need to identify "bad/dropped data" and "blinks"...
         if( 'blinkcol' in params ):
+
+            if( 'interpol_dropped_signal_sec' in params and
+                params['interpol_dropped_signal_sec'] > 0 ):
+                skipsamps = params['interpol_dropped_signal_sec'] * samplerate; #REV: e.g. 1000 * 0.005 = 5
+                
+                nanmask = eyesamps2[bcol]; #REV: "true" means blink, i.e. is bad, i.e. IS NAN
+
+                before = nanmask.count();
+                
+                from scipy import ndimage
+                clusters, nclusters = ndimage.label(nanmask);
+                for i in range(nclusters):
+                    # cluster index is base1
+                    i = i + 1;
+                    if (clusters == i).sum()  <= skipsamps:
+                        clusters[clusters==i] = 0; #= False
+                        pass;
+                    pass;
+                
+                stillnan = clusters > 0;
+                after = stillnan.count();
+                print("(EYE={}) Interpolating dropped signal (removing short blinks) ({} sec = {} samples @ {} hz/sec)   [{}] -> [{}] samples".format(
+                    eye,
+                    params['interpol_dropped_signal_sec'],
+                    skipsamps,
+                    samplerate,
+                    before,
+                    after )
+                      );
+                pass;
+            
+            
             bcol=params['blinkcol'];
             print("SETTING BLINKS X/Y to NAN (And, ensuring that all NAN locations are set with BLINKCOL=True)!!");
             #print("1st) Re-NANing x/y based on blinkcolumn [{}] (in case smoothing added?)".format(bcol));
