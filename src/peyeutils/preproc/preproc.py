@@ -710,6 +710,7 @@ def blink_df_from_samples(indf,
                           use_index=True,
                           eyecol='eye',
                           DEBUG=False,
+                          
                           ):
     
     dfs = [indf];
@@ -726,10 +727,12 @@ def blink_df_from_samples(indf,
         
         if(len(df.index) < 2 ):
             raise Exception("df has no data,  < 2 rows");
-
+        
         df = df.sort_values(by=tcol).reset_index(drop=True);
-
+        
         if(use_index):
+            #REV: cond_rle_df returns "start" and "length" of each run.
+            #REV: i.e. starts at 0, continues for 5.
             ev = pu.utils.cond_rle_df( df[badcol], val=True, t=df.index ); #REV: will ignore time.
             ev[stidx] = ev['sidx'];
             ev[enidx] = ev['eidx'];
@@ -748,9 +751,10 @@ def blink_df_from_samples(indf,
         #REV; shit, since it's a blink, there is by definition NAN at start/end time? So I need to do at least -1 and +1 to get "position"?
         ev[stidx] -= 1; #REV: assume "time difference" (error) is very small...
         ev[enidx] += 1;
-
+        
         ev.loc[ev[stidx]<0, stidx] = 0; #REV: make any that would be negative 0 so it doesnt read outside df
-        ev.loc[ev[enidx]>len(df.index), enidx] = len(df.index)-1; #REV: make any that would be negative 0 so it doesnt read outside df
+        #REV: 2026/07 changed > to >=. 
+        ev.loc[ev[enidx]>=len(df.index), enidx] = len(df.index)-1; #REV: make any that would be negative 0 so it doesnt read outside df
 
         if(DEBUG):
             print(ev);
@@ -761,7 +765,7 @@ def blink_df_from_samples(indf,
             if(DEBUG):
                 print("Computing X/Y for blinks!");
                 pass;
-
+            
             #REV: gets "seconds" time etc.
             tmpdf = df[[tcol, xcol, ycol ]].copy();
             tmpdf['index'] = tmpdf.index;
@@ -779,8 +783,10 @@ def blink_df_from_samples(indf,
             ev['stx'] = stev[xcol];
             ev['sty'] = stev[ycol];
             ev[stcol] = stev[tcol];
+
             
             enev = pd.merge( left=ev, right=tmpdf, left_on=enidx, right_on='index', how='left' );
+            
             ev['enx'] = enev[xcol];
             ev['eny'] = enev[ycol];
             ev[encol] = enev[tcol];
@@ -809,6 +815,15 @@ def blink_df_from_samples(indf,
             myeye=df[eyecol].unique()[0];
             ev[eyecol] = myeye;
             pass;
+        
+        if( use_index ):
+            ev = ev.sort_values(by=stidx).reset_index(drop=True);
+            pass;
+        else:
+            ev = ev.sort_values(by=stsec).reset_index(drop=True);
+            pass;
+
+                
         evlist.append(ev);
         
         

@@ -49,7 +49,7 @@ def preproc_and_compute_events(df,
                                eyecol='eye',
                                PLOT=False,
                                DEBUG=False,
-                               
+                               remove_firstlast=True,
                                ):
 
     import pandas as pd;
@@ -210,15 +210,18 @@ def preproc_and_compute_events(df,
         else:
             nonsaccs = rev;
             pass;
-        
+
+        #REV: wait, this is RE-computing blinks?
         #REV: handles eyecol
         blinks = pu.eyemovements.blink.compute_blinks_from_sampcol( sdf,
                                                                     dva_per_px=params['dva_per_px'],
                                                                     badcol=params['blinkcol'],
                                                                     tcol=tcol,
                                                                     xcol=xcol,
-                                                                    ycol=ycol )
+                                                                    ycol=ycol );
         
+        print("R BLINKS");
+        print(blinks[ blinks.eye=='R']);
         #REV: should I remove blinks in which eye did not move much (< 0.5 deg ?). I.e. fixation with intermediate lbink?
         # Vision is not happening during that time and physiologically it is equivalent...and then ISI is?
         
@@ -226,9 +229,34 @@ def preproc_and_compute_events(df,
                                        blinks,
                                        nonsaccs, #REV: this is currently just PISI (original ISI from saccade detection...). In other cases
                                        # there may also be e.g. drifts/smooth pursuits, etc.?
-                                       ] ); #.reset_index(drop=True);
+                                       ] );
+
         
         ev = ev.sort_values(by='stsec').reset_index(drop=True);
+
+
+        
+        #REV: drop first and last "blink" since they are simply NAN at edges.
+	if( remove_firstlast ):
+            evs=list();
+            for _eye,_ev in ev.groupby(eyecol):
+                if( len(_ev.index) > 1 ):
+                    print("Removing FIRST event:");
+                    print(_ev.iloc[0]); #[['stsec','ensec','label','dursec']]);
+                    _ev = _ev.iloc[1:];
+                    pass;
+                if( len(_ev.index) > 1 ):
+                    print("Removing LAST event:");
+                    print(_ev.iloc[-1]); #[['stsec','ensec','label','dursec']]);
+                    _ev = _ev.iloc[:-1];
+                    pass;
+                evs.append(_ev);
+                pass;
+            ev = pu.utils.safe_df_concat(evs);
+            pass;
+        
+        
+        
         
         #REV: handles eyecol
         #REV: this combines small saccs etc., and also blinks and saccs...
@@ -236,7 +264,7 @@ def preproc_and_compute_events(df,
                                                   eyecol=eyecol,
                                                   min_isi_dur=blinksacc_merge_envelop_sec,
                                                  );
-        
+                
         ISIevents=['SACC', 'BLNK']; #REV: i.e. use blinks as saccades (gaze shifts often happen during blinks...)
         
         #REV: handles eyecol
@@ -246,6 +274,7 @@ def preproc_and_compute_events(df,
                                                             );
         ev = pd.concat([ev, isis]);
         ev = ev.sort_values(by='stsec').reset_index(drop=True);
+
         #isis = isis[ isis['dursec'] > min_isi_sec ];
         
         isis = ev[ (ev['label']=='ISI') ];

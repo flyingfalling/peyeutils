@@ -17,20 +17,29 @@ def compute_ISIs_from_events( ev,
         print("Adding eyecol {} to ev".format(eyecol));
         ev[eyecol]='';
         pass;
-
+    
     isilist = list();
     for eye, eyedf in ev.groupby(eyecol, as_index=False):
         saccblnks = eyedf[ eyedf.label.isin(eventstouse) ];
+        
+        if( len(saccblnks.index) <= 1 ):
+            print("Skipping creation of ISIs: only {} saccs/blinks".format(len(saccblnks.index)));
+            continue;
+        
         saccblnks = saccblnks.sort_values(by=stname).reset_index(drop=True);
         
         isis = saccblnks.copy();
+        #REV: by default we will make one...
         
-        isis[stname] = saccblnks.shift(1)[enname].copy();    #start of ISI is the "end" of the PREVIOUS one (will be null for first)
+        #REV: start times are now NEXT one's end time.
+        isis[stname] = saccblnks.shift(1)[enname].copy();    #start of ISI is the "end" of the PREVIOUS one (will be null for first). I.e. +1 to "this" ISI and use "end"
         
+        #REV: set first one's start time to zero time (it was NAN because we shifted it down one).
         if( len(isis.index) > 0 ):
             isis.loc[ isis.index[0], stname ] = zerotime;
             pass;
-        
+
+        # end time of ISI is THIS one's start time.
         isis[enname] = saccblnks[stname];
         isis[durname] = isis[enname] - isis[stname];
         isis['label'] = label;
@@ -38,7 +47,7 @@ def compute_ISIs_from_events( ev,
         isilist.append(isis);
         pass;
 
-    isis = pd.concat(isilist).reset_index(drop=True);
+    isis = pu.utils.safe_df_concat(isilist);
     
     return isis;
 
@@ -94,7 +103,7 @@ def eye_event_merge( df,
         #                            max_blink_amp=max_blink_amp,
         #                            min_isi_dur=min_isi_dur,
         #                            );
-        ev2 = absorb_blink_artifacts(eyedf, margin_sec=min_isi_dur); #REV: this could have been done by just expanding (dilating) nn
+        ev2 = absorb_blink_artifacts(eyedf, margin_sec=min_isi_dur); #REV: this could have been done by just expanding (dilating) nan
         ev2[eyecol] = eye;
         evlist.append(ev2);
         pass;

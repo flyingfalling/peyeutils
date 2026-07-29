@@ -1,5 +1,6 @@
 
 import peyeutils as pu;
+import pandas as pd;
 
 #REV: blink returns "ampl" and "angle" of blink (as if it were a saccade), in case we want to include it.
 #     Note, in cases where we go "off" the image, what do we do? We don't want to "reconnect" at the edge of the image...
@@ -29,9 +30,10 @@ def compute_blinks_from_sampcol( samps,
         blinkev[eyecol] = eye;
         blinkevs.append(blinkev);
         pass;
+
     
-    import pandas as pd;
-    blinkev = pd.concat(blinkevs, use_index=False);
+    blinkev = pu.utils.safe_df_concat(blinkevs);
+    
     return blinkev;
 
 
@@ -54,11 +56,12 @@ def add_blinks_to_events_from_sampcol( ev, samps,
                                            ycol=ycol,
                                            eyecol=eyecol,
                                           );
-        
+    
     #REV: should I remove blinks in which eye did not move much (< 0.5 deg ?). I.e. fixation with intermediate lbink?
     # Vision is not happening during that time and physiologically it is equivalent...and then ISI is?
     import pandas as pd;
     ev = pd.concat([ev, blinkev]);
+    
     ev = ev.sort_values(by='stsec').reset_index(drop=True);
     return ev;
 
