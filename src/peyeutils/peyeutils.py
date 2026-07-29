@@ -127,17 +127,13 @@ def preproc_and_compute_events(df,
     sparams['saccadr_min_sep_sec']=min_isi_sec; #0.050;
     sparams['saccadr_min_dur_sec']=0.010;
     
-    #print(sdf);
+    
     #REV: has each timepoint labelled with is sacc or not, etc.
     sdf, sev = pu.eyemovements.saccadr.saccadr_detect_saccades(sdf, sparams, tsecname=tcol, xname=xcol, yname=ycol, eyecol=eyecol);
     
     rdf, rev = pu.eyemovements.remodnav.remodnav_classify_events(sdf, params, eyecol=eyecol); #REV: ah, x/y names are stored in "params"
-    
-    #print(sev);
-    #print(rev);
-    
-    
-    
+        
+        
     evlist = list();
     if( len(sev.index) > 0 ):
         sev['source'] = 'saccadr';

@@ -420,7 +420,7 @@ def interpolate_df_to_samplerate(df, tcol, targ_srhzsec, tcolunit_s, truesrs=dic
 def get_dilated_nan_mask(arr, iterations, max_ignore_size=None):
     
     from scipy import ndimage
-    clusters, nclusters = ndimage.label(np.isnan(arr))
+    clusters, nclusters = ndimage.label( np.isnan(arr) );
     # go through all clusters and remove any cluster that is less
     # the max_ignore_size
 

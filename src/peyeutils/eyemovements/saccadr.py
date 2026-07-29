@@ -101,7 +101,7 @@ def diff_ek(x, y, params):
     return xvel, yvel, ampl;
 
 
-'''
+
 #REV: "flips" dilated nans, i.e. sets to NAN where mask is FALSE.
 #REV: don't use this...wtf?
 def saccadr_dilate_nans( df, cols, params ):
@@ -110,21 +110,25 @@ def saccadr_dilate_nans( df, cols, params ):
     dilate_nan_win_samp = math.ceil(params['dilate_nan_win_sec'] * sr);
     #min_blink_samp = int(params['min_blink_sec'] * sr);
     mask = np.full( len(df.index), False );
+    #REV: mask will be TRUE where values in arr[col] are NAN.
+    #REV: for *ANY* column.
+    #REV: *and* it will be dilated by iterations.
     for col in cols:
-        mask = mask | (get_dilated_nan_mask( df[col],
-                                             dilate_nan_win_samp ) );
+        mask = mask | (get_dilated_nan_mask( arr = df[col],
+                                             iterations = dilate_nan_win_samp ) );
         pass;
+
+    #REV: so, "False" will just be "good" data locations outside
+    #REV: of any dilated NAN. Note I never actually dilate the NAN.
+    #REV: just where it WOULD BE.
     
+    df = df.reset_index(drop=True); #REV: added 2026/07
     for col in cols:
-        #tmp = df[col].to_numpy().copy();
-        #tmp[mask] = np.nan;
-        #df[col] = tmp;
-        #df[col][mask] = np.nan;
         df.loc[(mask==False), col] = np.nan;
         pass;
     
     return df;
-'''
+
 
 '''
 def dilate_val( arr, val, winsamp ):
@@ -839,6 +843,9 @@ def default_saccadr_params():
              );
     return d;
 
+
+# Sets "votes[start:end]" from TRUE to FALSE
+#  if x[start-1] or x[end] is NAN.
 def filter_nans_beforeafter( votes, x ):
     #REV: must be bool array.
     if( votes.dtype != bool ):
@@ -907,10 +914,11 @@ def saccadr_detect_saccades( sampdf,
     for eye, eyedf in sampdf.groupby(eyecol, as_index=False):
         
         if( pu.utils.not_enough_data( eyedf[xname], minpct=0.05, minsamps=200, printit=True  ) ):
-            print("Skipping eye={} due to insufficient data".format(eye));
+            print("SACCADR -- Skipping eye=[{}] due to insufficient data".format(eye));
             sdflist.append(eyedf);
             continue;
-        
+
+        print("RUNNING - SACCADR -> EYE [{}]".format(eye));
         sdf, edf = _saccadr_sacc( sampdf=eyedf, #REV: ok checked 2026/07/28
                                   params=params,
                                   tsecname=tsecname,
@@ -936,7 +944,6 @@ def saccadr_detect_saccades( sampdf,
     
 
 
-#REV: this is hackish, it uses prefix (l, r) for eyes to determine how to handle data...
 def _saccadr_sacc( sampdf,
                    params,
                    tsecname, #='Tsec',
@@ -955,7 +962,7 @@ def _saccadr_sacc( sampdf,
     blink_vel_thresh_degsec = params['blink_vel_thresh_degsec'];
     
     vote_thresh=0.99*(len(methods)-1)/len(methods);
-
+    
     '''
     isreg = is_regular_samples( sampdf, sr, tname=tsecname );
     if( False == isreg ):
@@ -974,19 +981,20 @@ def _saccadr_sacc( sampdf,
     #REV: note velocity is always DEG/SEC
     #REV: acc is DEG/SEC/SEC (and is absolute value, i.e. euclid dist
     #     of xvel and yval!!!!)
-
+    
     min_separation_sec = params['saccadr_min_sep_sec'];
     min_duration_sec = params['saccadr_min_dur_sec'];
     
     delta_t_sec=1/sr;
     min_sep_samples=math.ceil(min_separation_sec * sr);
     min_dur_samples=math.ceil(min_duration_sec * sr);
-
+    
     
     
     votecols=[];
-
     
+    #REV: compute velocities, and remove points where 
+    #REV: ABSOLUTE velocity > threshold (set to NAN)
     xvel, yvel, vel =  velocity_function( sampdf[xname],
                                           sampdf[yname],
                                           params
@@ -994,24 +1002,33 @@ def _saccadr_sacc( sampdf,
     
     #REV: optionally, remove biologically unrealistic values and re-dilate?
     #REV: removing those over some maximum velocity (likely blinks or biologically unrealistic data...)
+    #REV: this is ghetto blink detection based on velocity.
+    #REV: and, I'll 
     vel[ vel > blink_vel_thresh_degsec ] = np.nan;
-
+    
     sampdf['xvel'] = xvel;
     sampdf['yvel'] = yvel;
     sampdf['vel'] = vel;
     
     cols = [xname, yname, 'vel', 'xvel', 'yvel'];
-    cols = [s for s in cols];
+    #cols = [s for s in cols];
     
-    #REV: why is this "inverse"?
+    
+    #REV: why is this "inverse"? (only set GOOD values which would
+    #     note be dilated to NANs to NAN...)
     # REV: this dilates nans of those where mask is FALSE.
-    #REV: this raw dilates where
+    #sampdf = saccadr_dilate_nans(sampdf, cols, params);
+    
+    #REV: 2026/07 changed to normal dilate nans...
     sampdf = pu.utils.dilate_nans(sampdf, cols, params);
     
+    
     #REV: could run median filter if I want...
+    #REV: nah, assume it's "pre-run"
     sampdf['medvel'] = vel;
-
-
+    
+    
+    ###### Compute acceleration (velocity of velocity) ########
     xacc, yacc, acc = velocity_function( sampdf['xvel'],
                                          sampdf['yvel'],
                                          params
@@ -1022,11 +1039,11 @@ def _saccadr_sacc( sampdf,
 
 
     for i, m in enumerate(methods):
-
+        
         #################################
         ####### WORK IS HERE!! ##########
         #################################
-
+        
         #REV: note this just returns VOTES!!! No info about
         #REV: velocity etc... I have to go re-extract it.
         methodvotecol = 'vote_'+str(i)+"_{}".format(m.__name__);
@@ -1034,25 +1051,25 @@ def _saccadr_sacc( sampdf,
         sampvotes = methods[i]( sampdf, params, eyepfix='' );
         sampvotes = filter_nans_beforeafter( sampvotes, sampdf['vel'] );
         sampdf[methodvotecol] = sampvotes;
-
+        
         pass;
-
-
-
+    
+    
+    
     #REV: average by-row (between merged);
     normvotecol='normvotes';
     sampdf[normvotecol] = np.nanmean( sampdf[ votecols ], axis=1 );
-
+    
     if(DEBUG):
         print( sampdf[ sampdf[normvotecol] > 0 ][ votecols + [normvotecol] ] );
         pass;
-
-
-
-
+    
+    
+    
+    
     vals, starts, lens = rle( sampdf['normvotes'] > vote_thresh );
     #REV: only doe for where vals==True for saccs
-
+    
     #REV: first, need to check...
     # if true, or (false but surrounded by true on both sides and with length < min_separation between saccades in samples)
     #REV: then, keep it as a "saccade"?
@@ -1061,20 +1078,20 @@ def _saccadr_sacc( sampdf,
                                & (shift_elements(vals, -1, False)==True)
                                & (lens < min_sep_samples)
                              );
-
+    
     remarked_samps = inverse_rle(vals, starts, lens);
     vals, starts, lens = rle(remarked_samps);
     vals = (vals==True) & (lens >= min_dur_samples);
-
+    
     #REV: include both saccs and ISI...
     #vals = np.where( True==vals )[0];
     #starts = starts[vals];
     #lens = lens[vals];
-
+    
     if( len(vals) == 1 and vals[0] == False ):
         print("SACCADR: No saccades detected by votes!");
         pass;
-
+    
     dictlist=list();
     #REV: assume sroted by TSEC
     for v, s, l in zip(vals, starts, lens):
@@ -1087,8 +1104,8 @@ def _saccadr_sacc( sampdf,
 
         #REV: 2026/07/23 fix for mean of nan slice.
         tmpvel = sampdf[ (sampdf[tsecname]>=sampdf[tsecname][s]) &
-                           (sampdf[tsecname]<sampdf[tsecname][e])
-                          ]['vel'] ;
+                         (sampdf[tsecname]<sampdf[tsecname][e])
+                        ]['vel'] ;
         if( pu.utils.allnan( tmpvel ) ):
             pvel = np.nan;
             medvel = np.nan;
