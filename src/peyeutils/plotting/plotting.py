@@ -432,7 +432,7 @@ def plot_gaze_chunks_wpupil(
 
             # --- Plot Events ---
             if has_events:
-                rel_ev = events_df[(events_df[event_start_col] < t1) & (events_df[event_end_col] > t0)]
+                rel_ev = events_df[(events_df[event_start_col] < t1) & (events_df[event_end_col] > t0) & (events_df[eye_col].isin(eyes_to_plot))];
                 for idx, ev in rel_ev.iterrows():
                     
                     etype = ev[event_type_col]
