@@ -354,7 +354,7 @@ def _consolidate_saccades_slow(df, isi_threshold=0.010):
             res['pvel'] = group['pvel'].max()
 
             #REV: this should never happen, we always detect SACCBLNK after sacc...
-            # Label priority: SACBLNK beats SACC
+            # Label priority: SACCBLNK beats SACC
             if any(group['label'].str.upper() == 'SACCBLNK'):
                 res['label'] = 'SACCBLNK'
             else:
@@ -380,7 +380,7 @@ def _consolidate_saccades_slow(df, isi_threshold=0.010):
 
 
 def _consolidate_saccades_slow(df, isi_threshold=0.010):
-    # 1. Identify Saccades (Robust to 'SACC', 'SACBLNK', etc.)
+    # 1. Identify Saccades (Robust to 'SACC', 'SACCBLNK', etc.)
     # Use a copy to avoid SettingWithCopy warnings
     is_sacc_mask = df['label'].str.upper().str.startswith('SACC').fillna(False)
     sacc_df = df[is_sacc_mask].copy()
@@ -419,9 +419,9 @@ def _consolidate_saccades_slow(df, isi_threshold=0.010):
         res['ampldva'] = np.sqrt((enx - stx)**2 + (eny - sty)**2)
         res['pvel'] = group['pvel'].max()
         
-        # If the group contained a SACBLNK, keep that more descriptive label
-        if any(group['label'].str.upper() == 'SACBLNK'):
-            res['label'] = 'SACBLNK'
+        # If the group contained a SACCBLNK, keep that more descriptive label
+        if any(group['label'].str.upper() == 'SACCBLNK'):
+            res['label'] = 'SACCBLNK'
         else:
             res['label'] = 'SACC'
 
@@ -522,7 +522,7 @@ def _consolidate_saccades_debug(df, isi_threshold=0.010, target_time=None):
             res['stx'], res['sty'], res['enx'], res['eny'] = stx, sty, enx, eny
             res['ampldva'] = np.sqrt((enx - stx)**2 + (eny - sty)**2)
             res['pvel'] = group['pvel'].max()
-            res['label'] = 'SACBLNK' if any(group['label'].str.upper() == 'SACBLNK') else 'SACC'
+            res['label'] = 'SACCBLNK' if any(group['label'].str.upper() == 'SACCBLNK') else 'SACC'
 
         # Remove group_id before appending
         merged_list.append(res.drop('group_id'))
@@ -583,7 +583,7 @@ def _diagnose_vanishing_saccade(df, target_start=32.6, target_end=33.0):
         res = group.iloc[0].copy()
         if len(group) > 1:
             res['stsec'], res['ensec'] = group['stsec'].min(), group['ensec'].max()
-            res['label'] = 'SACBLNK' if any(group['label'] == 'SACBLNK') else 'SACC'
+            res['label'] = 'SACCBLNK' if any(group['label'] == 'SACCBLNK') else 'SACC'
         merged_list.append(res.drop('group_id', errors='ignore'))
 
     merged_df = pd.DataFrame(merged_list)

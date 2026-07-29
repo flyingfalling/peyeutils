@@ -223,14 +223,15 @@ def preproc_and_compute_events(df,
         # Vision is not happening during that time and physiologically it is equivalent...and then ISI is?
         
         ev = pu.utils.safe_df_concat( [saccs,
-                         blinks,
-                         nonsaccs, #REV: this is currently just PISI (original ISI from saccade detection...). In other cases
-                         # there may also be e.g. drifts/smooth pursuits, etc.?
-                         ] ).reset_index(drop=True);
+                                       blinks,
+                                       nonsaccs, #REV: this is currently just PISI (original ISI from saccade detection...). In other cases
+                                       # there may also be e.g. drifts/smooth pursuits, etc.?
+                                       ] ); #.reset_index(drop=True);
         
         ev = ev.sort_values(by='stsec').reset_index(drop=True);
         
         #REV: handles eyecol
+        #REV: this combines small saccs etc., and also blinks and saccs...
         ev = pu.eyemovements.isi.eye_event_merge( ev,
                                                   eyecol=eyecol,
                                                   min_isi_dur=blinksacc_merge_envelop_sec,

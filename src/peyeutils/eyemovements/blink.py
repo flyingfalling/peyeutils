@@ -29,9 +29,9 @@ def compute_blinks_from_sampcol( samps,
         blinkev[eyecol] = eye;
         blinkevs.append(blinkev);
         pass;
-
+    
     import pandas as pd;
-    blinkev = pd.concat(blinkevs).reset_index(drop=True);
+    blinkev = pd.concat(blinkevs, use_index=False);
     return blinkev;
 
 

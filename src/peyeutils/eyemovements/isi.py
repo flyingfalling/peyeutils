@@ -119,13 +119,15 @@ def absorb_blink_artifacts(df, margin_sec=0.050):
 
     # 1. Isolate the relevant events
     # We ignore ISIs/Fixations so they don't accidentally get swallowed
-    mask = df['label'].str.upper().isin(['BLNK', 'SACC', 'SACBLNK'])
+    mask = df['label'].str.upper().isin(['BLNK', 'SACC', 'SACCBLNK'])
     work_df = df[mask].copy()
     others = df[~mask].copy()
     
-    if work_df.empty: return df
+    if work_df.empty:
+        return df;
+    
     work_df = work_df.sort_values('stsec').reset_index(drop=True)
-
+    
     # 2. Build the Envelope (Expand Blinks, keep Saccades normal)
     work_df['match_start'] = np.where(
         work_df['label'].str.upper() == 'BLNK', 
@@ -138,11 +140,11 @@ def absorb_blink_artifacts(df, margin_sec=0.050):
         work_df['ensec'] + margin_sec, 
         work_df['ensec']
     )
-
+    
     # 3. Grouping by Envelope Intersection
     run_max = work_df['match_end'].cummax().shift(1)
     work_df['group_id'] = ((run_max.isna()) | (work_df['match_start'] > run_max)).cumsum()
-
+    
     merged_list = []
     
     # 4. The Metadata-Safe Aggregator
@@ -408,7 +410,7 @@ def _eye_event_merge_slow_old(df,
             # Label Priority
             labels = set(group['label'].str.upper())
             if 'BLNK' in labels and 'SACC' in labels:
-                res['label'] = 'SACBLNK'
+                res['label'] = 'SACCBLNK'
             elif 'BLNK' in labels:
                 res['label'] = 'BLNK'
             elif 'SACC' in labels:
