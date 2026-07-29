@@ -834,7 +834,7 @@ def default_saccadr_params():
              ek_min_dur_sec=0.014,
              #ek_min_sep_sec=0.012, #REV: not currently used
              ek_vel_window_sec=0.024, #REV: 24 msec in original paper
-             dilate_nan_win_sec=0, #0.015,
+             dilate_nan_win_sec=0.010, #0.015,
              min_blink_sec=0.010, #REV: only dilate nans longer
              saccadr_min_sep_sec=0.070, #0.012,
              saccadr_min_dur_sec=0.014,
@@ -880,13 +880,13 @@ def filter_nans_beforeafter( votes, x ):
 #REV: hm, let user pass actual functions?
 def saccadr_detect_saccades( sampdf,
                              params,
-                             tsecname, #='Tsec',
-                             xname, #='xcdva',
-                             yname, #='ycdva',
+                             tsecname,
+                             xname,
+                             yname,
+                             eyecol,
                              namedmethods=('ek', 'om', 'nh'), #method_ek, method_om, method_nh), #REV: method_om is too forgiving?
                              extramethods=list(),
                              velocity_function=diff_ek,
-                             eyecol='eye',
                             ):
     
     mymethods=list();
@@ -926,6 +926,7 @@ def saccadr_detect_saccades( sampdf,
                                   velocity_function=velocity_function,
                                   xname=xname,
                                   yname=yname,
+                                  eyecol=eyecol,
                                  );
         
         edf[eyecol] = eye;
@@ -946,12 +947,12 @@ def saccadr_detect_saccades( sampdf,
 
 def _saccadr_sacc( sampdf,
                    params,
-                   tsecname, #='Tsec',
+                   tsecname,
+                   xname,
+                   yname,
+                   eyecol,
                    methods=(method_ek, method_om, method_nh),
                    velocity_function=diff_ek,
-                   xname='xcdva',
-                   yname='ycdva',
-                   eyecol='eye',
                    DEBUG=False,
                   ):
     
@@ -990,7 +991,6 @@ def _saccadr_sacc( sampdf,
     min_dur_samples=math.ceil(min_duration_sec * sr);
     
     
-    
     votecols=[];
     
     #REV: compute velocities, and remove points where 
@@ -999,7 +999,7 @@ def _saccadr_sacc( sampdf,
                                           sampdf[yname],
                                           params
                                          );
-    
+
     #REV: optionally, remove biologically unrealistic values and re-dilate?
     #REV: removing those over some maximum velocity (likely blinks or biologically unrealistic data...)
     #REV: this is ghetto blink detection based on velocity.
@@ -1010,9 +1010,13 @@ def _saccadr_sacc( sampdf,
     sampdf['yvel'] = yvel;
     sampdf['vel'] = vel;
     
+    #REV: one of these must be all NAN or some shit?
     cols = [xname, yname, 'vel', 'xvel', 'yvel'];
-    #cols = [s for s in cols];
     
+    #print(sampdf[cols]);
+    #print(params);
+    ### REV: filter out and remove "blinks" based on unrealistic velocities.
+    ###      so I don't detect them as saccades?
     
     #REV: why is this "inverse"? (only set GOOD values which would
     #     note be dilated to NANs to NAN...)
@@ -1020,7 +1024,10 @@ def _saccadr_sacc( sampdf,
     #sampdf = saccadr_dilate_nans(sampdf, cols, params);
     
     #REV: 2026/07 changed to normal dilate nans...
+    pren = sampdf[ sampdf[cols].isna().any(axis=1) ];
     sampdf = pu.utils.dilate_nans(sampdf, cols, params);
+    postn = sampdf[ sampdf[cols].isna().any(axis=1) ];
+    print("(SACCADR vel-based blink) Dilated from {}->{} NAN (note len={})".format(len(pren.index), len(postn.index), len(sampdf.index)));
     
     
     #REV: could run median filter if I want...

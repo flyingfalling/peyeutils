@@ -914,9 +914,16 @@ def dilate_nans( df, cols, params ):
         'dilate_nan_win_sec' not in params ):
         print(params);
         raise Exception("Params dict must contain required fields: samplerate_hzsec and dilate_nan_win_sec");
+
+    
     
     sr=params['samplerate_hzsec'];
     dilate_nan_win_samp = math.ceil(params['dilate_nan_win_sec'] * sr); # E.g. if 0.030 sec and SR=100, 0.030 * 100 = 3
+    if( dilate_nan_win_samp <= 0 ):
+        raise Exception("Will dilate infinite nans? (you probably had window set wrong). Dilating {} samples (window={} sec @ sr={})".format(dilate_nan_win_samp, params['dilate_nan_win_sec'], sr));
+    
+    print("Dilating NAN {} samples (window={} sec @ sr={})".format(dilate_nan_win_samp, params['dilate_nan_win_sec'], sr));
+    
     #REV: maybe better to interpolate barely missing values?
     #min_blink_samp = int(params['min_blink_sec'] * sr);
     mask = np.full( len(df.index), False ); #REV: just array of "False"
