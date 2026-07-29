@@ -906,7 +906,7 @@ def saccadr_detect_saccades( sampdf,
     edflist=list();
     for eye, eyedf in sampdf.groupby(eyecol, as_index=False):
         
-        if( pu.utils.not_enough_data( eyedf[xname], minpct=0.10, minsamps=100, printit=True  ) ):
+        if( pu.utils.not_enough_data( eyedf[xname], minpct=0.05, minsamps=200, printit=True  ) ):
             print("Skipping eye={} due to insufficient data".format(eye));
             sdflist.append(eyedf);
             continue;

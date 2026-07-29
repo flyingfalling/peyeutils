@@ -105,9 +105,11 @@ def preproc_and_compute_events(df,
     #print(df);
 
     #REV: this should "smooth" samples (i.e. smooth over jittery/droppy missing NANs due to some small stuff like FMRI EPI noise).
-    sdf = pu.eyemovements.remodnav.remodnav_preprocess_eyetrace2d(eyesamps=df, params=params, eyecol=eyecol);
+    sdf, nogooddata = pu.eyemovements.remodnav.remodnav_preprocess_eyetrace2d(eyesamps=df, params=params, eyecol=eyecol);
     
-    
+    if( nogooddata ):
+        print("No good data in preproc_and_compute_events, returning");
+        return sdf, pd.DataFrame(), nogooddata;
     
     ################ SACCADE DETECTION #######################
     
@@ -150,7 +152,7 @@ def preproc_and_compute_events(df,
     if( not ev.empty ):
         print(rev.columns);
         print(sev.columns);
-
+        
         
         saccs = ev[ ev['label'] =='SACC' ].copy().reset_index(drop=True);
         
@@ -333,10 +335,10 @@ def preproc_and_compute_events(df,
             pass;
         pass;
     else:
-        ev = pd.DataFrame();
+        print("No events!");
         pass;
     
-    return sdf, ev;
+    return sdf, ev, nogooddata;
 
 
 

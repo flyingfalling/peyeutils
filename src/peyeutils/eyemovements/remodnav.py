@@ -804,7 +804,7 @@ def make_default_preproc_params(samplerate_hzsec, timeunitsec, dva_per_px, xname
                 yname=yname,
                 tname=tname,
                 timeunitsec=timeunitsec,
-                interpol_dropped_signal_sec=0.012,
+                interpol_dropped_signal_sec=0.018,
                 );
     
     return params;
@@ -974,14 +974,14 @@ def remodnav_preprocess_eyetrace2d(eyesamps : pd.DataFrame,
         #REV: I need to make sure that only "true" blinks (from e.g. pupil acceleration) are blinks, and not just jittery/dropped data.
         #REV: I need to identify "bad/dropped data" and "blinks"...
         if( 'blinkcol' in params ):
-
+            bcol=params['blinkcol'];
             if( 'interpol_dropped_signal_sec' in params and
                 params['interpol_dropped_signal_sec'] > 0 ):
                 skipsamps = params['interpol_dropped_signal_sec'] * samplerate; #REV: e.g. 1000 * 0.005 = 5
                 
                 nanmask = eyesamps2[bcol]; #REV: "true" means blink, i.e. is bad, i.e. IS NAN
 
-                before = nanmask.count();
+                before = nanmask.sum();
                 
                 from scipy import ndimage
                 clusters, nclusters = ndimage.label(nanmask);
@@ -994,8 +994,8 @@ def remodnav_preprocess_eyetrace2d(eyesamps : pd.DataFrame,
                     pass;
                 
                 stillnan = clusters > 0;
-                after = stillnan.count();
-                print("(EYE={}) Interpolating dropped signal (removing short blinks) ({} sec = {} samples @ {} hz/sec)   [{}] -> [{}] samples".format(
+                after = stillnan.sum();
+                print("(EYE={}) Interpolating dropped signal (remove short blinks) ({} sec = {} samps@{} hz/sec)  [{}] -> [{}] NAN/blink samps".format(
                     eye,
                     params['interpol_dropped_signal_sec'],
                     skipsamps,
@@ -1003,10 +1003,11 @@ def remodnav_preprocess_eyetrace2d(eyesamps : pd.DataFrame,
                     before,
                     after )
                       );
+                eyesamps2[bcol] = stillnan;
                 pass;
             
             
-            bcol=params['blinkcol'];
+            
             print("SETTING BLINKS X/Y to NAN (And, ensuring that all NAN locations are set with BLINKCOL=True)!!");
             #print("1st) Re-NANing x/y based on blinkcolumn [{}] (in case smoothing added?)".format(bcol));
             eyesamps2.loc[ (eyesamps2[bcol]==True), [xname, yname] ] = np.nan;
@@ -1160,6 +1161,12 @@ def remodnav_preprocess_eyetrace2d(eyesamps : pd.DataFrame,
 
     eyesamps = pu.utils.safe_df_concat( result );
     
+    nogooddata=False;
+    if(allnan(eyesamps[xname]) or allnan(eyesamps[yname])):
+        nogooddata=True;
+        print("End of remodnav PREPROCESS -- trial is now BAD (all x/y is NAN)");
+        pass;
+    
     '''
     cols=list();
     
@@ -1198,5 +1205,5 @@ def remodnav_preprocess_eyetrace2d(eyesamps : pd.DataFrame,
     #valid_results = [df for df in result if not df.empty and not df.isna().all().all()]
     #eyesamps = pd.concat(valid_results).reset_index(drop=True);
     '''
-    return eyesamps;
+    return eyesamps, nogooddata;
     
