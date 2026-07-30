@@ -56,7 +56,7 @@ def preproc_and_compute_events(df,
     import numpy as np;
     
     min_sacc_dva = 0.33;
-    min_isi_sec = 0.060; #REV: true minimum time to code saccade?
+    min_isi_sec = 0.060; #0.060; #REV: true minimum time to code saccade? Note, "double stepped" saccade detection will fail!!! orz
     
     blinksacc_merge_envelop_sec=0.040;
     
@@ -126,13 +126,15 @@ def preproc_and_compute_events(df,
     
     sparams['saccadr_min_sep_sec']=min_isi_sec; #0.050;
     sparams['saccadr_min_dur_sec']=0.010;
-    
+
+    #REV: should detect all and only keep the "largest" in each window, combine only if "same direction" (how to define? lol).
+    #REV: note "echo back" is bad...
     
     #REV: has each timepoint labelled with is sacc or not, etc.
     sdf, sev = pu.eyemovements.saccadr.saccadr_detect_saccades(sdf, sparams, tsecname=tcol, xname=xcol, yname=ycol, eyecol=eyecol);
     
     rdf, rev = pu.eyemovements.remodnav.remodnav_classify_events(sdf, params, eyecol=eyecol); #REV: ah, x/y names are stored in "params"
-        
+    
         
     evlist = list();
     if( len(sev.index) > 0 ):

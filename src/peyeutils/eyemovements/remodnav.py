@@ -1051,10 +1051,10 @@ def remodnav_preprocess_eyetrace2d(eyesamps : pd.DataFrame,
         eyesamps2.loc[ ((eyesamps2.acc >= blink_acc_thresh_degsecsec) | (eyesamps2.vel >= blink_vel_thresh_degsec)), cols ] = np.nan;
         
         pren = eyesamps2[ eyesamps2[cols].isna().any(axis=1) ]; #  len(eyesamps2[ eyesamps2[cols].isna() ].index);
-
+        
         #REV: if ANY of cols is NAN, set all to!
         eyesamps2.loc[ eyesamps2[cols].isna().any(axis=1), cols ] = np.nan;
-
+        
         ok = eyesamps2[ np.isfinite(eyesamps2[cols]).any(axis=1) ];
         
         eyesamps2 = dilate_nans(eyesamps2, cols, params);

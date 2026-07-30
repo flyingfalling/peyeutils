@@ -400,11 +400,14 @@ def interpolate_df_to_samplerate(df, tcol, targ_srhzsec, tcolunit_s, truesrs=dic
             raise Exception("ERROR -- tsec exists but does not contain expected data!");
         pass;
     
-    if( tsec0name not in mdf ):
+    if( tsec0name not in mdf    or
+        zeroTsec is not None ):
         mdf[tsec0name] = tsec0;
         pass;
     else:
         if( False == np.all(np.isclose(tsec0, mdf[tsec0name])  ) ):
+            print(tsec0);
+            print(mdf[tsec0name]);
             raise Exception("ERROR -- tsec0 exists but does not contain expected data! (maybe it already existed and you used zeroTsec this time?)");
         pass;
     

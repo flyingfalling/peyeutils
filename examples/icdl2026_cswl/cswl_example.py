@@ -181,7 +181,7 @@ truesrs = { c:tobiisr for c in df.columns  };
 
 
 #REV: taking the mean of each timepoint (should already be fine, I already dropped duplicates above) 
-df = df.groupby([tname], as_index=False).agg( saccr.safe_agg(df,'mean') ).reset_index(drop=True);
+df = df.groupby([tname], as_index=False).agg( pu.eyemovements.saccadr.safe_agg(df,'mean') ).reset_index(drop=True);
 
 #REV: interpolate (upsample) to 1000 Hz...
 df = pu.utils.tsutils.interpolate_df_to_samplerate(df, tname, targ_sr_hzsec, startsec=None, endsec=None,
@@ -193,6 +193,7 @@ df[baddatacol] = False;
 
 maxdva=20;
 df.loc[ ((df.xcdva < -maxdva) | (df.ycdva < -maxdva) | (df.xcdva > maxdva) | (df.ycdva > maxdva)) , baddatacol] = True;
+
 
 
 
@@ -264,6 +265,9 @@ if(PUPILSIZE_BLINKS):
 baddata = df[ (df[baddatacol]==True) ].copy();
 
 
+df['eye'] = 'B'; #REV: by default we're just doing binocular (artifically) now.
+
+
 
 #REV: remove here?
 NAN_OUTSIDE=True;
@@ -272,15 +276,15 @@ if( NAN_OUTSIDE ):
     df.loc[ ((df.xcdva < -maxdva) | (df.ycdva < -maxdva) | (df.xcdva > maxdva) | (df.ycdva > maxdva)) , ['xcdva', 'ycdva'] ] = np.nan;
     pass;
 
-
-sdf, ev = pu.peyeutils.preproc_and_compute_events( df=df,
-                                                   tcol=tname,
-                                                   xcol=xcol,
-                                                   ycol=ycol,
-                                                   sr_hzsec=targ_sr_hzsec,
-                                                   mainseq_err_gain=1.5,
-                                                   PLOT=True,
-                                                  );
+sdf, ev, nodata = pu.peyeutils.preproc_and_compute_events( df=df,
+                                                           tcol=tname,
+                                                           xcol=xcol,
+                                                           ycol=ycol,
+                                                           eyecol='eye',
+                                                           sr_hzsec=targ_sr_hzsec,
+                                                           mainseq_err_gain=1.5,
+                                                           PLOT=True,
+                                                          );
 
 print("FINISHED");
 print(ev);
