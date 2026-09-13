@@ -314,7 +314,7 @@ def main():
         
         print(bigdf.species.unique());
             
-        bigdf.to_csv('bigdf'+str(count)+'_'+str(inf_error_sigma)+'.csv', index=False);
+        #bigdf.to_csv('bigdf'+str(count)+'_'+str(inf_error_sigma)+'.csv', index=False);
         
         
         DOPLOT=False;
@@ -385,7 +385,8 @@ def main():
                         spec2=idxdf[ idxdf.trialidx==tidx2 ].iloc[0].species;
                         age2 =idxdf[ idxdf.trialidx==tidx2 ].iloc[0].agemonths;
                         
-                        
+                        #killed due to OOM killer?
+
                         #REV: should not interpolate across NAN times...
                         tdf = pd.merge(left=tdf1, left_on='movie_ts',
                                     right=tdf2, right_on='movie_ts',
@@ -396,6 +397,8 @@ def main():
                         #REV: this will fail wierdly if timestamps don't exactly match up by name? Oh well FIX IT LATER.
                         tdf = tdf.sort_values(by='movie_ts').reset_index(drop=True);
                         tdf = tdf.interpolate(method='linear', limit=1); #REV: limit 1 nan filled.
+
+                        print(tdf);
 
                         mylen=len(tdf.index);
                         
@@ -408,6 +411,8 @@ def main():
                         ntdf1 = tdf1.copy();
                         ntdf1[toshuffle] = ntdf1[toshuffle].sample(frac=1).values;
                         
+                        print(ntdf1);
+
                         #df[cols_to_shuffle] = df[cols_to_shuffle].sample(frac=1).values
                         #tdf1=tdf1.iloc[:mylen].reset_index(drop=True);
                         #tdf2=tdf2.iloc[:mylen].reset_index(drop=True); #pd corr uses index?
