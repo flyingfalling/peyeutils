@@ -282,17 +282,20 @@ def main():
     #exit(0);
     #REV: ah, some are missing due to muscimol.
 
-    repeatnum=args.repeatnum;
+    repeatnum=int(args.repeatnum);
 
     for count in range(repeatnum):
 
         ###add random bias on the gaze
-        inf_error_sigma=args.inf_error_sigma;
-        #xpix_noise=pd.DataFrame(np.random.normal(scale=inf_error_sigma, size=len(gazedf['pix_x'])));
-        #ypix_noise=pd.DataFrame(np.random.normal(scale=inf_error_sigma, size=len(gazedf['pix_y'])));
+        inf_error_sigma=float(args.inf_error_sigma);
+        xpix_noise=pd.Series(np.random.normal(scale=inf_error_sigma, size=len(gazedf['pix_x'])));
+        ypix_noise=pd.Series(np.random.normal(scale=inf_error_sigma, size=len(gazedf['pix_y'])));
 
-        #gazedf['pix_x']=gazedf['pix_x']+xpix_noise;
-        #gazedf['pix_y']=gazedf['pix_x']+ypix_noise;
+        #print(gazedf['pix_x'].shape);
+        #print(xpix_noise.shape);
+
+        gazedf['pix_x']=gazedf['pix_x']+xpix_noise;
+        gazedf['pix_y']=gazedf['pix_y']+ypix_noise;
 
 
         bigdf = pd.merge(left=gazedf, right=idxdf, on=['trialidx', 'wotype'], how='inner');
@@ -302,9 +305,6 @@ def main():
         print(bigdf.subj.unique());
         #bigdf.groupby(['subj']).count().to_csv('wtf.csv');
         
-        print(bigdf.pix_x);
-        print(bigdf.pix_y);
-
         #REV: clean data?
         maxx=340;
         maxy=340;
@@ -538,6 +538,8 @@ def main():
         g.figure.savefig('myfig.png');
         '''
         
+        print(f'{count}/{repeatnum} now!')
+
         return 0;
 
 
