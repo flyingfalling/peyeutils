@@ -77,9 +77,10 @@ def main():
         
         
     #REV: add infant data
+    inf_idx=args.inf_idx;
+    inf_gaze=args.inf_gaze;
+
     if  (inf_idx is not None)&(inf_gaze is not None):
-        inf_idx=args.inf_dix;
-        inf_gaze=args.inf_gaze;
 
         iidxdf=pd.read_csv(inf_idx);
         iidxdf['trialidx'] = iidxdf['trialidx'].astype(str) + 'i';
@@ -179,7 +180,8 @@ def main():
         print(idxdf[idxdf['species']=='nan']);
         raise Exception("<1");
     
-    gazedf = gazedf.drop(columns=['timems']);
+    if not marmoskip:
+        gazedf = gazedf.drop(columns=['timems']);
     
     
     
@@ -286,11 +288,11 @@ def main():
 
         ###add random bias on the gaze
         inf_error_sigma=args.inf_error_sigma;
-        xpix_noise=pd.DataFrame(np.random.normal(scale=inf_error_sigma, size=len(gazedf['pix_x'])));
-        ypix_noise=pd.DataFrame(np.random.normal(scale=inf_error_sigma, size=len(gazedf['pix_y'])));
+        #xpix_noise=pd.DataFrame(np.random.normal(scale=inf_error_sigma, size=len(gazedf['pix_x'])));
+        #ypix_noise=pd.DataFrame(np.random.normal(scale=inf_error_sigma, size=len(gazedf['pix_y'])));
 
-        gazedf['pix_x']=gazedf['pix_x']+xpix_noise;
-        gazedf['pix_y']=gazedf['pix_x']+ypix_noise;
+        #gazedf['pix_x']=gazedf['pix_x']+xpix_noise;
+        #gazedf['pix_y']=gazedf['pix_x']+ypix_noise;
 
 
         bigdf = pd.merge(left=gazedf, right=idxdf, on=['trialidx', 'wotype'], how='inner');
@@ -300,6 +302,9 @@ def main():
         print(bigdf.subj.unique());
         #bigdf.groupby(['subj']).count().to_csv('wtf.csv');
         
+        print(bigdf.pix_x);
+        print(bigdf.pix_y);
+
         #REV: clean data?
         maxx=340;
         maxy=340;
@@ -539,15 +544,15 @@ def main():
 if __name__=='__main__':
 
     parser=argparse.ArgumentParser();
-    parser.add_argument('wajd_idx',default=None);
-    parser.add_argument('wajd_gaze',default=None);
-    parser.add_argument('orig_idx',default=None);
-    parser.add_argument('orig_gaze',default=None);
-    parser.add_argument('inf_idx',default=None);
-    parser.add_argument('inf_gaze',default=None);
-    parser.add_argument('inf_error_sigma',help='add random noise on the gaze based on this sigma',default=0);
-    parser.add_argument('repeatnum',help='how many times you make the random noises',default=1);
-    parser.add_argument('marmoskip',help='when you do not have marmoset data',default=False);
+    parser.add_argument('--wajd_idx',nargs='?',default=None);
+    parser.add_argument('--wajd_gaze',nargs='?',default=None);
+    parser.add_argument('--orig_idx',nargs='?',default=None);
+    parser.add_argument('--orig_gaze',nargs='?',default=None);
+    parser.add_argument('--inf_idx',nargs='?',default=None);
+    parser.add_argument('--inf_gaze',nargs='?',default=None);
+    parser.add_argument('--inf_error_sigma',nargs='?',help='add random noise on the gaze based on this sigma',default=0);
+    parser.add_argument('--repeatnum',nargs='?',help='how many times you make the random noises',default=1);
+    parser.add_argument('--marmoskip',nargs='?',help='when you do not have marmoset data',default=False);
     
     args=parser.parse_args()
 
