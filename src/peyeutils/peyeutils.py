@@ -55,30 +55,31 @@ def preproc_and_compute_events(df,
     import pandas as pd;
     import numpy as np;
     
-    min_sacc_dva = 0.33;
+    min_sacc_dva = 0.330;
     min_isi_sec = 0.060; #0.060; #REV: true minimum time to code saccade? Note, "double stepped" saccade detection will fail!!! orz
     
     blinksacc_merge_envelop_sec=0.040;
     
     ##############################
     xyunits_dva=1;
+    tunits_sec=1;
     
     sr = pu.utils.tsutils.check_samplerate(df[df[eyecol]==df[eyecol].unique()[0]], tcol=tcol );
     
     if( not np.isclose( sr, sr_hzsec ) ):
         raise Exception("Samplerate not good, expected {}, got {}".format(sr_hzsec, sr));
-
+    
     ########### PREPROCESSING (smooth/savgol filter/median filter/dilate NANs  ################
     params1 = pu.eyemovements.remodnav.make_default_preproc_params(samplerate_hzsec=sr_hzsec,
-                                                                   timeunitsec=1,
-                                                                   dva_per_px=xyunits_dva,
+                                                                   timeunitsec=tunits_sec,
+                                                                   dva_per_px=xyunits_dva, #1 "pix" (i.e. a.u. is 1 DVA).
                                                                    xname=xcol,
                                                                    yname=ycol,
                                                                    tname=tcol);
     
     #REV: default other params for remodnav (will be ignored if not needed).
     params2 = pu.eyemovements.remodnav.make_default_params(samplerate_hzsec=sr_hzsec);
-
+    
     #REV: combine this into single large params dict. These do not affect results very much
     params = params1 | params2;
     
@@ -267,9 +268,13 @@ def preproc_and_compute_events(df,
                                                   eyecol=eyecol,
                                                   min_isi_dur=blinksacc_merge_envelop_sec,
                                                  );
-                
-        ISIevents=['SACC', 'BLNK']; #REV: i.e. use blinks as saccades (gaze shifts often happen during blinks...)
+
+        #REV: so I 'abandoned' combine.py to use isi.py -> eye_event_merge. What about ISIs? They don't exist yet?
         
+        ISIevents=['SACC', 'BLNK']; #REV: i.e. use blinks as saccades (gaze shifts often happen during blinks...)
+
+
+        #REV: this adds ISIs (they don't exist yet, ONLY SACC and BLNK exist.
         #REV: handles eyecol
         isis = pu.eyemovements.isi.compute_ISIs_from_events( ev,
                                                              zerotime=sdf[tcol].iloc[0], #REV: or .min()
@@ -374,7 +379,6 @@ def preproc_peyefv_edf( in_edf_path : str,
     """
     #-> (pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame, dict, bool):
     if( out_csv_path ):
-        
         pu.utils.create_dir(out_csv_path);
         pass
     try:
@@ -389,8 +393,7 @@ def preproc_peyefv_edf( in_edf_path : str,
     
     row=dict();
     haseyetracking=True;
-    error=False;
-    row['edferror'] = False;
+    
     
     #REV: expect FNAME to be UNIQUE
     fname=os.path.basename(in_edf_path);
@@ -402,9 +405,10 @@ def preproc_peyefv_edf( in_edf_path : str,
     print(" ++++++++ Reading [{}] ++++++++++".format(in_edf_path));
     
     try:
-        s, e, m = pyedfread.read_edf(in_edf_path);
+        s, e, m = pyedfread.read_edf(in_edf_path); #REV: raw EDF has samples, events, messages.
         print(s.time.min(), s.time.max());
         print(s.time);
+        row['edferror'] = False;
         error=False;
         pass;
     except Exception as e:
@@ -412,10 +416,9 @@ def preproc_peyefv_edf( in_edf_path : str,
         error=True;
         print("  -------- WARNING -- Could not read EDF file [{}], exception [{}]".format(in_edf_path, e));
         return row, pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
-        
+    
     
     if( out_csv_path ):
-        #mkdir(out_csv_path);
         sfn = fname + '.edfsamples.csv';
         efn = fname + '.edfevents.csv';
         mfn = fname + '.edfmessages.csv';
@@ -445,17 +448,24 @@ def preproc_peyefv_edf( in_edf_path : str,
         pass;
     
     
-    #REV: this
+    #REV: this function (preproc_EL_A_clean...) does following:
     #(0) extracts messages etc.
     #(1) separates samples per eye
     #(2) cleans events i.e. renames eyes, renames saccade->SACC, fix->FIXA etc.
-    #(3) Checks simult events, sets "elblink" and "elhasblink" for where eventtype='blink' versus 'contains_blink'. Note events.blink is removed in A02 clean events. 'blink' just means CONTAINS blink in the first place. Oh shit, no it is added in there. OK, contains blink just means that
-    # a blink is either started/ended or totally contained within the thing. BLINK IS ALWAYS SANDWICHED BY A SACCADE!!! (right? REV)
-    #(4) (if not bad) Adds pupilsize columns (LPF etc., MAD) - for blinks
-    #(5) labels blinks (SHARED) -- i.e. adds columns "bad" (badpupil, badPRE etc.) -> Note uses some parameters/thresholds
-    df, ev, msgs, eldict = pu.eyelink.preproc_EL_A_clean_samples(s,e,m,targ_sr_hzsec=targ_sr_hzsec);
+    #(3) Checks simult events, sets "elblink" and "elhasblink" for where eventtype='blink' versus 'contains_blink'.
+    #    Note events.blink is removed in A02 clean events. 'blink' just means CONTAINS blink in the first place.
+    #    !! Oh shit, IT IS added in there. OK, contains blink meas that:
+    #    !! a blink is either started/ended or totally contained within the thing.
+    #    !! BLINK IS ALWAYS SANDWICHED BY A SACCADE!!! (right? REV)
+    #(4) (if not bad data, i.e. not(allNAN)) then adds pupilsize columns (LPF etc., MAD) - for blink detection based on pupil size.
+    #(5) labels blinks (SHARED) -- i.e. adds columns "bad" (badpupil, badPRE etc.) -> Note uses some parameters/thresholds that
+    ##    may depend on data?
+    df, ev, msgs, eldict['badtrial'] =    pu.eyelink.preproc_EL_A_clean_samples(s,
+                                                                                e,
+                                                                                m,
+                                                                                targ_sr_hzsec=targ_sr_hzsec);
     
-    badtrial = eldict['badtrial'];
+    #badtrial = eldict['badtrial'];
     #REV: set resampled samplerate of this file...
     row['sr_hzsec'] = eldict['sr_hzsec'];
     
@@ -472,13 +482,18 @@ def preproc_peyefv_edf( in_edf_path : str,
     ##    replaces with mean offset for one eye missing points.
     ## REV: need to reconsider this, and filter out unphysiological stuff like jumps, recording nostril, etc.
     ##   Use the "more reliable eye" at every time point...
-    if( False == badtrial ):
+    if( False == eldict['badtrial'] ):
         exclude_thresh_dva=1.5;
         df = pu.preproc.preproc_SHARED_C_binoc_gaze(df, xcol='cgx_dva', ycol='cgy_dva', tcol='Tsec',
                                                     exclude_thresh = exclude_thresh_dva);
         pass;
+
+    #REV: this literally just sets "bad" data samples to NAN. (i.e. blinks, bad (missing) data, etc.)
+    #REV: HOW TO DIFFERENTIATE BETWEEN BLINKS AND MISSING DATA?!?!?!?
+    #REV: blinks will be either sandwitched by pupil size changes OR detected as blinks by EYELINK.
+    #REV: PROBLEM: if head turns away outside range, we will see similar blink-like change in pupil size (turning into oval?)
     
-    #df = preproc_SHARED_D_exclude_bad( df, xcol='cgx_dva', ycol='cgy_dva', badcol='bad' );
+    #df = pu.preproc.preproc_SHARED_D_exclude_bad( df, xcol='cgx_dva', ycol='cgy_dva', badcol='bad' );
     
     trialdf = pu.peyefv.import_fv_trials( msgs );
     if( badtrial ):

@@ -6,6 +6,8 @@ import matplotlib.pyplot as plt;
 import numpy as np;
 import sys;
 
+import pyedfread;
+
 
 def plotit(edfrow, out_csv_path):
     msgdf = pd.read_csv( os.path.join(out_csv_path, edfrow['messages_csv']) );
@@ -297,7 +299,11 @@ def saccades_remodnav( edfrow, out_csv_path):
 
 
 
-
+def simpletest():
+    fn=sys.argv[1];
+    s, e, m = pyedfread.read_edf(fn);
+    df, ev, msg, dct = pu.eyelink.preproc_EL_A_clean_samples(s,e,m);
+    return 0;
 
 def test1(out_csv_path):
     #fn='/mnt/coishare/data/freeviewing/data/bigsmall/nakazawa20251003/PYFREE_nakazawa_SIZEDVA_10__endrec_start_2025-10-03-11-07-42_end_2025-10-03-11-12-52.edf';
@@ -308,7 +314,7 @@ def test1(out_csv_path):
         fn=sys.argv[1];
         pass;
     print("Setting input EDF filename to [{}]".format(fn));
-    
+        
     row, s, m, bt, b = pu.preproc_peyefv_edf(fn, out_csv_path=out_csv_path);
     
     print(s);
@@ -333,13 +339,16 @@ def test2(row, out_csv_path):
 def test3(row, out_csv_path):
     row = { a:[row[a]] for a in row };
     df = pd.DataFrame(row);
-
+    
     saccades_remodnav( df.iloc[0], out_csv_path );
     
     return;
 
 def main():
     outcsv='outcsvs';
+    err = simpletest();
+
+    '''
     row = test1(out_csv_path=outcsv);
     print("MY ROW", row);
     if( False == row['edferror'] ):
@@ -349,6 +358,7 @@ def main():
     else:
         print("Empty row, i.e. no file?");
         pass;
+    '''
     return 0;
 
 if __name__=='__main__':

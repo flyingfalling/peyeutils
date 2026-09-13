@@ -75,6 +75,7 @@ def select_legal_timepoints4(ts, vals, maxdt, DEBUG=False):
 
 
 #REV: interpolates, filling in NANs.
+#REV: DOES NOT ADD/REMOVE SAMPLES -- simply fills in NANs which are missing!
 def strsafe_interpolate(df,
                         tcol,
                         method='linear',
@@ -182,7 +183,7 @@ def interpolate_df_to_samplerate(df, tcol, targ_srhzsec, tcolunit_s, truesrs=dic
     
     if( tcolunit_s != 1 ):
         #raise Exception("Unit of tcol (time column) must be seconds (tcolunit_s=1) (is {})".format(tcolunit_s));
-        print("WARNING: REV: still uncertain/untested when tcolunit_s is not 1 (second)");
+        print("WARNING: REV: still uncertain/untested when tcolunit_s is not 1 (second) (you passed {})".format(tcolunit_s));
 
     #REV: note units of DT is in units timecolunit_s
     dt = (1/tcolunit_s) / targ_srhzsec; #REV: e.g. (1/0.001) / 500 = 1000/500 = 2

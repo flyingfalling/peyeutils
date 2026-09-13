@@ -98,7 +98,7 @@ def get_tag_lists( mymessages, tag ):
 
     Returns
     -------
-
+    
     """
     vbmsgs = mymessages[ mymessages['tag'] == tag ];
     mylists=[];
@@ -237,7 +237,7 @@ def get_elparams( mymessages ):
     elparams = get_tag_lists( mymessages, 'RECCFG' );
     eldict = reccfg_params( elparams[0] );
     #coorddict = gazecoord_params( get_tag_lists( mymessages, "GAZE_COORDS" )[0] );
-
+    
     return eldict;
 
 def get_gazecoords( mymessages ):
