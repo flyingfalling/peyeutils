@@ -820,7 +820,7 @@ def blink_df_from_samples(indf,
             ev = ev.sort_values(by=stidx).reset_index(drop=True);
             pass;
         else:
-            ev = ev.sort_values(by=stsec).reset_index(drop=True);
+            ev = ev.sort_values(by=stcol).reset_index(drop=True);
             pass;
 
                 

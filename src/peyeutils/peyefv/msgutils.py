@@ -450,8 +450,18 @@ def import_fv_trials( mymessages, includeAasE=False, fixvidlensec=None, fiximgle
     #REV: special case for recovery from my mistake of not writing VID S
     #REV: note, fixdvawid is literally its wid, not scaled target wid...
     if( not includeAasE and (fixvidlensec is not None or fiximglensec is not None) and fixdvawid is not None ):
+        #REV: this branch is unfinished -- it depends on a `cv_vid_file_exists(vidpathdict[vid])` helper and a
+        #REV: `vidpathdict` mapping (video name -> filesystem path) that don't exist anywhere in this codebase
+        #REV: (the call was commented out, leaving `w`/`h`/`fps` undefined below). Rather than crash deep inside
+        #REV: the loop with a confusing NameError after partially mutating subfm, fail immediately and clearly.
+        raise NotImplementedError(
+            "import_fv_trials(fixvidlensec/fiximglensec + fixdvawid=...) recovery path is unfinished: "
+            "it needs a `vidpathdict` (video name -> path) and a `cv_vid_file_exists(path) -> (w,h,fps,nframes)` "
+            "helper, neither of which currently exist in peyeutils. Implement those, or call without "
+            "fixvidlensec/fiximglensec/fixdvawid to skip this recovery path."
+        );
         endf=subfm[subfm.sten=='E'].copy();
-        
+
         #REV: insert the missing rows...
         for (enidx, enrow) in endf.iterrows():
             enmsg = enrow.body.split(' ');
@@ -460,7 +470,7 @@ def import_fv_trials( mymessages, includeAasE=False, fixvidlensec=None, fiximgle
 
             #REV get vid w/h/fps/frames.
             #w, h, fps, fr = cv_vid_file_exists( vidpathdict[vid] );
-                        
+
             #REV: scale based on PPM and DM
             wpx = fixdvawid / dva_per_px;
             ratio=float(h)/w;

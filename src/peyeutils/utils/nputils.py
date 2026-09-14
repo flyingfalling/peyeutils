@@ -1,4 +1,5 @@
 import numpy as np;
+import math;
 
 def linsteps(start, stop, step, pastend=True):
     """

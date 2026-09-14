@@ -5,6 +5,7 @@ import sklearn;
 import peyeutils as pu;
 
 from peyeutils.utils.tsutils import get_dilated_nan_mask, rle, inverse_rle;
+from peyeutils.utils.filtering import filter_spikes;
 
 import peyeutils as pu;
 
@@ -158,26 +159,35 @@ def dilate_xy_nans( df, params ):
 '''
 
 def diff_nh(x, y, params):
+    from scipy.signal import savgol_filter;
+
     sg_order = params['nh_savgol_order'];
     sg_win_sec = params['nh_savgol_window_sec'];
     sr = params['samplerate_hzsec'];
     dt = 1/sr;
-    sg_win_samp = sg_window_sec * sr;
-    
+    sg_win_samp = int(round(sg_win_sec * sr));
+    if( (sg_win_samp % 2) == 0 ):
+        sg_win_samp += 1;
+        pass;
+    if( sg_win_samp <= sg_order ):
+        sg_win_samp = sg_order + 1 + ((sg_order+1) % 2==0); #REV: savgol_filter requires window_length > polyorder and odd.
+        pass;
+
     vx = np.diff(x) / dt;
     vy = np.diff(y) / dt;
     v = np.sqrt( vx**2 + vy**2 );
-    
-    fvx = savgol_filter(vx, savgol_win_samp, sg_order );
-    fvy = savgol_filter(vy, savgol_win_samp, sg_order );
-    fv = savgol_filter(v, savgol_win_samp, sg_order );
-    
+
+    fvx = savgol_filter(vx, sg_win_samp, sg_order );
+    fvy = savgol_filter(vy, sg_win_samp, sg_order );
+    fv = savgol_filter(v, sg_win_samp, sg_order );
+
     return fvx, fvy, fv;
 
 
 #REV: only include finites...
 def sd_via_median_estimator(x):
-    sd = np.sqrt( np.nanmedian(x**2) - np.nanmedian(x)**2 );
+    var_est = np.nanmedian(x**2) - np.nanmedian(x)**2;
+    sd = np.sqrt(var_est) if var_est > 0 else 0.0; #REV: median-based variance estimator can go slightly negative; guard against NaN from sqrt of negative.
     SMALL_EPSIL=0.00000001;
     if( sd < SMALL_EPSIL ):
         sd = np.sqrt( np.nanmean(x**2) - np.nanmean(x)**2 );
@@ -537,11 +547,20 @@ def method_om(df, params, eyepfix,
     
     kmeans=dict();
     scores=dict();
-    maxcut=min(len(sdf.index), 4) + 1;
+    #REV: sklearn's silhouette_score requires 2 <= n_clusters <= n_samples-1. The old formula
+    #REV: (min(len(sdf.index),4)+1) let groups_n reach len(sdf.index) itself whenever there were
+    #REV: exactly 3 or 4 candidate saccades, crashing with "Number of labels is N. Valid values
+    #REV: are 2 to n_samples - 1" every single time that (very common) count occurred.
+    maxcut=min(len(sdf.index)-1, 4) + 1;
     if( len(sdf.index) < 3 ):
         print("WTF only a single event (sdf in saccadr)?!?!");
         bestk=0;
-        kmeans[0] = np.zeros( len(sdf.index), dtype=int);
+        #REV: kmeans[bestk].labels_ is accessed unconditionally below (line ~606), so this
+        #REV: placeholder needs a `.labels_` attribute too -- a bare ndarray (the old code)
+        #REV: has no such attribute and raised AttributeError whenever there were exactly
+        #REV: 1 or 2 candidate saccades (a very common count for short trials).
+        import types;
+        kmeans[0] = types.SimpleNamespace( labels_ = np.zeros( len(sdf.index), dtype=int) );
         pass;
     else:
         #REV: 2, maxcut? Separate into "noise" or "not"?
@@ -819,6 +838,28 @@ def method_nh(df, params, eyepfix):
 
 
 def default_saccadr_params():
+    """Reasonable default parameters for :func:`saccadr_detect_saccades`.
+
+    Saccades are detected by combining three independent velocity-based
+    methods -- Engbert & Kliegl 2003 ('ek'), Nystrom & Holmqvist-style
+    ('nh'), and a peak/PCA-clustering method ('om') -- and voting: a sample
+    only counts as part of a saccade once (nearly) all requested methods
+    agree. The returned dict holds tunable thresholds for all three
+    methods plus the vote-combination step (the ``saccadr_*`` keys).
+    Override individual keys on the returned dict before passing it to
+    `saccadr_detect_saccades` -- in particular you must set
+    ``samplerate_hzsec`` to your data's actual sample rate.
+
+    Returns
+    -------
+    dict
+        See the source for the full set of keys; the most commonly tuned
+        ones are ``om_vel_thresh_degsec`` (minimum peak velocity to
+        consider, deg/sec), ``saccadr_min_dur_sec``/``saccadr_min_sep_sec``
+        (minimum saccade duration / minimum gap between accepted saccades),
+        and ``blink_vel_thresh_degsec`` (velocities above this are treated
+        as blink artifacts and excluded).
+    """
     d = dict(nh_max_vel_degsec=1e3,
              nh_max_acc_degsecsec=1e5,
              nh_init_vel_thresh_degsec=100, #REV: 300 in remodnav??!
@@ -888,7 +929,63 @@ def saccadr_detect_saccades( sampdf,
                              extramethods=list(),
                              velocity_function=diff_ek,
                             ):
-    
+    """Detect saccades in a regularly-sampled 2D gaze trace via
+    multi-method velocity voting.
+
+    Requires `sampdf[xname]`/`sampdf[yname]` already expressed in degrees
+    of visual angle (dva), regularly sampled at ``params['samplerate_hzsec']``.
+    Each eye in `eyecol` is processed independently. See
+    :func:`default_saccadr_params` for a starting parameter dict.
+
+    Parameters
+    ----------
+    sampdf : pandas.DataFrame
+        Gaze samples.
+    params : dict
+        See :func:`default_saccadr_params`; must include
+        ``samplerate_hzsec``.
+    tsecname, xname, yname : str
+        Column names for time (seconds), x (dva), y (dva).
+    eyecol : str
+        Column identifying which eye each row belongs to. Added (as a
+        single empty-string eye) if missing.
+    namedmethods : tuple of str
+        Which built-in detection methods to vote with: any of 'ek'
+        (Engbert & Kliegl 2003), 'om' (peak/PCA-clustering), 'nh'
+        (Nystrom & Holmqvist-style adaptive threshold).
+    extramethods : list of callable
+        Additional custom vote functions, each with signature
+        ``f(df, params, eyepfix) -> bool array``.
+    velocity_function : callable
+        Function computing (xvel, yvel, speed) from (x, y, params); default
+        :func:`diff_ek`.
+
+    Returns
+    -------
+    sdf : pandas.DataFrame
+        `sampdf` with added velocity/acceleration/per-method vote columns.
+    evdf : pandas.DataFrame
+        One row per detected segment, `label` is 'SACC' for accepted
+        saccades and 'SISI' for the (sub-threshold) gaps between them, with
+        `stsec`/`ensec`, `ampldva`, `dursec`, `angle`, etc.
+
+    Examples
+    --------
+    >>> import numpy as np, pandas as pd
+    >>> from peyeutils.eyemovements.saccadr import saccadr_detect_saccades, default_saccadr_params
+    >>> sr = 250.0
+    >>> t = np.arange(int(3 * sr)) / sr
+    >>> rng = np.random.RandomState(0)
+    >>> x = np.where(t < 1.5, 0.0, 10.0) + rng.normal(0, 0.03, len(t))
+    >>> y = rng.normal(0, 0.03, len(t))  # needs *some* noise -- a perfectly flat channel breaks the EK method's SD estimate
+    >>> df = pd.DataFrame({'Tsec': t, 'x': x, 'y': y})
+    >>> params = default_saccadr_params(); params['samplerate_hzsec'] = sr
+    >>> sdf, evdf = saccadr_detect_saccades(df, params, tsecname='Tsec', xname='x', yname='y', eyecol='eye')
+    >>> saccs = evdf[evdf['label'] == 'SACC']
+    >>> len(saccs.index), round(saccs.iloc[0]['ampldva'])
+    (1, 10.0)
+    """
+
     mymethods=list();
     if('ek' in namedmethods):
         mymethods.append(method_ek);

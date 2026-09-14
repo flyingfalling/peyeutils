@@ -63,35 +63,37 @@ def read_unpack_next_tagtype( myf, ts ):
 
 #REV: this could get LARGE
 def timestamps_from_file( fn, tb_hz_sec ):
-    times = open( fn, "rb" );
-    tstype = get_next_u8_time_from_filehandle( times );
-    if tstype is not None:
-        print( "Type {}".format( int(tstype)) );
-        pass;
-    else:
-        exit(0);
-        pass;
+    if( tb_hz_sec == 0 ):
+        raise ValueError("timestamps_from_file requires tb_hz_sec != 0 (got 0)");
 
-    res = [];
-    idx=0;
-    while( True ):
-        val = read_unpack_next_tagtype( times, tstype );
-        if( val == None ):
-            break;
-        else:
-            #if( 0 == idx ):
-            #    zerotime = val;
-            #    pass;
-            #assec = (val - zerotime) / tb_hz_sec;
-            assec = val / tb_hz_sec;
-            #print("Timestamp: {}  (Zeroed Sec: {})".format( val, assec ) );
-            #if outf is not None:
-            #    outf.write( "{} {} {}\n".format( idx, assec, val ) );
-            res.append( [ idx, assec, val ] );
-            idx+=1;
+    with open( fn, "rb" ) as times:
+        tstype = get_next_u8_time_from_filehandle( times );
+        if tstype is not None:
+            print( "Type {}".format( int(tstype)) );
             pass;
-        pass;
-    
+        else:
+            raise Exception("timestamps_from_file: could not read type tag from [{}] (empty or truncated file?)".format(fn));
+
+        res = [];
+        idx=0;
+        while( True ):
+            val = read_unpack_next_tagtype( times, tstype );
+            if( val == None ):
+                break;
+            else:
+                #if( 0 == idx ):
+                #    zerotime = val;
+                #    pass;
+                #assec = (val - zerotime) / tb_hz_sec;
+                assec = val / tb_hz_sec;
+                #print("Timestamp: {}  (Zeroed Sec: {})".format( val, assec ) );
+                #if outf is not None:
+                #    outf.write( "{} {} {}\n".format( idx, assec, val ) );
+                res.append( [ idx, assec, val ] );
+                idx+=1;
+                pass;
+            pass;
+
     return res;
 
 
