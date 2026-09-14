@@ -169,7 +169,7 @@ def plot_gaze_chunks(
                 ]
                 for _, stim in relevant_stim.iterrows():
                     stim_name = stim[stim_name_col]
-                    color = stim_color_map.get(stim_name, 'gray')
+                    color = stim_color_map.get(stim_name, (0.5, 0.5, 0.5, 1.0)) #REV: fallback must be an RGBA tuple (not the string 'gray') since it's later scaled via color*0.8
                     
                     # Get absolute event times
                     stim_start_abs = stim[stim_start_col]

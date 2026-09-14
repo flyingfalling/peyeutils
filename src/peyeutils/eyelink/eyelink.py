@@ -344,7 +344,7 @@ def preproc_EL_A03_remove_errors(df,
         print("WARNING -> ALL PX DATA IS NAN AFTER ERRORS/CUTOFF->NAN");
         pass;
     if( 'hx' in df.columns and pu.utils.allnan( df['hx'] ) ):
-        print("WARNING -> ALL PX DATA IS NAN AFTER ERRORS/CUTOFF->NAN");
+        print("WARNING -> ALL HX DATA IS NAN AFTER ERRORS/CUTOFF->NAN");
         pass;
     if( pacol in df.columns and pu.utils.allnan( df[pacol] ) ):
         print("WARNING -> ALL PA DATA IS NAN AFTER ERRORS/CUTOFF->NAN");

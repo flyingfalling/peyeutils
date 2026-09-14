@@ -93,7 +93,7 @@ def tobii3_fix_imudf(normdf, prepend='data.'):
 
 def tobii3_fix_gazedf(normdf, prepend='data.'):
     
-    df = normdf.copy(0);
+    df = normdf.copy(); #REV: was .copy(0), which passes deep=0 (False) -- a shallow copy that risked mutating the caller's normdf.
     
     #toconvert = ['data.gaze2d', 'data.gaze3d', 'data.eyeleft.gazeorigin', 'data.eyeleft.gazedirection', 'data.eyeright.gazeorigin', 'data.eyeright.gazedirection'];
     toconvert = list();

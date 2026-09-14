@@ -8,7 +8,7 @@ version = "0.0.1"
 authors = [
   { name="Richard Veale", email="richard.e.veale@gmail.com" },
 ]
-dependencies=["numpy", "scipy", "pandas", "statsmodels", "matplotlib", "av", "opencv-python"]
+dependencies=["numpy", "scipy", "pandas", "statsmodels", "matplotlib", "seaborn", "scikit-learn", "av", "opencv-python", "imufusion"]
 #optional_dependencies=["psychopy", "pyedfread",]
 description = "p(e)y(e) utils -- utilities for running/analyzing eyetracking and neurophysiology experiments"
 readme = "README.md"
@@ -20,6 +20,12 @@ classifiers = [
 license = "MIT"
 license-files = ["LICEN[CS]E*"]
 
+[project.optional-dependencies]
+dev = ["pytest"]
+
 [project.urls]
 Homepage = "https://github.com/flyingfalling/peyeutils"
 Issues = "https://github.com/flyingfalling/peyeutils/issues"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
