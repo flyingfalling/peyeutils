@@ -19,7 +19,9 @@ import peyeutils.preproc as pre;
 
 
 
-def preproc_EL_A00_add_Tsec(rawdf, timecol='time', timeunitsec=pu.EL_TIMEUNIT_SEC):
+def preproc_EL_A00_add_Tsec(rawdf,
+                            timecol='time',
+                            timeunitsec=pu.EL_TIMEUNIT_SEC):
     """
 
     Parameters
@@ -41,61 +43,22 @@ def preproc_EL_A00_add_Tsec(rawdf, timecol='time', timeunitsec=pu.EL_TIMEUNIT_SE
     rawdf['Tsec'] = tvals * timeunitsec;
     MSEC=1e3;
     rawdf['Tmsec'] = rawdf['Tsec'] * MSEC;
+    
+    
+    
+    
     return rawdf;
 
 
-
-
-
-def preproc_EL_A01_separate_samps_eye( samples,
-                                       samplerate,
-                                       ELtname='time', #REV: this is "EL" default time column
-                                       tname='Tmsec',
-                                       tsecname='Tsec',
-                                       eyename='eye',
-                                       eyes_to_use=[pu.PEYEUTILS_LEFT_EYE, pu.PEYEUTILS_RIGHT_EYE],
-                                       timeunit=1e-3,
-                                       exclude_EL_blinks=False,
-                                       ELcutoff=30000, #REV: their representtaion of NAN is like 100000000.. ):
-
-                                       clean_errors=True,
-                                       drop_bad_eyes=False,
-                                      ):
-    """
-
-    Parameters
-    ----------
-    samples :
-        
-    samplerate :
-        
-    ELtname :
-         (Default value = 'time')
-    #REV: this is "EL" default time columntname :
-         (Default value = 'Tmsec')
-    tsecname :
-         (Default value = 'Tsec')
-    eyename :
-         (Default value = 'eye')
-    eyes_to_use :
-         (Default value = [pu.PEYEUTILS_LEFT_EYE)
-    pu.PEYEUTILS_RIGHT_EYE] :
-        
-    timeunit :
-         (Default value = 1e-3)
-    exclude_EL_blinks :
-         (Default value = False)
-    ELcutoff :
-         (Default value = 30000)
-    #REV: their representtaion of NAN is like 100000000.. :
-        
-
-    Returns
-    -------
-
-    """
+def preproc_EL_A01_resample_time( samples,
+                                  samplerate,
+                                  ELtname='time',
+                                  tname='Tmsec',
+                                  tsecname='Tsec',
+                                  timeunit=1e-3 ):
+    
     if( len(samples.index) < 2 ):
-        print("GOOD_EL_SMAPLES_LR: no samples in df (you should exclude this data anyways)");
+        print("preproc_EL_A01_resample_time: no samples in df (you should exclude this data anyways)");
         return pd.DataFrame();
     
     print( "Will resample");
@@ -139,8 +102,17 @@ def preproc_EL_A01_separate_samps_eye( samples,
     #REV: add Tsec0
     samples[tsecname+'0'] = samples[tsecname] - samples[tsecname].min();
     
+    return samples;
+
+#REV: note this sets any "NANval" EL things to NAN.
+#REV: (should ovelap with "error" or not? I.e. not detected?)
+def preproc_EL_A02_separate_samps_eye( samples,
+                                       tname='Tmsec',
+                                       eyename='eye',
+                                       eyes_to_use=[pu.PEYEUTILS_LEFT_EYE, pu.PEYEUTILS_RIGHT_EYE],
+                                       unused_eyes_to_nan=False,
+                                      ):
     
-        
     llist=[];
     lold=[];
     rlist=[];
@@ -172,7 +144,6 @@ def preproc_EL_A01_separate_samps_eye( samples,
             pass;
         pass;
     
-    #REV: wtf it ignored the "pass" and obeyed only the indentation ugh.
     ## (i.e. in situation where some columns were excluded etc...)
     if( sorted(llist) != sorted(rlist) ):
         print(llist);
@@ -181,7 +152,7 @@ def preproc_EL_A01_separate_samps_eye( samples,
     
     ldict = {lold[i]: llist[i] for i in range(len(lold))};
     rdict = {rold[i]: rlist[i] for i in range(len(rold))};
-
+    
     ## llist or rlist, same columns.
     newcols = blist + llist;
     
@@ -223,72 +194,189 @@ def preproc_EL_A01_separate_samps_eye( samples,
             by=[tname, eyename]).reset_index(
                 drop=True);
     
-    if( drop_bad_eyes ):
+    if( unused_eyes_to_nan ):
         df = df[ df.useeye == True ];
         pass;
     else:
-        df.loc[ (df.useeye==False), ['px','py','gx','gy','hx','hy'] ] = np.nan;
+        df.loc[ (df.useeye==False), ['px','py',
+                                     'gx','gy',
+                                     'hx','hy'] ] = np.nan;
         pass;
-    
-    ####### REMOVE VALUES OUTSIDE CUTOFFS#########
-    fixed=False;
-    if( 'gx' in df.columns ):
-        df.loc[ ((df.gx < -ELcutoff) | (df.gx > ELcutoff) | (df.gy < -ELcutoff) | (df.gy > ELcutoff)), ['gx', 'gy'] ] = np.nan;
         
-        if( clean_errors ):
-            df.loc[ (df.errors != 0), ['gx', 'gy'] ] = np.nan;
-        fixed=True;
-        if( pu.utils.allnan( df['gx'] ) ):
-            #raise Exception("EYEUTILS -> GOODLR -> WTF ALL NAN IN GOOD LR AFTER ELCUTOFF");
-            print("WARNING -> ALL GX DATA IS NAN AFTER CUTOFF->NAN");
-            pass;
-        pass;
-    
-    if( 'px' in df.columns ):
-        df.loc[ ((df.px < -ELcutoff) | (df.px > ELcutoff) | (df.py < -ELcutoff) | (df.py > ELcutoff)), ['px', 'py'] ] = np.nan;
-        if( clean_errors ):
-            df.loc[ (df.errors != 0), ['px', 'py'] ] = np.nan;
-        fixed=True;
-        if( pu.utils.allnan( df['px'] ) ):
-            #raise Exception("EYEUTILS -> GOODLR -> WTF ALL NAN IN GOOD LR AFTER CUTOFF");
-            print("WARNING -> ALL PX DATA IS NAN AFTER CUTOFF->NAN");
-            pass;
-        pass;
-
-    if( 'hx' in df.columns ):
-        df.loc[ ((df.px < -ELcutoff) | (df.px > ELcutoff) | (df.py < -ELcutoff) | (df.py > ELcutoff)), ['hx', 'hy'] ] = np.nan;
-        if( clean_errors ):
-            df.loc[ (df.errors != 0), ['hx', 'hy'] ] = np.nan;
-        fixed=True;
-        if( pu.utils.allnan( df['hx'] ) ):
-            #raise Exception("EYEUTILS -> GOODLR -> WTF ALL NAN IN GOOD LR AFTER CUTOFF");
-            print("WARNING -> ALL PX DATA IS NAN AFTER CUTOFF->NAN");
-            pass;
-        pass;
-    
-    #REV: better to use "local" MAD after first rough split?
-    pacol='pa';
-    if(pacol in df.columns):
-        pacutoff=ELcutoff; #30000;
-        #REV: 2025/09/15 -- PA of 0 is "nan" basically (zero area pupil?). Different than non-detection?
-        df.loc[ ((df[pacol] <= 0) | (df[pacol] > pacutoff) | (df[pacol] < -pacutoff)), pacol] = np.nan;
-        if( clean_errors ):
-            df.loc[ (df.errors != 0), [pacol] ] = np.nan;
-            pass;
-        if( pu.utils.allnan( df[pacol] ) ):
-            #raise Exception("EYEUTILS -> GOODLR -> WTF ALL NAN IN GOOD LR AFTER CUTOFF");
-            print("WARNING -> ALL PA DATA IS NAN AFTER CUTOFF->NAN");
-            pass;
-        pass;
-    
-    if( not fixed ):
-        raise Exception("ERROR Neither px nor gx in data");
-    
     return df;
 
 
+#REV: these are missing data eyelink.
+#REV: in case any snuck by?
+# MISSING_DATA -32768
+# define MISSING -32768
+# define INaN -32768
 
-def preproc_EL_A02_clean_events(eventdf,
+def preproc_EL_A03_remove_errors(df,
+                                 ELcutoff=30000,
+                                 ELnan_to_nan=True,
+                                 errors_to_nan=True,
+                                 pacol='pa',
+                                 zero_pupil_to_nan=True,
+                                 ):
+    
+    ####### REMOVE VALUES OUTSIDE CUTOFFS#########
+    tonancols=list();
+    if( 'gx' in df.columns ):
+        df['Gnan'] = False;
+        df.loc[ ((df.gx < -ELcutoff) | (df.gx > ELcutoff) | (df.gy < -ELcutoff) | (df.gy > ELcutoff)), 'Gnan' ] = True;
+        tonancols += ['gx', 'gy',];
+        pass;
+    
+    if( 'px' in df.columns ):
+        df['Pnan'] = False;
+        df.loc[ ((df.px < -ELcutoff) | (df.px > ELcutoff) | (df.py < -ELcutoff) | (df.py > ELcutoff)), 'Pnan' ] = True;
+        #df.loc[ ((df.px < -ELcutoff) | (df.px > ELcutoff) | (df.py < -ELcutoff) | (df.py > ELcutoff)), ['px', 'py'] ] = np.nan;
+        tonancols += ['px', 'py',];
+        pass;
+    
+    if( 'hx' in df.columns ):
+        df['Hnan'] = False;
+        df.loc[ ((df.hx < -ELcutoff) | (df.hx > ELcutoff) | (df.hy < -ELcutoff) | (df.hy > ELcutoff)), 'Hnan' ] = True;
+        #df.loc[ ((df.hx < -ELcutoff) | (df.hx > ELcutoff) | (df.hy < -ELcutoff) | (df.hy > ELcutoff)), ['hx', 'hy'] ] = np.nan;
+        tonancols += ['hx', 'hy'];
+        pass;
+    
+    if(pacol in df.columns):
+        #REV: better to use "local" MAD after first rough split?
+        pacutoff=ELcutoff; #30000;
+        df['PAnan'] = False;
+        #REV: 2025/09/15 -- PA of 0 is "nan" basically (zero area pupil?). Different than non-detection?
+        #df.loc[ ((df[pacol] <= 0) | (df[pacol] > pacutoff) | (df[pacol] < -pacutoff)), pacol] = np.nan;
+        if(zero_pupil_to_nan):
+            df.loc[ ((df[pacol] == 0 ) |
+                     (df[pacol] > pacutoff) |
+                     (df[pacol] < -pacutoff)), 'PAnan'] = True;
+            pass;
+        else:
+            df.loc[ ((df[pacol] > pacutoff) | (df[pacol] < -pacutoff)), 'PAnan'] = True;
+            pass;
+        tonancols += [pacol]; #REV: set pupil size to NAN too if error flag?
+        pass;
+    
+    
+    '''
+    if( 'gx' in df.columns ): #and False == df['ELerror'].equals(df['Gnan']) ):
+        print("Nerr={}/{}  NGnan={}   Overlap={}".format( df['ELerror'].sum(), len(df.index), df['Gnan'].sum(),
+                                                          len(df[ (df.ELerror==True) & (df.Gnan==True) ].index) ));
+        
+        print(df.gx.max(), df.gx.min());
+        #raise Exception( "Some error columns are not GX/GY nan");
+    
+    if( 'px' in df.columns ): # and False == df['ELerror'].equals(df['Pnan']) ):
+        print("Nerr={}/{}  NPnan={}   Overlap={}".format( df['ELerror'].sum(), len(df.index), df['Pnan'].sum(),
+                                                          len(df[ (df.ELerror==True) & (df.Pnan==True) ].index) ));
+        print(df.px.max(), df.px.min());
+        #raise Exception( "Some error columns are not PX/PY nan");
+
+    if( 'hx' in df.columns ): # and False == df['ELerror'].equals(df['Hnan']) ):
+        print("Nerr={}/{}  NHnan={}   Overlap={}".format( df['ELerror'].sum(), len(df.index), df['Hnan'].sum(),
+                                                          len(df[ (df.ELerror==True) & (df.Hnan==True) ].index) ));
+        print(df.hx.max(), df.hx.min());
+        #raise Exception( "Some error columns are not HX/HY nan");
+        
+    if( pacol in df.columns ): #and False == df['ELerror'].equals(df['PAnan']) ):
+
+        
+        print("Nerr={}/{}  NPAnan={}   NPazero={}   Overlap={}   ZOverlap={}".format( df['ELerror'].sum(),
+                                                                                      len(df.index),
+                                                                                      df['PAnan'].sum(),
+                                                                                      len( df[ df[pacol] == 0 ].index) ,
+                                                                                      len(df[ (df.ELerror==True) & (df.PAnan==True) ].index) ,
+                                                                                      len(df[ (df.ELerror==True) & (df[pacol]==0) ].index ) ) );
+        print(df.pa.min(), df.pa.max());
+        #raise Exception( "Some error columns are not PA nan");
+        
+        pass;
+    '''
+
+    if( errors_to_nan ):
+        df.loc[ (df['errors'] != 0), tonancols ] = np.nan;
+        pass;
+
+    
+    
+    
+    '''
+    #REV: some where pa is NOT nan but GX is?
+    #REV: ok seems they (PA) are all 0 (or NA)
+    print(df[pacol].isna().sum(), len(df.index));
+    print(len(df[ df[pacol]==0 ].index), len(df.index));
+    print(len(df[ df[pacol]==0 ].index)+df[pacol].isna().sum(), len(df.index));
+    print(df['gx'].isna().sum(), len(df.index));
+    
+    some = df[ (~df[pacol].isna()) &
+               (df[pacol]>0) &
+               (df['gx'].isna() ) ];
+    if( len(some.index) > 0 ):
+        print(some);
+        raise Exception("Some pupil are positive but there is no corresponding gaze?");
+    
+    '''
+
+    
+    if( ELnan_to_nan ):
+        if( 'gx' in df.columns ):
+            df.loc[ (df['Gnan']==True), ['gx', 'gy'] ] = np.nan;
+            pass;
+        if( 'px' in df.columns ):
+            df.loc[ (df['Pnan']==True), ['px', 'py'] ] = np.nan;
+            pass;
+        if( 'hx' in df.columns ):
+            df.loc[ (df['Hnan']==True), ['hx', 'hy'] ] = np.nan;
+            pass;
+        if( pacol in df.columns ):
+            df.loc[ (df['PAnan']==True), pacol ] = np.nan;
+            pass;
+        pass;
+    
+        
+    
+    if( 'gx' in df.columns and pu.utils.allnan( df['gx'] ) ):
+        print("WARNING -> ALL GX DATA IS NAN AFTER ERRORS/CUTOFF->NAN");
+        pass;
+    if( 'px' in df.columns and pu.utils.allnan( df['px'] ) ):
+        print("WARNING -> ALL PX DATA IS NAN AFTER ERRORS/CUTOFF->NAN");
+        pass;
+    if( 'hx' in df.columns and pu.utils.allnan( df['hx'] ) ):
+        print("WARNING -> ALL PX DATA IS NAN AFTER ERRORS/CUTOFF->NAN");
+        pass;
+    if( pacol in df.columns and pu.utils.allnan( df[pacol] ) ):
+        print("WARNING -> ALL PA DATA IS NAN AFTER ERRORS/CUTOFF->NAN");
+        pass;
+    
+
+    #REV: just measuring pupil size not acceptable?
+    if( len(tonancols) < 2 ):
+        raise Exception("ERROR Neither px nor gx etc in data?!");
+
+    #REV: clean the data...
+    tormcols = ['Gnan', 'Pnan', 'PAnan', 'Hnan' ];
+    df = df[ [c for c in df.columns if c not in tormcols ] ];
+
+    '''
+    import matplotlib.pyplot as plt;
+    plt.plot(df[df.eye=='L'].Tmsec, df[df.eye=='L'].fgxvel);
+    plt.plot(df[df.eye=='L'].Tmsec, df[df.eye=='L'].gxvel);
+    plt.show();
+    '''
+    return df;
+
+
+def preproc_EL_cull_columns(df):
+    tormcols = ['samples', 'errors'];
+    other=['hdata', 'htype', 'input', 'buttons']; #htype/htdata is type of head data and head data (unscaled?). Input is port input? Buttons
+    # is button press etc.
+    #REV: 'fgxvel_left', 'gxvel_left', rxvel, ryvel, hxvel, gxvel, etc.   rx/ry is resolution, i.e. pix/deg, but requires correct setup...
+    df = df[ [c for c in df.columns if c not in tormcols ] ];
+    return df;
+
+def preproc_EL_A04_clean_events(eventdf,
                                 timeunitsec=1e-3,
                                 eyes_to_use=[pu.PEYEUTILS_LEFT_EYE, pu.PEYEUTILS_RIGHT_EYE],
                                 ):
@@ -402,7 +490,7 @@ def preproc_EL_A02_clean_events(eventdf,
     
     return ev;
 
-def preproc_EL_A04_check_nogazedata( df,
+def preproc_EL_A06_check_nogazedata( df,
                                      colstouse ):
         
     #REV: if all false, all are all nan.
@@ -410,12 +498,22 @@ def preproc_EL_A04_check_nogazedata( df,
     
     return nogazedata;
 
+
+
+
+
+
+
+#REV: Note, that although this uses PYFV utils,
+#REV: they are general for eyelink (i.e. only sample rate, tag,
+#REV: etc.
 def preproc_EL_A_clean_samples(rawsamps,
                                rawevents,
                                rawmessages,
                                targ_sr_hzsec=-1,
                                preblinks=False,
                                nogazecols=['gx','gy']):
+
     """
 
     Parameters
@@ -434,23 +532,25 @@ def preproc_EL_A_clean_samples(rawsamps,
 
     """
     
-    
+    #REV: creates DF with "tag" and "body".
     msgs = pfv.separate_EDF_msg_tags(rawmessages);
     
+    #REV: this just adds Tsec, Tmsec, and moves 'time' to ELtime.
     msgs = preproc_EL_A00_add_Tsec(msgs);
     
-    elparamdict = pfv.get_elparams(msgs); #rawmessages); # has samplerate etc.
-    
-    
-    
+    #  has samplerate etc., these are standard/same in ALL
+    #   EDF recordings! (REV: I hope).
+    elparamdict = pfv.get_elparams(msgs); 
     print(elparamdict);
+    
     ELsr=elparamdict['samplerate'];
     if(targ_sr_hzsec <= 0):
         targ_sr_hzsec = ELsr;
         pass;
     
     ELeyes = [ eye for eye in elparamdict['eyes'] ];
-    #REV: this lists "L", "R"
+    
+    
     for eye in ELeyes:
         if eye not in [pu.PEYEUTILS_LEFT_EYE, pu.PEYEUTILS_RIGHT_EYE]:
             raise Exception("Unrecognized eye [{}], I only recognize from: {}".format(eye, [pu.PEYEUTILS_LEFT_EYE, pu.PEYEUTILS_RIGHT_EYE]));
@@ -458,29 +558,39 @@ def preproc_EL_A_clean_samples(rawsamps,
     
     print("EYELINK RECORDING FROM EYES: {} @ SR: {} Hz   (will resample to {})".format(ELeyes, ELsr, targ_sr_hzsec));
     
-    #REV: this will resample to my identical samplerate already...
-    #REV: this *may* mess up indexing/timing of events/etc.? Should I resample *after*?
-    df = preproc_EL_A01_separate_samps_eye(rawsamps,
-                                           samplerate=targ_sr_hzsec,
+    #REV: resamples to time hz desired.
+    #REV: could cause issues with events if they are specifically
+    #REV: locked to exact index of sample?
+    df = preproc_EL_A01_resample_time( rawsamps,
+                                       samplerate=targ_sr_hzsec,
+                                       );
+    
+    #REV: separates eyes and also sets ERRORS and ELNAN to nan.
+    df = preproc_EL_A02_separate_samps_eye(df,
                                            eyes_to_use=ELeyes,
                                            );
+    
+    
+    df = preproc_EL_A03_remove_errors(df);
+    
     
     #REV: cleans events (i.e. renames saccade->SACC, fixa->FIXA, and sets 'stsec' and 'ensec'
     # Note, stsec and ensec will be accurate because no re-zeroing.
     # Uses "start" and "end" which are in MSEC time.
-    ev = preproc_EL_A02_clean_events(rawevents,
+    ev = preproc_EL_A04_clean_events(rawevents,
                                      timeunitsec=pu.EL_TIMEUNIT_SEC,
                                      );
     
     
     #REV: if all bad, i.e. NAN etc., return 'badtrial=True'
-    df, nogazedata = preproc_EL_A03_filter_samps_by_ELevents(df, ev,
+    df, nogazedata = preproc_EL_A05_filter_samps_by_ELevents(df,
+                                                             ev,
                                                              sr_hzsec=targ_sr_hzsec,
                                                              timeunitsec=pu.EL_TIMEUNIT_SEC,
                                                              );
 
     #REV: could pa also do it? Could I have pa without gaze data?
-    #nogazedata = preproc_EL_A04_check_nogazedata( df, colstouse=nogazecols );
+    #nogazedata = preproc_EL_A06_check_nogazedata( df, colstouse=nogazecols );
     
     elparamdict['badtrial'] = nogazedata;
     elparamdict['sr_hzsec'] = targ_sr_hzsec;
@@ -516,13 +626,14 @@ def preproc_EL_A_clean_samples(rawsamps,
                                              preblinkcols=preblinkcols, #REV: remove elblink detected. NOT other events...
                                              );
         pass;
-    
+
+    print(" !! Completed EL_A_preproc");
     return df, ev, msgs, elparamdict;
     
     
 
 #REV: this only works because start/end are in 'msec' time, and so it is tname=Tmsec
-def preproc_EL_A03_filter_samps_by_ELevents(df, ev,
+def preproc_EL_A05_filter_samps_by_ELevents(df, ev,
                                             sr_hzsec,
                                             timeunitsec=1e-3,
                                             xname='px',

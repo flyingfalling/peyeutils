@@ -110,6 +110,7 @@ def flatscreen_dva( dm, wm ):
     return 2*math.degrees(math.atan2( wm/2, dm ));
 
 
+
 #scaled linearly, not with tangent function. Only good to about 20deg.
 def get_center_dva_per_meter( dm, ppm, reference_width_meters=0.01, reference_cutoff_dva=2.0 ):
     """
