@@ -379,6 +379,8 @@ def main():
                 subj1=idxdf[ idxdf.trialidx==tidx1 ].iloc[0].subj;
                 spec1=idxdf[ idxdf.trialidx==tidx1 ].iloc[0].species;
                 age1 =idxdf[ idxdf.trialidx==tidx1 ].iloc[0].agemonths;
+
+                original_tdf1=tdf1.copy();
                         
                 for tidx2, tdf2 in vgazedf.groupby('trialidx'):
                     if(tidx1 > tidx2):
@@ -387,15 +389,8 @@ def main():
                         spec2=idxdf[ idxdf.trialidx==tidx2 ].iloc[0].species;
                         age2 =idxdf[ idxdf.trialidx==tidx2 ].iloc[0].agemonths;
                         
-                        #killed due to OOM killer?
-                        #Only 3 columns in tdf1 in 11i
-                        print(f'tidx1:{tidx1}');
-                        print(f'tidx2:{tidx2}');
-                        print(f'tdf1:{tdf1}');
-                        print(f'tdf2:{tdf2}');
-                        
                         #REV: should not interpolate across NAN times...
-                        tdf = pd.merge(left=tdf1, left_on='movie_ts',
+                        tdf = pd.merge(left=original_tdf1, left_on='movie_ts',
                                     right=tdf2, right_on='movie_ts',
                                     how='outer',
                                     suffixes=('_1', '_2')
