@@ -389,6 +389,12 @@ def main():
                         spec2=idxdf[ idxdf.trialidx==tidx2 ].iloc[0].species;
                         age2 =idxdf[ idxdf.trialidx==tidx2 ].iloc[0].agemonths;
                         
+                        print(f'tidx1:{tidx1}');
+                        print(f'tidx2:{tidx2}');
+                        print(f'tdf1:{original_tdf1}');
+                        print(f'tdf2:{tdf2}');
+                        #killed due to OOM killer when tdfs are 0i and 3i
+
                         #REV: should not interpolate across NAN times...
                         tdf = pd.merge(left=original_tdf1, left_on='movie_ts',
                                     right=tdf2, right_on='movie_ts',
