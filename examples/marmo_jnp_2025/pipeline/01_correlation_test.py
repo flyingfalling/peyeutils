@@ -267,73 +267,76 @@ def main():
     #REV: ah, some are missing due to muscimol.
 
      ###add random bias on the gaze
+
+    
     inf_error_sigma=float(sys.argv[3]);
-    xpix_noise=pd.Series(np.random.normal(scale=inf_error_sigma, size=len(gazedf['pix_x'])));
-    ypix_noise=pd.Series(np.random.normal(scale=inf_error_sigma, size=len(gazedf['pix_y'])));
-
-    gazedf['pix_x']=gazedf['pix_x']+xpix_noise;
-    gazedf['pix_y']=gazedf['pix_y']+ypix_noise;
-
-
-    bigdf = pd.merge(left=gazedf, right=idxdf, on=['trialidx', 'wotype'], how='inner');
-    print(bigdf.species.unique());
-        
-    bigdf = bigdf.sort_values(by=['trialidx', 'movie_ts']).reset_index(drop=True);
-    print(bigdf.subj.unique());
-    #bigdf.groupby(['subj']).count().to_csv('wtf.csv');
-    
-    #REV: clean data?
-    maxx=340;
-    maxy=340;
-    bigdf.loc[ ( (bigdf.pix_x > maxx) | (bigdf.pix_x < -maxx) |
-                 (bigdf.pix_y > maxy) | (bigdf.pix_y < -maxy) ),
-               ['pix_x', 'pix_y'] ] = np.nan;
-    
-    print(bigdf.species.unique());
-        
-    #bigdf.to_csv('bigdf.csv', index=False);
-    
-    
-    DOPLOT=True;
-    #DOCORR=False;
-    
-    if(DOPLOT):
-        nrow=len( idxdf.vid.unique() );
-        rowhei=4;
-        rowwid=8;
-        
-        ncol=len( idxdf.species.unique() );
-        #fig, axs = plt.subplots(nrows=nrow, ncols=ncol, figsize=(rowwid*ncol, rowhei*nrow), sharey=True, sharex=True);
-        fig, axs = plt.subplots(figsize=(rowwid*ncol, rowhei*nrow), sharey=True, sharex=True);
-        #ax=0;
-
-        pass;
-    
-    print("Unique species: {}".format( idxdf.species.unique()));
-    
-    
-    #REV: make pairwise distance plots here too.
-    #REV: I could do "groupby", but better to do for each timepoint (in each video), subtract distance from all other timepoints
-    #REV: in pairwise manner...huge. Note within vid of course.
-    
-    #REV: need to ensure "number of timepoints" is similar? Or "distance" is kind of pointless on a per-video thing.
-    
-        
-    corrlist=list();
-    distlist=list();
-    nulllist=list();
-    ncorrlist=list();
-
-    vididx=0;
-    nvids=len(idxdf.vid.unique());
-
     repeatnum=int(sys.argv[4]);
 
     for count in range(repeatnum):
+        xpix_noise=pd.Series(np.random.normal(scale=inf_error_sigma, size=len(gazedf['pix_x'])));
+        ypix_noise=pd.Series(np.random.normal(scale=inf_error_sigma, size=len(gazedf['pix_y'])));
+
+        gazedf['pix_x']=gazedf['pix_x']+xpix_noise;
+        gazedf['pix_y']=gazedf['pix_y']+ypix_noise;
+
+
+        bigdf = pd.merge(left=gazedf, right=idxdf, on=['trialidx', 'wotype'], how='inner');
+        print(bigdf.species.unique());
+            
+        bigdf = bigdf.sort_values(by=['trialidx', 'movie_ts']).reset_index(drop=True);
+        print(bigdf.subj.unique());
+        #bigdf.groupby(['subj']).count().to_csv('wtf.csv');
+        
+        #REV: clean data?
+        maxx=340;
+        maxy=340;
+        bigdf.loc[ ( (bigdf.pix_x > maxx) | (bigdf.pix_x < -maxx) |
+                    (bigdf.pix_y > maxy) | (bigdf.pix_y < -maxy) ),
+                ['pix_x', 'pix_y'] ] = np.nan;
+        
+        print(bigdf.species.unique());
+            
+        #bigdf.to_csv('bigdf.csv', index=False);
+        
+        
+        DOPLOT=True;
+        #DOCORR=False;
+        
+        if(DOPLOT):
+            nrow=len( idxdf.vid.unique() );
+            rowhei=4;
+            rowwid=8;
+            
+            ncol=len( idxdf.species.unique() );
+            #fig, axs = plt.subplots(nrows=nrow, ncols=ncol, figsize=(rowwid*ncol, rowhei*nrow), sharey=True, sharex=True);
+            fig, axs = plt.subplots(figsize=(rowwid*ncol, rowhei*nrow), sharey=True, sharex=True);
+            #ax=0;
+
+            pass;
+        
+        print("Unique species: {}".format( idxdf.species.unique()));
+        
+        
+        #REV: make pairwise distance plots here too.
+        #REV: I could do "groupby", but better to do for each timepoint (in each video), subtract distance from all other timepoints
+        #REV: in pairwise manner...huge. Note within vid of course.
+        
+        #REV: need to ensure "number of timepoints" is similar? Or "distance" is kind of pointless on a per-video thing.
+        
+            
+        corrlist=list();
+        distlist=list();
+        nulllist=list();
+        ncorrlist=list();
+
+        vididx=0;
+        nvids=len(idxdf.vid.unique());
+
+
         for v, vdf in idxdf.groupby('vid'):
             vididx+=1;
 
-            if vididx>=2:
+            if vididx>3:
                 break
 
             print("DOING for [{}] ({}/{})".format(v, vididx, nvids));
@@ -497,7 +500,7 @@ def main():
                     pass;
                 pass;
             pass;
-           
+            
         if(DOPLOT):
             fig.savefig('manualplot'+str(count)+'_'+str(inf_error_sigma)+'.pdf');
             pass;
@@ -514,8 +517,8 @@ def main():
         nulldf = pd.concat( nulllist );
         nulldf.to_csv('nulldists'+str(count)+'_'+str(inf_error_sigma)+'.csv', index=False);
 
-        print(f'{count+1}/{repeatnum} have been progressed')
-
+        print(f'{count+1}/{repeatnum} have been progressed');
+     
         pass;
     
     pass;
