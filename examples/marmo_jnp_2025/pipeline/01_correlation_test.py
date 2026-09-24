@@ -4,6 +4,8 @@ import sys
 import os;
 import seaborn as sns;
 import matplotlib.pyplot as plt;
+import psutil;
+import gc;
 
 
 def main():
@@ -299,7 +301,7 @@ def main():
         #bigdf.to_csv('bigdf.csv', index=False);
         
         
-        DOPLOT=True;
+        DOPLOT=False;
         #DOCORR=False;
         
         if(DOPLOT):
@@ -332,12 +334,13 @@ def main():
         vididx=0;
         nvids=len(idxdf.vid.unique());
 
+        PLOTSAMPLE=False;
 
         for v, vdf in idxdf.groupby('vid'):
             vididx+=1;
 
-            if vididx>3:
-                break
+            #if vididx>1:
+                #break
 
             print("DOING for [{}] ({}/{})".format(v, vididx, nvids));
             trials = vdf['trialidx'].to_numpy();
@@ -375,15 +378,15 @@ def main():
                 original_tdf1=tdf1.copy();
                         
                 for tidx2, tdf2 in vgazedf.groupby('trialidx'):
-                    if(tidx1 > tidx2)&(tidx2!='0i'):
+                    if(tidx1 > tidx2):
                         subj2=idxdf[ idxdf.trialidx==tidx2 ].iloc[0].subj;
                         spec2=idxdf[ idxdf.trialidx==tidx2 ].iloc[0].species;
                         age2 =idxdf[ idxdf.trialidx==tidx2 ].iloc[0].agemonths;
 
-                        print(f'tidx1:{tidx1}');
-                        print(f'tidx2:{tidx2}');
-                        print(f'tdf1:{original_tdf1}');
-                        print(f'tdf2:{tdf2}');
+                        #print(f'tidx1:{tidx1}');
+                        #print(f'tidx2:{tidx2}');
+                        #print(f'tdf1:{original_tdf1}');
+                        #print(f'tdf2:{tdf2}');
                         
                         
                         #REV: should not interpolate across NAN times...
@@ -392,6 +395,11 @@ def main():
                                     how='outer',
                                     suffixes=('_1', '_2')
                                     ).reset_index(drop=True)[['movie_ts', 'pix_x_1', 'pix_y_1', 'pix_x_2', 'pix_y_2']];
+                        
+                        print('After merge');
+                        process = psutil.Process(os.getpid());
+                        print(f"Memory: {process.memory_info().rss / 1024**3:.2f} GB");
+                        
 
                         #REV: this will fail wierdly if timestamps don't exactly match up by name? Oh well FIX IT LATER.
                         tdf = tdf.sort_values(by='movie_ts').reset_index(drop=True);
@@ -407,7 +415,13 @@ def main():
                         #REV: should find max overlap?
                         ntdf1 = tdf1.copy();
                         ntdf1[toshuffle] = ntdf1[toshuffle].sample(frac=1).values;
-                        
+
+                        if PLOTSAMPLE:
+
+                            tdf1.to_csv('gazesample_idx'+str(tidx1)+'_sigma'+str(inf_error_sigma)+'.csv');
+                            ntdf1.to_csv('nullsample_idx'+str(tidx1)+'_sigma'+str(inf_error_sigma)+'.csv');
+                            sys.exit(0);
+
                         #df[cols_to_shuffle] = df[cols_to_shuffle].sample(frac=1).values
                         #tdf1=tdf1.iloc[:mylen].reset_index(drop=True);
                         #tdf2=tdf2.iloc[:mylen].reset_index(drop=True); #pd corr uses index?
@@ -418,6 +432,10 @@ def main():
                         if(tdiff != 0):
                             print( tdf1[ (tdf1.movie_ts - tdf1.t) != 0 ][['movie_ts', 't']] );
                             raise Exception("TDIFF not zero {}".format(tdiff));
+                    
+                        print('Before correlation');
+                        process = psutil.Process(os.getpid());
+                        print(f"Memory: {process.memory_info().rss / 1024**3:.2f} GB");
                         
                         x1=tdf1.pix_x;
                         x2=tdf2.pix_x;
@@ -430,6 +448,10 @@ def main():
                         nxcc = x2.corr( ntdf1.pix_x );
                         nycc = y2.corr( ntdf1.pix_y );
                         nxycc = (nxcc+nycc)/2;
+
+                        print('After correlation');
+                        process = psutil.Process(os.getpid());
+                        print(f"Memory: {process.memory_info().rss / 1024**3:.2f} GB");
                         
                         #REV: should randomly sample N times and take mean dist? Mean of each timepoint? Will approach the mean dist.
                         #REV: right, problem is mean distance is different...how about mean and stddev of X/Y?
@@ -496,6 +518,17 @@ def main():
                         ddf = pd.DataFrame( { 'dist_px':pxdist, 'movie_ts':tdf.movie_ts } );
                         ddf = ddf.assign( **mydict );
                         distlist.append(ddf);
+
+                        print('After dist');
+                        process = psutil.Process(os.getpid());
+                        print(f"Memory: {process.memory_info().rss / 1024**3:.2f} GB");
+
+                        gc.collect();
+
+                        print('After gc collect');
+                        process = psutil.Process(os.getpid());
+                        print(f"Memory: {process.memory_info().rss / 1024**3:.2f} GB");
+                        
                         pass;
                     pass;
                 pass;
