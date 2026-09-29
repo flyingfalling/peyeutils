@@ -32,6 +32,20 @@ def sec_to_msec( msec ):
     """
     return msec*1e3;
 
+def deg_to_rad( deg ):
+    """
+
+    Parameters
+    ----------
+    deg :
+
+
+    Returns
+    -------
+
+    """
+    return math.radians( deg );
+
 #REV: calculated angle (in radians!) of something of width wid_meters at dist of eye_to_screen_meters
 def meter_to_rad( eye_to_screen_meters, wid_meters ):
     """
@@ -131,17 +145,13 @@ def get_center_dva_per_meter( dm, ppm, reference_width_meters=0.01, reference_cu
 
     """
     if( ppm <= 0 or dm <= 0 ):
-        print("Error, dm,ppm<=0");
-        exit(1);
-        pass;
-    
+        raise ValueError("get_center_dva_per_meter requires dm>0 and ppm>0 (got dm={}, ppm={})".format(dm, ppm));
+
     rad = meter_to_rad( dm, reference_width_meters ); #REV: use only a very small area in the middle? 1cm...
     indeg = math.degrees(rad);
-    
+
     if( indeg > reference_cutoff_dva ):
-        print("Reference {} meters corresponds to more than {} degrees visual angle...you are very close to screen and errors will happen! (reference, 1 meter wide screen at 1 meter distance, right of screen is 50cm from middle and 45 degrees visual angle, so about 1.1ish dva/centimeter".format(reference_width_meters, reference_cutoff_dva ) );
-        exit(1);
-        pass;
+        raise ValueError("Reference {} meters corresponds to more than {} degrees visual angle...you are very close to screen and errors will happen! (reference, 1 meter wide screen at 1 meter distance, right of screen is 50cm from middle and 45 degrees visual angle, so about 1.1ish dva/centimeter".format(reference_width_meters, reference_cutoff_dva ) );
     
     return (indeg/reference_width_meters);
 

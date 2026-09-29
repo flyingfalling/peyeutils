@@ -88,7 +88,8 @@ def ahrs_pose_heading(df, kind, srhzsec, tcol='timestamp', fusionsettings=None, 
 
             if(with_mag):
                 #premag = np.array([ mag_mat[50,0], mag_mat[50,1], mag_mat[50,2] ] * len(pret)).reshape([len(pret),3]);
-                premag = np.array([ np.nanmean(mag_mat), np.nanmean(mag_mat), np.nanmean(mag_mat) ] * len(pret)).reshape([len(pret),3]);
+                mag_axis_mean = np.nanmean(mag_mat, axis=0); #REV: per-axis (x,y,z) mean -- previously collapsed all 3 axes into one scalar via nanmean over the whole 2D array.
+                premag = np.tile(mag_axis_mean, (len(pret), 1));
                 pass;
             
             tsec_mat = np.concatenate([pret, tsec_mat]);
@@ -101,9 +102,9 @@ def ahrs_pose_heading(df, kind, srhzsec, tcol='timestamp', fusionsettings=None, 
             pass;
 
         dt = np.diff(tsec_mat, prepend=tsec_mat[0]);
-        euler = np.empty((len(tsec_mat), 3));
-        internal_states = np.empty((len(tsec_mat), 6))
-        flags = np.empty((len(tsec_mat), 4))
+        euler = np.full((len(tsec_mat), 3), np.nan); #REV: NaN (not empty/garbage) so skipped (NaN-input) timesteps read as missing, not garbage.
+        internal_states = np.full((len(tsec_mat), 6), np.nan)
+        flags = np.full((len(tsec_mat), 4), np.nan)
 
         for index in range(len(tsec_mat)):
             #REV: fuck, this expects a numpy 3xT...

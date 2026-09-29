@@ -39,7 +39,7 @@ def frametimes_with_pyav(videofn: str, index: int = 0, timename='Tsec') -> pd.Da
     cap = cv2.VideoCapture( videofn );
     
     if( False == cap.isOpened() ):
-        raise Exception("VID file {} does not exist".format(vidfn));
+        raise Exception("VID file {} does not exist".format(videofn));
     
     wpx  = cap.get(cv2.CAP_PROP_FRAME_WIDTH); #flt
     hpx = cap.get(cv2.CAP_PROP_FRAME_HEIGHT);
@@ -60,7 +60,7 @@ def frametimes_with_pyav(videofn: str, index: int = 0, timename='Tsec') -> pd.Da
     timestampdf = pd.DataFrame( av_timestamps );
     timestampdf = timestampdf.sort_values(by=timename);
     d = timestampdf.idx.diff();
-    if( d.min() != 1 and d.max() != 1 ):
+    if( d.min() != 1 or d.max() != 1 ):
         print(timestampdf);
         raise Exception("Wat, df diff min/max for PTS is fucked ({}, {})".format(d.min(), d.max()));
     

@@ -12,6 +12,57 @@ def compute_ISIs_from_events( ev,
                               durname='dursec',
                               eyecol='eye',
                               ):
+    """Fill the gaps between successive events (default: saccades and
+    blinks) with new "inter-saccadic-interval" events, per eye.
+
+    For each eye, one new row is created for every gap between the end of
+    one `eventstouse` event and the start of the next; the very first ISI
+    (before the first event) starts at `zerotime`. Eyes with 0 or 1
+    qualifying events are skipped (nothing to compute a gap between).
+
+    Note this does NOT merge in the existing rows of `ev` -- it only
+    returns the newly-computed ISI rows (concatenate with `ev` yourself if
+    you want a single combined event table, as `preproc_and_compute_events`
+    does).
+
+    Parameters
+    ----------
+    ev : pandas.DataFrame
+        Events table with (at least) `stname`, `enname`, 'label', and
+        `eyecol` columns.
+    zerotime : float
+        Start time (same units as `stname`/`enname`) of the recording, used
+        as the start of the very first ISI.
+    eventstouse : list of str
+        Which `ev['label']` values to treat as the "events" whose gaps
+        should be filled (default: saccades and blinks).
+    label : str
+        Label to assign to the newly-created rows.
+    stname, enname, durname : str
+        Column names for start time, end time, and duration.
+    eyecol : str
+        Column identifying which eye each row belongs to.
+
+    Returns
+    -------
+    pandas.DataFrame
+        One row per gap, across all eyes, with `label` set to `label`
+        (default 'ISI'). Empty if no eye had >=2 qualifying events.
+
+    Examples
+    --------
+    >>> import pandas as pd
+    >>> from peyeutils.eyemovements.isi import compute_ISIs_from_events
+    >>> ev = pd.DataFrame({
+    ...     'label': ['SACC', 'SACC'],
+    ...     'stsec': [1.0, 3.0],
+    ...     'ensec': [1.1, 3.2],
+    ...     'eye': ['L', 'L'],
+    ... })
+    >>> isis = compute_ISIs_from_events(ev, zerotime=0.0)
+    >>> isis[['stsec', 'ensec']].values.tolist()
+    [[0.0, 1.0], [1.1, 3.0]]
+    """
 
     if eyecol not in ev:
         print("Adding eyecol {} to ev".format(eyecol));
@@ -69,7 +120,7 @@ def add_ISIs_to_events( ev,
                                      label=label,
                                      stname=stname,
                                      enname=enname,
-                                     durname=dursec,
+                                     durname=durname,
                                      eyecol=eyecol,
                                     );
 

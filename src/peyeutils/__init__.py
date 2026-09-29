@@ -23,5 +23,5 @@ from . import eyerevealer;
 from . import plotting;
 from . import imu;
 
-from .peyeutils import preproc_peyefv_edf;
+from .peyeutils import preproc_peyefv_edf, preproc_and_compute_events;
 

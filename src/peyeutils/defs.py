@@ -8,5 +8,5 @@ PEYEUTILS_BINOC_EYE='B';
 
 
 #REV: wav is only ...?
-videoexts=['mkv', 'mpeg', 'm4v', 'mp4', 'avi' 'mov', 'webm' ];
+videoexts=['mkv', 'mpeg', 'm4v', 'mp4', 'avi', 'mov', 'webm' ];
 imgexts=['jpg', 'jpeg', 'tiff', 'pnm', 'ppm', 'png' ];

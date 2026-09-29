@@ -238,7 +238,7 @@ def interpolate_df_to_samplerate(df, tcol, targ_srhzsec, tcolunit_s, truesrs=dic
         st = startsec;
         pass;
     if( endsec is not None ):
-        en = ensec;
+        en = endsec;
         pass;
 
     if(DEBUG):
@@ -765,18 +765,42 @@ def contiguous_identical_vals( xs ):
 #REV: we can either include in our RLE (i.e. have sections that are "nan" together).
 #REV: They are not normally recognized due to "notequal"
 def rle(x, withnan=True):
-    """Find runs of consecutive items in an array.
+    """Run-length encode a 1D array.
+
+    Note: because ``NaN != NaN``, every NaN in `x` starts (and ends) its own
+    run of length 1 -- runs of consecutive NaNs are NOT merged into one run.
+    This is intentional (see :func:`inverse_rle` for the exact inverse).
 
     Parameters
     ----------
-    x :
-        
-    withnan :
-         (Default value = True)
+    x : array-like, 1D
+        Values to run-length encode. Compared with `!=`, so any type
+        supporting that works (bools, ints, floats, strings, ...).
+    withnan : bool
+        If False, raises if `x` contains any non-finite (NaN/inf) value.
+        If True (default), non-finite values are allowed and each becomes
+        its own length-1 run (see note above).
 
     Returns
     -------
+    run_values : numpy.ndarray
+        The value of each run, in order.
+    run_starts : numpy.ndarray
+        The (0-based) start index of each run.
+    run_lengths : numpy.ndarray
+        The length (in samples) of each run.
+        ``inverse_rle(run_values, run_starts, run_lengths)`` reconstructs
+        the original array.
 
+    Examples
+    --------
+    >>> import numpy as np
+    >>> from peyeutils.utils.tsutils import rle, inverse_rle
+    >>> vals, starts, lens = rle(np.array([1, 1, 2, 2, 2, 3]))
+    >>> vals.tolist(), starts.tolist(), lens.tolist()
+    ([1, 2, 3], [0, 2, 5], [2, 3, 1])
+    >>> inverse_rle(vals, starts, lens).tolist()
+    [1, 1, 2, 2, 2, 3]
     """
     """REV: modified for NAN/INF (now exception)"""
     
@@ -839,20 +863,30 @@ def rle(x, withnan=True):
 
 #REV: build array X from rle values
 def inverse_rle(run_values, run_starts, run_lengths):
-    """
+    """Reconstruct the original 1D array from a run-length encoding.
+
+    Exact inverse of :func:`rle`.
 
     Parameters
     ----------
-    run_values :
-        
-    run_starts :
-        
-    run_lengths :
-        
+    run_values : array-like
+        Value of each run (as returned by `rle`).
+    run_starts : array-like of int
+        Start index of each run.
+    run_lengths : array-like of int
+        Length of each run.
 
     Returns
     -------
+    numpy.ndarray
+        Length ``sum(run_lengths)``, dtype matching `run_values`.
 
+    Examples
+    --------
+    >>> from peyeutils.utils.tsutils import rle, inverse_rle
+    >>> vals, starts, lens = rle([True, True, False, False, False])
+    >>> inverse_rle(vals, starts, lens).tolist()
+    [True, True, False, False, False]
     """
     totallen=np.sum(run_lengths); #REV: must be list?
     x=np.zeros(totallen, dtype=run_values.dtype); #REV: will make false if bool

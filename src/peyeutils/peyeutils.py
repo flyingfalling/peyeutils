@@ -51,7 +51,88 @@ def preproc_and_compute_events(df,
                                DEBUG=False,
                                remove_firstlast=True,
                                ):
-    
+    """Preprocess a regularly-sampled gaze trace and detect saccades, blinks,
+    fixations (ISIs), and their timing, in one call.
+
+    This is the main "batteries included" entry point of peyeutils: it runs
+    NAN dilation/smoothing (via :mod:`peyeutils.eyemovements.remodnav`),
+    saccade detection (via :mod:`peyeutils.eyemovements.saccadr`), a
+    main-sequence sanity check on detected saccades, blink detection, and
+    inter-saccadic-interval (fixation) computation, and returns a single
+    tidy events DataFrame.
+
+    Parameters
+    ----------
+    df : pandas.DataFrame
+        Gaze samples. Must be regularly sampled at `sr_hzsec` (checked via
+        :func:`peyeutils.utils.tsutils.check_samplerate`), with `xcol`/`ycol`
+        already expressed in degrees of visual angle (dva) and `tcol`
+        expressed in seconds. If more than one eye is present, `eyecol`
+        must distinguish them (each eye is processed independently).
+    tcol, xcol, ycol : str
+        Column names for time (seconds), horizontal gaze (dva), and
+        vertical gaze (dva) respectively.
+    sr_hzsec : float
+        Expected sample rate of `df` in Hz. Raises if the measured rate of
+        `df[tcol]` doesn't match this (within floating-point tolerance).
+    mainseq_err_gain : float
+        Tolerance multiplier for the saccade amplitude/duration
+        main-sequence check (see
+        :func:`peyeutils.eyemovements.mainseq.mainseq_ampldur_linear_95pctl_human_chen2021`).
+        Pass 0 to disable the check (accept all saccades regardless of
+        amplitude/duration relationship). Typical values are around 1.5-3,
+        depending on eye tracker noise.
+    badcol : str, optional
+        Name of an existing column marking known-bad/unreliable samples.
+    nablinks : bool, optional
+        If True (default), any row where `xcol` is NaN is marked as a
+        blink candidate via `blinkcol`.
+    blinkcol : str, optional
+        Column name used to mark blink/bad samples (created if `nablinks`).
+    eyecol : str, optional
+        Column identifying which eye each row belongs to (default 'eye').
+        If missing, all rows are treated as a single (unnamed) eye.
+    PLOT : bool, optional
+        If True, also produce and save diagnostic matplotlib/seaborn plots
+        (main sequence, amplitude/ISI histograms, gaze scatter, saccade
+        vectors, per-chunk gaze traces) to the current working directory.
+    DEBUG : bool, optional
+        Verbose diagnostic printing.
+    remove_firstlast : bool
+        Currently unused (the code path that implemented this is commented
+        out) -- kept for backwards API compatibility.
+
+    Returns
+    -------
+    sdf : pandas.DataFrame
+        The (preprocessed/smoothed) input samples, with added velocity,
+        acceleration, and per-method saccade "vote" columns.
+    ev : pandas.DataFrame
+        One row per detected event, with columns including `label` (one of
+        'SACC', 'BLNK', 'FIXA'/'ISI', ...), `stsec`/`ensec` (start/end
+        time), `dursec`, `ampldva`, `angle`, and `eye`. Empty if no events
+        were found.
+    nogooddata : bool
+        True if preprocessing determined there wasn't enough usable data to
+        proceed (in which case `ev` will be empty and `sdf` may be partial).
+
+    Examples
+    --------
+    >>> import numpy as np, pandas as pd, peyeutils as pu
+    >>> np.random.seed(0)
+    >>> sr = 250.0
+    >>> t = np.arange(int(6 * sr)) / sr
+    >>> x = np.where(t < 2.0, 0.0, np.where(t < 4.0, 10.0, 20.0))
+    >>> x = x + np.random.normal(0, 0.03, len(t))
+    >>> y = np.random.normal(0, 0.03, len(t))
+    >>> df = pd.DataFrame({'Tsec': t, 'x': x, 'y': y, 'eye': 'R'})
+    >>> sdf, ev, nogooddata = pu.preproc_and_compute_events(
+    ...     df, tcol='Tsec', xcol='x', ycol='y', sr_hzsec=sr, mainseq_err_gain=1.5,
+    ... )
+    >>> sorted(ev['label'].unique())
+    ['FIXA', 'ISI', 'SACC']
+    """
+
     import pandas as pd;
     import numpy as np;
     
@@ -392,6 +473,7 @@ def preproc_peyefv_edf( in_edf_path : str,
         pass;
     
     row=dict();
+    eldict=dict();
     haseyetracking=True;
     
     
@@ -496,7 +578,7 @@ def preproc_peyefv_edf( in_edf_path : str,
     #df = pu.preproc.preproc_SHARED_D_exclude_bad( df, xcol='cgx_dva', ycol='cgy_dva', badcol='bad' );
     
     trialdf = pu.peyefv.import_fv_trials( msgs );
-    if( badtrial ):
+    if( eldict['badtrial'] ):
         #trialdf['haseyetracking'] = False;
         haseyetracking=False;
         print(" BAD TRIAL (no data?)...");
