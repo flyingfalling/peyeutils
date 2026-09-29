@@ -537,7 +537,7 @@ def method_om(df, params, eyepfix,
     
     kmeans=dict();
     scores=dict();
-    maxcut=min(len(sdf.index), 4) + 1;
+    maxcut=min(len(sdf.index)-1, 4) + 1; #REV; fixed off-by-one...
     if( len(sdf.index) < 3 ):
         print("WTF only a single event (sdf in saccadr)?!?!");
         bestk=0;

@@ -223,8 +223,8 @@ def preproc_and_compute_events(df,
                                                                     xcol=xcol,
                                                                     ycol=ycol );
         
-        print("R BLINKS");
-        print(blinks[ blinks.eye=='R']);
+        #print("R BLINKS");
+        #print(blinks[ blinks.eye=='R']);
         #REV: should I remove blinks in which eye did not move much (< 0.5 deg ?). I.e. fixation with intermediate lbink?
         # Vision is not happening during that time and physiologically it is equivalent...and then ISI is?
         

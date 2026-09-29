@@ -376,35 +376,15 @@ def preproc_SHARED_pupilsize(sampledf,
                              timecol, #e.g. 'Tsec0'
                              pacol, #e.g. 'pa'
                              eyecol, #e.g. 'eye'
-                             characteristic_timescale_sec=0.010, #Rough characteristic timescale
+                             characteristic_timescale_sec=0.010, #Rough characteristic timescale of pupil change.
                              tunitsec=1,
-                             ## of pupil size change
+                             
                              ):
-    """
-
-    Parameters
-    ----------
-    sampledf :
-        
-    timecol :
-        
-    #e.g. 'Tsec0'valcol :
-        
-    #e.g. 'pa'eyecol :
-        
-    #e.g. 'eye'characteristic_timescale_sec :
-         (Default value = 0.010)
-    #Rough characteristic timescale## of pupil size change :
-        
-
-    Returns
-    -------
-
-    """
+    
     if(tunitsec != 1 ):
         raise Exception("REV: Assumes use seconds units for timecol...");
     
-    lst=[];
+    lst=list();
     for eye, df in sampledf.groupby(eyecol):
         ##No, I need DIFFS. (dprime)
         df = df.sort_values(by=timecol).reset_index(drop=True);
@@ -416,9 +396,9 @@ def preproc_SHARED_pupilsize(sampledf,
         df = df.set_index(smoothtimename);
         smoothpacol=pacol+'_lpf';
         df[smoothpacol] = df[pacol].rolling(center=True,
-                                              min_periods=1,
-                                              window=pd.to_timedelta(characteristic_timescale_sec, unit='s'),
-                                              ).mean();
+                                            min_periods=1,
+                                            window=pd.to_timedelta(characteristic_timescale_sec, unit='s'),
+                                            ).mean();
         df[pacol] = df[smoothpacol];
         df = df.reset_index(drop=True);
         diffdf, newcol = ut.magnitude_change_over_time(df, valcol=pacol, timecol=timecol);

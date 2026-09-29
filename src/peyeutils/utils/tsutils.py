@@ -76,6 +76,7 @@ def select_legal_timepoints4(ts, vals, maxdt, DEBUG=False):
 
 #REV: interpolates, filling in NANs.
 #REV: DOES NOT ADD/REMOVE SAMPLES -- simply fills in NANs which are missing!
+#REV: *DOES NOT INTERPOLATE TIME!* (tcol is used as index).
 def strsafe_interpolate(df,
                         tcol,
                         method='linear',
@@ -84,37 +85,55 @@ def strsafe_interpolate(df,
     
     df = df.sort_values(by=tcol).reset_index(drop=True);
     
+    if(df[tcol].diff().min() == 0 ):
+        raise Exception("fail, doubled times?");
+    df = df.set_index(tcol);
+    
     interpcolumns = [ colname  for colname in df.columns if (True==is_numeric_dtype(df[colname])) ]
     notinterpcolumns = [ colname  for colname in df.columns if (False==is_numeric_dtype(df[colname]))]
     
     
     strdf = df[ notinterpcolumns ];
     #strdf = strdf.ffill().infer_objects(copy=False); #REV: same?
+
+    #REV: this front-fills? And converts DTYPES. Makes all in column same.
     strdf = strdf.convert_dtypes().ffill(); #.infer_objects(copy=False); #REV: same?
     #strdf = strdf.infer_objects(copy=False); #.ffill(); REV: same?
     
     if(DEBUG):
         print("WILL NOT INTERP", notinterpcolumns, strdf.dtypes);
         pass;
-    
+
+    #REV: just the columns to interpol
     tmpdf = df[ interpcolumns ];
     if(DEBUG):
         print("WILL INTERP", interpcolumns, tmpdf.dtypes);
         pass;
     
-    tmpdf = tmpdf.set_index( tmpdf[tcol] );
+    #REV: can I sort this?
+    #tmpdf = tmpdf.sort_values(by=tcol).reset_index(drop=True);
+    #REV: was getting:
+    #        raise ValueError("The number of derivatives at boundaries does not "
+    #ValueError: The number of derivatives at boundaries does not match: expected 2, got 0+0
+    
+    
+    
     #REV: added limit_direction='both' so that savgol stops failing due to leading nans...
     tmpdf = tmpdf.interpolate(method=method, order=order, limit_direction='both');
-    tmpdf = tmpdf.reset_index(drop=True); #REV: assume index will be tight and unimodal?
-    
+    #tmpdf = tmpdf.reset_index(); #REV: assume index will be tight and unimodal? #REV: do not DROP bcause we want Tcol back!
+
+    #REV: wait, is "inner" right?
     df = pd.merge( left=tmpdf, right=strdf, how='inner', left_index=True, right_index=True );
+    
+    df = df.reset_index();
     
     return df;
 
 def refill_interpolate_NANs( df, maskdf, nontcol ):
     if( len(df.index) != len(maskdf.index) ):
-        print(df, maskdf);
-        raise Exception("maskdf and df do not match length...");
+        print("HERE IS DF AND MASKDF: ", df, maskdf);
+        print(nontcol);
+        raise Exception("maskdf and df do not match length...: {}  vs  {}".format(df.shape, maskdf.shape));
     
     for c in nontcol:
         toset= (maskdf[c] == False);
@@ -342,10 +361,10 @@ def interpolate_df_to_samplerate(df, tcol, targ_srhzsec, tcolunit_s, truesrs=dic
             good, bad = select_legal_timepoints4(mdf[tcol], mdf[c], maxdt, DEBUG=DEBUG);
             goodbad = np.concatenate([good, bad]);
             maskdf[c] = False;
-            for c in mydtgrp:
+            for a in mydtgrp:
                 #print("Column is: [{}]".format(c));
-                maskdf[c] = False;
-                maskdf.loc[ maskdf[tcol].isin(goodbad), c ] = True;
+                maskdf[a] = False;
+                maskdf.loc[ maskdf[tcol].isin(goodbad), a ] = True;
                 pass;
             pass;
         pass;
@@ -359,12 +378,15 @@ def interpolate_df_to_samplerate(df, tcol, targ_srhzsec, tcolunit_s, truesrs=dic
         print(len(mdf[tcol].unique()));
         print(mdf[tcol].iloc[np.where(mdf[tcol].duplicated())]);
         raise Exception("Tcol is not unique (you need to have unique times, suggest groupby(tcol).mean() for example)!");
+
+    #print("Before: {}".format(mdf.shape));
     
     ## REV: handle string columns existing...?
     mdf = strsafe_interpolate( mdf, tcol=tcol, method=method, order=order, DEBUG=DEBUG );
 
     #REV: and replace NAN in locations of missing data (interpolate
     ## will have filled all holes, no matter how far from "good" data)
+    #print("Will call input {} and {}".format(mdf.shape, maskdf.shape));
     mdf = refill_interpolate_NANs( df=mdf, maskdf=maskdf, nontcol=nontcol );
     
     #REV: tdf is literally just the linstep new time column.

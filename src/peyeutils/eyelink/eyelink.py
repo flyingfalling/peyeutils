@@ -61,7 +61,7 @@ def preproc_EL_A01_resample_time( samples,
         print("preproc_EL_A01_resample_time: no samples in df (you should exclude this data anyways)");
         return pd.DataFrame();
     
-    print( "Will resample");
+    print( "Will resample ()");
     print( samples.columns );
     
     
@@ -479,7 +479,7 @@ def preproc_EL_A04_clean_events(eventdf,
             by=['eye','stsec']).reset_index(drop=True);
         
         #REV: drop events involving bad eye.
-        ev = ev[ ev.useeye == True ];
+        ev = ev[ ev.useeye == True ].reset_index(drop=True).copy();
         
         pass;
     else:
@@ -512,7 +512,8 @@ def preproc_EL_A_clean_samples(rawsamps,
                                rawmessages,
                                targ_sr_hzsec=-1,
                                preblinks=False,
-                               nogazecols=['gx','gy']):
+                               nogazecols=['gx','gy'],
+                               DEBUG=False):
 
     """
 
@@ -561,6 +562,7 @@ def preproc_EL_A_clean_samples(rawsamps,
     #REV: resamples to time hz desired.
     #REV: could cause issues with events if they are specifically
     #REV: locked to exact index of sample?
+    #REV: EYES NOT SEPARARTED YET -- same row! _left/_right
     df = preproc_EL_A01_resample_time( rawsamps,
                                        samplerate=targ_sr_hzsec,
                                        );
@@ -577,6 +579,7 @@ def preproc_EL_A_clean_samples(rawsamps,
     #REV: cleans events (i.e. renames saccade->SACC, fixa->FIXA, and sets 'stsec' and 'ensec'
     # Note, stsec and ensec will be accurate because no re-zeroing.
     # Uses "start" and "end" which are in MSEC time.
+    #REV: removes "bad" eyes data (unused eyes)
     ev = preproc_EL_A04_clean_events(rawevents,
                                      timeunitsec=pu.EL_TIMEUNIT_SEC,
                                      );
@@ -587,8 +590,9 @@ def preproc_EL_A_clean_samples(rawsamps,
                                                              ev,
                                                              sr_hzsec=targ_sr_hzsec,
                                                              timeunitsec=pu.EL_TIMEUNIT_SEC,
+                                                             DEBUG=DEBUG
                                                              );
-
+    
     #REV: could pa also do it? Could I have pa without gaze data?
     #nogazedata = preproc_EL_A06_check_nogazedata( df, colstouse=nogazecols );
     
@@ -600,6 +604,7 @@ def preproc_EL_A_clean_samples(rawsamps,
         df['bad'] = True; #should fill in all bad ...
         pass;
     else:
+        #REV: this just labels samples.
         df = pre.preproc_SHARED_pupilsize(df,
                                           timecol='Tsec',
                                           pacol='pa',
@@ -633,7 +638,8 @@ def preproc_EL_A_clean_samples(rawsamps,
     
 
 #REV: this only works because start/end are in 'msec' time, and so it is tname=Tmsec
-def preproc_EL_A05_filter_samps_by_ELevents(df, ev,
+def preproc_EL_A05_filter_samps_by_ELevents(df, #samples
+                                            ev, #events
                                             sr_hzsec,
                                             timeunitsec=1e-3,
                                             xname='px',
@@ -644,6 +650,7 @@ def preproc_EL_A05_filter_samps_by_ELevents(df, ev,
                                             tsecname0='Tsec0',
                                             nan_EL_contains_blinks=False,
                                             nan_EL_pure_blinks=False,
+                                            DEBUG=False,
                                             ):
     """
 
@@ -698,10 +705,11 @@ def preproc_EL_A05_filter_samps_by_ELevents(df, ev,
     
     if( len(ev.index) > 0 ):
         #REV: all events which "contain_blink" is true.
-        containsblinks = ev[(ev['contains_blink']==True)]; 
-
+        containsblinks = ev[(ev['contains_blink']==True)];
+        print(containsblinks.ELevlabel);
+        
         '''
-        #REV: these may be both blinks and saccades?
+        #REV: these may be both (pure) blinks and saccades?
         if( len(containsblinks.index) > 0 ):
             print(containsblinks);
             for i, r in containsblinks.iterrows():
@@ -715,6 +723,34 @@ def preproc_EL_A05_filter_samps_by_ELevents(df, ev,
         #REV: these are only PURE BLINKS
         pureblinks = ev[(ev['ELevlabel']=='blink')];
 
+        #REV: debug.
+        #REV: this contains BOTH saccs AND pureblinks and they often will OVERLAP (i.e. be double-marked!!!!)
+        if(DEBUG):
+            blinkor = ev[(ev['contains_blink']==True) | (ev['ELevlabel']=='blink')];
+            print("DEBUGGING", blinkor.columns);
+            blinkor['dur'] = blinkor.enEL - blinkor.stEL;
+            print(blinkor[ ['ELevlabel', 'dur'] ] );
+            
+            for i,row in blinkor.iterrows():
+                import matplotlib.pyplot as plt;
+                smps = df[ (df['Tmsec'] >= (row['stEL'] - 200)) &
+                           (df['Tmsec'] < (row['enEL'] + 200)) &
+                           (df.eye == row['eye']) ];
+                smps = smps.sort_values(by='Tmsec');
+                fig, axs=plt.subplots(2,1);
+                fig.suptitle('{} ({})'.format(row['ELevlabel'], row['eye']));
+                axs[0].plot(smps['Tmsec'] - df.Tmsec.min(), smps['pa'], color='grey');
+                axs[1].plot(smps['Tmsec'] - df.Tmsec.min(), smps['gx'], color='red');
+                axs[1].plot(smps['Tmsec'] - df.Tmsec.min(), smps['gy'], color='orange');
+                plt.show();
+                pass;
+            pass;
+        
+        print("Pure blinks: {}    Contains blinks: {} (overlap: {})".format(len(pureblinks.index),
+                                                                            len(containsblinks.index),
+                                                                            len(ev[(ev['contains_blink']==True) &
+                                                                                   (ev['ELevlabel']=='blink') ].index) ) );
+        
         '''
         print("ENUMERATING BLINKS:");
         if( len(pureblinks.index) > 0 ):
@@ -724,7 +760,7 @@ def preproc_EL_A05_filter_samps_by_ELevents(df, ev,
                 pass;
             pass;
         '''
-
+        
         if( len(pureblinks.index) != len(containsblinks.index) ):
             print("Pure vs Contains blinks: ", len(pureblinks.index), len(containsblinks.index) );
             pass;

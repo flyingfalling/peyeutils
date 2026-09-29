@@ -467,6 +467,7 @@ def main():
                         #ycc = np.corrcoef(y1, y2)[0][0];
                         xycc = (xcc+ycc)/2;
 
+                        
                         corrlist.append( dict(npts=mylen, vid=v, t1=tidx1, t2=tidx2, xcc=xcc, ycc=ycc, xycc=xycc,
                                             subj1=subj1, subj2=subj2, spec1=spec1, spec2=spec2, age1=age1, age2=age2,
                                             ntps1=ntps1, ntps2=ntps2, overlap=noverlap) );

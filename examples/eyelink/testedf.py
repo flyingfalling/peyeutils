@@ -302,7 +302,9 @@ def saccades_remodnav( edfrow, out_csv_path):
 def simpletest():
     fn=sys.argv[1];
     s, e, m = pyedfread.read_edf(fn);
-    df, ev, msg, dct = pu.eyelink.preproc_EL_A_clean_samples(s,e,m);
+
+    #REV: some "blinks" are *after* blinks? Missing data of 200~ msec, after blink, tracking is lost...why?
+    df, ev, msg, dct = pu.eyelink.preproc_EL_A_clean_samples(s,e,m,DEBUG=True);
     return 0;
 
 def test1(out_csv_path):
