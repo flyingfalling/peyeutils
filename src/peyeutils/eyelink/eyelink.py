@@ -604,7 +604,8 @@ def preproc_EL_A_clean_samples(rawsamps,
         df['bad'] = True; #should fill in all bad ...
         pass;
     else:
-        #REV: this just labels samples.
+        #REV: this just adds some columns (e.g. MAD SD of velocity of pupil change, etc.).
+        #REV: some eyetrackers do not USE pupilsize (or should not for blinks). In that case, doing this step is POINTLESS.
         df = pre.preproc_SHARED_pupilsize(df,
                                           timecol='Tsec',
                                           pacol='pa',
@@ -737,6 +738,7 @@ def preproc_EL_A05_filter_samps_by_ELevents(df, #samples
                            (df['Tmsec'] < (row['enEL'] + 200)) &
                            (df.eye == row['eye']) ];
                 smps = smps.sort_values(by='Tmsec');
+                
                 fig, axs=plt.subplots(2,1);
                 fig.suptitle('{} ({})'.format(row['ELevlabel'], row['eye']));
                 axs[0].plot(smps['Tmsec'] - df.Tmsec.min(), smps['pa'], color='grey');
