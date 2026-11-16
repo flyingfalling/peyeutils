@@ -57,17 +57,22 @@ def align_time(bigdf,sample_hz,relative= True):
     
     bigdf["time"] = np.round(bigdf["movie_ts"]*sample_hz);
     bigdf=bigdf.drop(columns='movie_ts');
-
+    
     bigdf=bigdf.groupby(['trialidx','time','xy','subj','vid','species'], as_index=False)['xyvalue'].mean();
 
     return bigdf;
 
 
 def _corr_one(w, key, min_periods=2):
-    c = w.dropna(axis=1, how='all').corr(min_periods=min_periods);
+    #REV you only keep timepoints shared by ALL trials (any trial ever has an NAN at timepoint=3, no pair ever uses it)
+    #REV: this may reduce the actual number of timepoints used for correlation to a very small number.
+    #REV: can you add here also the number of remaining non-nan rows ("percent-data")
+    nonan =  w.dropna(axis=1, how='all');
+    ntpts =  nonan.shape[0];
+    c = nonan.corr(min_periods=min_periods); 
     iu = np.triu_indices(c.shape[0], k=1);
     return pd.DataFrame({key+'1': c.index[iu[0]], key+'2': c.columns[iu[1]],
-                         'corr': c.to_numpy()[iu]});
+                         'corr': c.to_numpy()[iu], 'ntpts': ntpts});
 
 
 def pairwise_corr(bigdf, group, key, values, min_periods=2):

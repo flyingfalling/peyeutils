@@ -69,7 +69,7 @@ def main():
     fulldf['recinfo_SESSION_DATE'] = pd.to_datetime(fulldf['recinfo_SESSION_DATE'], format='%Y-%m-%d-%H-%M-%S');
     fulldf['age'] = fulldf['recinfo_SESSION_DATE'] - fulldf['dob'];
     fulldf['vidscale'] = 640 / fulldf['vidw_px']; #REV: e.g. if 2x the size, we should mult this number by every val to get pix_x and pix_y.
-
+    
     
     agecuts = [ (4, 7.5), #4-7 mo
                 (8, 10.5), #8-10 mo
