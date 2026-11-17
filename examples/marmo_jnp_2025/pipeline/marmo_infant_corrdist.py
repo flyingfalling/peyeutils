@@ -68,11 +68,11 @@ def _corr_one(w, key, min_periods=2):
     #REV: this may reduce the actual number of timepoints used for correlation to a very small number.
     #REV: can you add here also the number of remaining non-nan rows ("percent-data")
     nonan =  w.dropna(axis=1, how='all');
-    ntpts =  nonan.shape[0];
+    nonan_ratio =  nonan.shape[0]/w.shape[0];
     c = nonan.corr(min_periods=min_periods); 
     iu = np.triu_indices(c.shape[0], k=1);
     return pd.DataFrame({key+'1': c.index[iu[0]], key+'2': c.columns[iu[1]],
-                         'corr': c.to_numpy()[iu], 'ntpts': ntpts});
+                         'corr': c.to_numpy()[iu], 'nonan_ratio': nonan_ratio});
 
 
 def pairwise_corr(bigdf, group, key, values, min_periods=2):
